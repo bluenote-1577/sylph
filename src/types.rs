@@ -142,4 +142,6 @@ pub struct AniResult<'a>{
     pub median_cov: f64,
     pub containment_index: (usize,usize),
     pub lambda: Option<f64>,
+    pub ani_ci: (Option<f64>,Option<f64>),
+    pub lambda_ci: (Option<f64>,Option<f64>),
 }

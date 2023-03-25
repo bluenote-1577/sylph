@@ -4,3 +4,4 @@ pub mod types;
 pub mod seeding;
 pub mod cmdline;
 pub mod contain;
+pub mod inference;
