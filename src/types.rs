@@ -133,8 +133,9 @@ pub struct MultGenomeSketch{
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub struct AniResult<'a>{
-    pub ani: f64,
-    pub cov_cor_ani: Option<f64>,
+    pub naive_ani: f64,
+    pub final_est_ani: f64,
+    pub final_est_cov: f64,
     pub seq_name: &'a str,
     pub gn_name: &'a str,
     pub contig_name: &'a str,

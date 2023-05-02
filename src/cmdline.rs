@@ -17,18 +17,20 @@ pub enum Mode {
 
 #[derive(Args, Default)]
 pub struct SketchArgs {
-    #[clap(short, multiple=true)]
-    pub sequences: Option<Vec<String>>,
-    #[clap(short, multiple=true)]
-    pub genomes: Option<Vec<String>>,
-    #[clap(long="so", default_value = "")]
-    pub sequence_output_prefix: String,
-    #[clap(long="go", default_value = "")]
-    pub genome_output_prefix: String,
-    #[clap(long="gl")]
-    pub genome_list: Option<String>,
-    #[clap(long="sl")]
-    pub sequence_list: Option<String>,
+    #[clap(multiple=true)]
+    pub files: Vec<String>,
+    #[clap(short='o',long="output-genome-prefix", default_value = "prita_genomes")]
+    pub genome_prefix: String,
+    #[clap(short,long="reads-output-prefix", default_value = "")]
+    pub read_prefix: String,
+    #[clap(short,long="individual-records")]
+    pub individual: bool,
+    #[clap(long="read-force")]
+    pub read_force: bool,
+    #[clap(long="genome-force")]
+    pub genome_force: bool,
+    #[clap(short,long="list-sequence")]
+    pub list_sequence: Option<String>,
     #[clap(short, default_value_t = 31)]
     pub k: usize,
     #[clap(short, default_value_t = 1000)]
@@ -42,14 +44,8 @@ pub struct SketchArgs {
 
 #[derive(Args)]
 pub struct ContainArgs {
-    #[clap(short, multiple=true)]
-    pub sequence_sketches: Option<Vec<String>>,
-    #[clap(short, multiple=true)]
-    pub genome_sketches: Option<Vec<String>>,
-    #[clap(long="gf")]
-    pub genome_folder: Option<String>,
-    #[clap(long="sf")]
-    pub sequence_folder: Option<String>,
+    #[clap(multiple=true)]
+    pub files: Vec<String>,
     #[clap(short, default_value_t = 31)]
     pub k: usize,
     #[clap(short, default_value_t = 1000)]
@@ -58,14 +54,19 @@ pub struct ContainArgs {
     pub threads: usize,
     #[clap(long="trace")]
     pub trace: bool,
-    #[clap(long="ratio")]
+    #[clap(long="ratio", hidden=true)]
     pub ratio: bool,
-    #[clap(long="mme")]
+    #[clap(long="mme", hidden=true)]
     pub mme: bool,
-    #[clap(long="nb")]
+    #[clap(long="mle", hidden=true)]
+    pub mle: bool,
+    #[clap(long="nb", hidden=true)]
     pub nb: bool,
     #[clap(long="ci")]
     pub ci: bool,
-
+    #[clap(long="no-adjust")]
+    pub no_adj: bool,
+    #[clap(short,long="individual-records")]
+    pub individual: bool,
 
 }
