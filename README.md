@@ -1,4 +1,4 @@
-# sylph -  ANI identification for genomes against metagenomic reads 
+# sylph -  abundanced-corrected minhash for ANI querying against shotgun metagenomes
 
 ## Introduction
 
