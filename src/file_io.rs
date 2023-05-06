@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Mutex;
 
-pub fn sketch_sequences_needle(read_file: &str) -> SequencesSketch {
+pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize) -> SequencesSketch {
     let mut kmer_map = HashMap::default();
     let ref_file = &read_file;
     let reader = parse_fastx_file(&ref_file);

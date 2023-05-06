@@ -50,6 +50,8 @@ pub struct ContainArgs {
     pub k: usize,
     #[clap(short, default_value_t = 1000)]
     pub c: usize,
+    #[clap(short, long="minimum-ani", default_value_t = 0.78)]
+    pub minimum_ani: f64,
     #[clap(short, default_value_t = 3)]
     pub threads: usize,
     #[clap(long="trace")]

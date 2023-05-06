@@ -4,6 +4,13 @@ use std::hash::{BuildHasherDefault, Hasher};
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
+pub enum AdjustStatus {
+    Lambda(f64),
+    Low,
+    High,
+}
+
 pub type Kmer = u64;
 pub const BYTE_TO_SEQ: [u8; 256] = [
     0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -142,7 +149,7 @@ pub struct AniResult<'a>{
     pub mean_cov: f64,
     pub median_cov: f64,
     pub containment_index: (usize,usize),
-    pub lambda: Option<f64>,
+    pub lambda: AdjustStatus,
     pub ani_ci: (Option<f64>,Option<f64>),
     pub lambda_ci: (Option<f64>,Option<f64>),
 }

@@ -1,11 +1,9 @@
 use clap::Parser;
-use prita::cmdline::*;
-use prita::sketch;
-use prita::contain;
+use sylph::cmdline::*;
+use sylph::sketch;
+use sylph::contain;
 
 fn main() {
-        
-
     let cli = Cli::parse();
     match cli.mode {
         Mode::Sketch(sketch_args) => sketch::sketch(sketch_args),

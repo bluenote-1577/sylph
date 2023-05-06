@@ -143,7 +143,13 @@ pub fn sketch(args: SketchArgs) {
         let pref = Path::new(&args.read_prefix);
 
         let read_file = &read_inputs[i];
-        let read_sketch_opt = sketch_query(args.c, args.k, args.threads, read_file);
+        let read_sketch_opt;
+        if args.read_force{
+            read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k)
+        }
+        else{
+            read_sketch_opt = sketch_query(args.c, args.k, args.threads, read_file);
+        }
         if read_sketch_opt.is_some() {
             let read_sketch = read_sketch_opt.unwrap();
             let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
@@ -400,4 +406,38 @@ pub fn sketch_query(
     } else {
         return None;
     }
+}
+
+pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize) -> Option<SequencesSketch> {
+    let mut kmer_map = HashMap::default();
+    let ref_file = &read_file;
+    let reader = parse_fastx_file(&ref_file);
+    let mut vec = vec![];
+    if !reader.is_ok() {
+        warn!("{} is not a valid fasta/fastq file; skipping.", ref_file);
+    } else {
+        let mut reader = reader.unwrap();
+        while let Some(record) = reader.next() {
+            if record.is_ok() {
+                let record = record.expect(&format!("Invalid record for file {}", ref_file));
+                let seq = record.seq();
+                unsafe {
+                    extract_markers_avx2(&seq, &mut vec, c, k);
+                }
+            } else {
+                warn!("File {} is not a valid fasta/fastq file", ref_file);
+            }
+        }
+        for km in vec {
+            let c = kmer_map.entry(km).or_insert(0);
+            *c += 1;
+        }
+    }
+
+    return Some(SequencesSketch {
+        kmer_counts: kmer_map,
+        file_name: read_file.to_string(),
+        c, 
+        k
+    });
 }

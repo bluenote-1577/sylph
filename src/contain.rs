@@ -16,10 +16,13 @@ use std::sync::Mutex;
 fn print_ani_result(ani_result: &AniResult) {
     let print_final_ani = format!("{:.2}", f64::min(ani_result.final_est_ani * 100., 100.));
     let lambda_print;
-    if let Some(lambda) = ani_result.lambda {
+    if let AdjustStatus::Lambda(lambda) = ani_result.lambda {
         lambda_print = format!("{:.3}", lambda);
-    } else {
-        lambda_print = format!("NA");
+    } else if ani_result.lambda == AdjustStatus::High{
+        lambda_print = format!("HIGH");
+    }
+    else{
+        lambda_print = format!("LOW");
     }
     let low_ani = ani_result.ani_ci.0;
     let high_ani = ani_result.ani_ci.1;
@@ -97,6 +100,9 @@ pub fn contain(args: ContainArgs) {
 
     let mut result_vec = stats_vec.into_inner().unwrap();
     result_vec.sort_by(|x, y| y.final_est_ani.partial_cmp(&x.final_est_ani).unwrap());
+    println!(
+        "Read_file\tGenome_file\tAdjusted_ANI\tNaive_ANI\tANI_5-95_percentile\tEff_cov\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov\tContainment_ind\tContig_name",
+        );
     for res in result_vec {
         print_ani_result(&res);
     }
@@ -130,8 +136,9 @@ fn get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genome
 
     let genome_sketches = Mutex::new(vec![]);
     let read_sketches = Mutex::new(vec![]);
-    let mut current_c = args.c;
-    let mut current_k = args.k;
+    //read c can be lower than lowest genome c. 
+    let mut lowest_genome_c = None;
+    let mut current_k = None;
 
     for genome_sketch_file in genome_sketch_files{
         let file = 
@@ -141,29 +148,49 @@ fn get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genome
             "Genome sketch {} is not a valid sketch.",
             &genome_sketch_file
         ));
-        current_c = genome_sketches_vec.first().unwrap().c;
-        current_k = genome_sketches_vec.first().unwrap().k;
+        if genome_sketches_vec.is_empty(){
+            continue
+        }
+        let c = genome_sketches_vec.first().unwrap().c;
+        let k = genome_sketches_vec.first().unwrap().k;
+        if lowest_genome_c.is_none(){
+            lowest_genome_c = Some(c);
+        }
+        else if lowest_genome_c.unwrap() < c{
+            lowest_genome_c = Some(c);
+        }
+        if current_k.is_none(){
+            current_k = Some(genome_sketches_vec.first().unwrap().k);
+        }
+        else if current_k.unwrap() != k{
+            error!("Genome sketches have inconsistent -k. Exiting.");
+            std::process::exit(1);
+        }
         genome_sketches.lock().unwrap().extend(genome_sketches_vec);
     }
 
     read_sketch_files.into_par_iter().for_each(|read_sketch_file|{
         let file = 
-                File::open(read_sketch_file.clone()).expect("Genome sketch {} not a valid file");
+                File::open(read_sketch_file.clone()).expect(&format!("Read sketch {} not a valid file", &read_sketch_file));
         let read_reader = BufReader::with_capacity(10_000_000, file);
         let read_sketch_enc: SequencesSketchEncode = bincode::deserialize_from(read_reader).expect(&format!(
             "Read sketch {} is not a valid sketch.",
             read_sketch_file
         ));
         let read_sketch = SequencesSketch::from_enc(read_sketch_enc);
+        if lowest_genome_c.is_some() && read_sketch.c > lowest_genome_c.unwrap(){
+            error!("Value of -c for {} is {} -- greater than the smallest value of -c for a genome sketch {}. Exiting.", read_sketch.c, read_sketch_file, lowest_genome_c.unwrap());
+            std::process::exit(1);
+        }
         read_sketches.lock().unwrap().push(read_sketch);
     });
 
     genome_files.into_par_iter().for_each(|genome_file|{
-        if current_c != args.c{
-            error!("-c {} is not equal to sketch -c {}. Not sketching {}.", args.c, current_c, genome_file);
+        if lowest_genome_c.is_some() && lowest_genome_c.unwrap() < args.c{
+            error!("Value of -c for contain is {} -- greater than the smallest value of -c for a genome sketch {}. Continuing without sketching.", args.c, lowest_genome_c.unwrap());
         }
-        else if current_k != args.k{
-            error!("-k {} is not equal to sketch -k {}. Not sketching {}.", args.c, current_c, genome_file);
+        else if current_k.is_some() && current_k.unwrap() != args.k{
+            error!("-k {} is not equal to -k {} found in sketches. Continuing without sketching.", args.k, current_k.unwrap());
         }
         else {
             if args.individual{
@@ -181,11 +208,11 @@ fn get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genome
     });
 
     read_files.into_par_iter().for_each(|read_file|{
-        if current_c != args.c{
-            error!("-c {} is not equal to sketch -c {}. Not sketching {}.", args.c, current_c, read_file);
+        if lowest_genome_c.is_some() && lowest_genome_c.unwrap() < args.c{
+            error!("Value of -c for contain is {} -- greater than the smallest value of -c for a genome sketch {}. Continuing without sketching.", args.c, lowest_genome_c.unwrap());
         }
-        else if current_k != args.k{
-            error!("-k {} is not equal to sketch -k {}. Not sketching {}.", args.c, current_c, read_file);
+        else if current_k.is_some() && current_k.unwrap() != args.k{
+            error!("-k {} is not equal to -k {} found in sketches. Continuing without sketching.", args.k, current_k.unwrap());
         }
         else {
             let read_sketch_opt = sketch_query(args.c, args.k, args.threads, &read_file);
@@ -199,156 +226,6 @@ fn get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genome
 
 }
 
-//fn get_sketches(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<GenomeSketch>) {
-//    let genome_sketches: Mutex<Vec<GenomeSketch>> = Mutex::new(vec![]);
-//    let sequence_sketches: Mutex<Vec<SequencesSketch>> = Mutex::new(vec![]);
-//    let sequence_sketches_clone;
-//    if args.sequence_sketches.is_some() {
-//        sequence_sketches_clone = args.sequence_sketches.as_ref().unwrap().clone();
-//    } else if args.sequence_folder.is_some() {
-//        let paths = fs::read_dir(args.sequence_folder.as_ref().unwrap()).unwrap();
-//        sequence_sketches_clone = paths
-//            .into_iter()
-//            .map(|x| x.unwrap().path().display().to_string())
-//            .collect();
-//    } else {
-//        panic!("Input sequence sketch argument not valid");
-//    }
-//
-//    let sketch_c = Mutex::new(None);
-//    let sketch_k = Mutex::new(None);
-//    let sketch_name_track = Mutex::new(None);
-//
-//    let sequence_index_vec = (0..sequence_sketches_clone.len()).collect::<Vec<usize>>();
-//    sequence_index_vec.into_par_iter().for_each(|i| {
-//        let sequence_file_name = &sequence_sketches_clone[i];
-//        let sequence_sketch;
-//        if sequence_file_name.contains(".prs") {
-//            let sequence_file =
-//                File::open(sequence_file_name).expect("Sequence sketch not a valid file");
-//            let seq_reader = BufReader::with_capacity(10_000_000, sequence_file);
-//            let sequence_sketch_enc: SequencesSketchEncode =
-//                bincode::deserialize_from(seq_reader).unwrap();
-//            {
-//                let mut s_c = sketch_c.lock().unwrap();
-//                let mut s_k = sketch_k.lock().unwrap();
-//                let mut s_n = sketch_name_track.lock().unwrap();
-//                if s_c.is_none() {
-//                    *s_c = Some(sequence_sketch_enc.c);
-//                    *s_n = Some(sequence_sketch_enc.file_name.clone());
-//                } else {
-//                    if s_c.unwrap() != sequence_sketch_enc.c {
-//                        log::error!(
-//                            "Value of 'c' for {} is not equal to value of 'c' for {}. Exiting.",
-//                            sequence_file_name,
-//                            s_n.as_ref().unwrap()
-//                        );
-//                    }
-//                }
-//                if s_k.is_none() {
-//                    *s_k = Some(sequence_sketch_enc.k);
-//                } else {
-//                    if s_k.unwrap() != sequence_sketch_enc.k {
-//                        log::error!(
-//                            "Value of 'k' for {} is not equal to value of 'k' for {}. Exiting.",
-//                            sequence_file_name,
-//                            s_n.as_ref().unwrap()
-//                        );
-//                    }
-//                }
-//            }
-//            sequence_sketch = Some(SequencesSketch::from_enc(sequence_sketch_enc));
-//        } else {
-//            {
-//                let s_c = sketch_c.lock().unwrap();
-//                let s_k = sketch_k.lock().unwrap();
-//                let s_n = sketch_name_track.lock().unwrap();
-//                if s_c.is_some() {
-//                    if s_c.unwrap() != args.c {
-//                        log::error!(
-//                            "Value of 'c' for {} is not equal to value of 'c' for {}. Exiting.",
-//                            sequence_file_name,
-//                            s_n.as_ref().unwrap()
-//                        );
-//                    }
-//                    if s_k.unwrap() != args.k {
-//                        log::error!(
-//                            "Value of 'k' for {} is not equal to value of 'k' for {}. Exiting.",
-//                            sequence_file_name,
-//                            s_n.as_ref().unwrap()
-//                        );
-//                    }
-//                }
-//            }
-//            sequence_sketch = sketch_query(args.c, args.k, args.threads, sequence_file_name);
-//        }
-//        if sequence_sketch.is_some(){
-//            let mut locked = sequence_sketches.lock().unwrap();
-//            locked.push(sequence_sketch.unwrap());
-//        }
-//    });
-//
-//    log::info!("Sequence sketch loading complete.");
-//
-//    let sequence_sketches = sequence_sketches.into_inner().unwrap();
-//    if sequence_sketches.is_empty() {
-//        log::error!("No sequence sketches. Exiting");
-//        std::process::exit(1);
-//    }
-//
-//    let c = sequence_sketches[0].c;
-//    let k = sequence_sketches[0].k;
-//
-//    let genome_sketches_clone;
-//    if args.genome_sketches.is_some() {
-//        genome_sketches_clone = args.genome_sketches.as_ref().unwrap().clone();
-//    } else if args.genome_folder.is_some() {
-//        let paths = fs::read_dir(args.genome_folder.as_ref().unwrap()).unwrap();
-//        genome_sketches_clone = paths
-//            .into_iter()
-//            .map(|x| x.unwrap().path().display().to_string())
-//            .collect();
-//    } else {
-//        panic!("Input sequence sketch argument not valid");
-//    }
-//
-//    let genome_index_vec = (0..genome_sketches_clone.len()).collect::<Vec<usize>>();
-//    genome_index_vec.into_par_iter().for_each(|i| {
-//        let genome_name = &genome_sketches_clone[i];
-//        let genome_sketch;
-//        if genome_name.contains(".prg") {
-//            let genome_file =
-//                File::open(&genome_sketches_clone[i]).expect("Genome sketch {} not a valid file");
-//            let genome_reader = BufReader::with_capacity(10_000_000, genome_file);
-//            let genome_sketch_m: GenomeSketch =
-//                bincode::deserialize_from(genome_reader).expect(&format!(
-//                    "Genome sketch {} is not a valid sketch.",
-//                    &genome_sketches_clone[i]
-//                ));
-//            genome_sketch = Some(genome_sketch_m);
-//        } else {
-//            let mut sketch_args = SketchArgs::default();
-//            sketch_args.c = c;
-//            sketch_args.k = k;
-//            let genome_sketch_opt = sketch_genome(c, k, &genome_sketches_clone[i]);
-//            if genome_sketch_opt.is_some() {
-//                genome_sketch = genome_sketch_opt;
-//            } else {
-//                genome_sketch = None;
-//            }
-//        }
-//        if genome_sketch.is_some() {
-//            let unwr = genome_sketch.unwrap();
-//            let mut locked = genome_sketches.lock().unwrap();
-//            locked.push(unwr);
-//        }
-//    });
-//    let genome_sketches = genome_sketches.into_inner().unwrap();
-//    log::info!("Genome sketch loading complete.");
-//
-//    return (sequence_sketches, genome_sketches);
-//}
-
 fn get_stats<'a>(
     args: &ContainArgs,
     genome_sketch: &'a GenomeSketch,
@@ -356,15 +233,15 @@ fn get_stats<'a>(
 ) -> Option<AniResult<'a>> {
     if genome_sketch.k != sequence_sketch.k {
         log::error!(
-            "k parameter for query {} != k parameter for reference {}",
+            "k parameter for reads {} != k parameter for genome {}",
             sequence_sketch.k,
             genome_sketch.k
         );
         std::process::exit(1);
     }
-    if genome_sketch.c != sequence_sketch.c {
+    if genome_sketch.c < sequence_sketch.c {
         log::error!(
-            "c parameter for query {} != c parameter for reference {}",
+            "c parameter for reads {} > c parameter for genome {}",
             sequence_sketch.c,
             genome_sketch.c
         );
@@ -409,23 +286,37 @@ fn get_stats<'a>(
     let mean_cov = full_covs.iter().sum::<u32>() as f64 / full_covs.len() as f64;
     let geq1_mean_cov = covs.iter().sum::<u32>() as f64 / covs.len() as f64;
 
-    let use_lambda = if median_cov > MEDIAN_ANI_THRESHOLD {
-        None
-    } else if args.ratio {
-        ratio_lambda(&full_covs)
-    } else if args.mme {
-        mme_lambda(&full_covs)
-    } else if args.nb {
-        binary_search_lambda(&full_covs)
-    } else if args.mle{
-        mle_zip(&full_covs, sequence_sketch.k as f64)
-    } else{
-        ratio_lambda(&full_covs)
-    };
+    let use_lambda;
+    if median_cov > MEDIAN_ANI_THRESHOLD {
+        use_lambda = AdjustStatus::High
+    } else {
+        let test_lambda;
+        if args.ratio {
+            test_lambda = ratio_lambda(&full_covs)
+        } else if args.mme {
+            test_lambda = mme_lambda(&full_covs)
+        } else if args.nb {
+            test_lambda = binary_search_lambda(&full_covs)
+        } else if args.mle{
+            test_lambda = mle_zip(&full_covs, sequence_sketch.k as f64)
+        } else{
+            test_lambda = ratio_lambda(&full_covs)
+        };
+        if test_lambda.is_none(){
+            use_lambda = AdjustStatus::Low
+        }
+        else{
+            use_lambda = AdjustStatus::Lambda(test_lambda.unwrap());
+        }
+    }
 
     let final_est_cov;
 
-    if use_lambda.is_none(){
+
+    if let AdjustStatus::Lambda(lam) = use_lambda{
+        final_est_cov = lam
+    }
+    else{
         if median_cov < MEDIAN_ANI_THRESHOLD{
             final_est_cov = geq1_mean_cov;
         }
@@ -433,17 +324,17 @@ fn get_stats<'a>(
             final_est_cov = geq1_mean_cov;
         }
     }
-    else{
-        final_est_cov = use_lambda.unwrap();
-    }
 
-    let mut opt_est_ani =
-        ani_from_lambda(use_lambda, mean_cov, sequence_sketch.k as f64, &full_covs);
-    if naive_ani < ANI_CUTOFF {
+    let opt_lambda;
+    if use_lambda == AdjustStatus::Low || use_lambda == AdjustStatus::High {opt_lambda = None} else { opt_lambda = Some(final_est_cov) };
+
+    let opt_est_ani =
+        ani_from_lambda(opt_lambda, mean_cov, sequence_sketch.k as f64, &full_covs);
+    if naive_ani < args.minimum_ani {
         return None;
     }
     let (mut low_ani, mut high_ani, mut low_lambda, mut high_lambda) = (None, None, None, None);
-    if args.ci && use_lambda.is_some() {
+    if args.ci && opt_lambda.is_some() {
         let bootstrap = bootstrap_interval(&full_covs, sequence_sketch.k as f64, &args);
         low_ani = bootstrap.0;
         high_ani = bootstrap.1;
@@ -452,7 +343,7 @@ fn get_stats<'a>(
     }
 
     let final_est_ani;
-    if use_lambda.is_none() || opt_est_ani.is_none() || args.no_adj{
+    if opt_lambda.is_none() || opt_est_ani.is_none() || args.no_adj{
         final_est_ani = naive_ani;
     }
     else{
