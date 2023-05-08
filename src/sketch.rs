@@ -286,7 +286,7 @@ pub fn sketch_genome(c: usize, k: usize, ref_file: &str) -> Option<GenomeSketch>
                 }
                 let seq = record.seq();
                 unsafe {
-                    extract_markers_avx2(&seq, &mut vec, c, k);
+                    extract_markers_avx2_positions(&seq, &mut vec, c, k);
                 }
             } else {
                 warn!("File {} is not a valid fasta/fastq file", ref_file);
@@ -296,16 +296,20 @@ pub fn sketch_genome(c: usize, k: usize, ref_file: &str) -> Option<GenomeSketch>
         let mut kmer_set = MMHashSet::default();
         let mut duplicate_set = MMHashSet::default();
         let mut new_vec = Vec::with_capacity(vec.len());
-        for km in vec.iter() {
+        vec.sort();
+        for (_,km) in vec.iter() {
             if !kmer_set.contains(&km) {
                 kmer_set.insert(km);
             } else {
                 duplicate_set.insert(km);
             }
         }
-        for km in vec.iter() {
-            if !duplicate_set.contains(&km) {
+        let mut last_pos = 0;
+        for (pos,km) in vec.iter() {
+            if !duplicate_set.contains(&km) && (pos - last_pos > 75 || last_pos == 0){
+            //if !duplicate_set.contains(&km){
                 new_vec.push(*km);
+                last_pos = *pos;
             }
         }
         return_genome_sketch.genome_kmers = new_vec;
