@@ -95,6 +95,12 @@ pub fn sketch(args: SketchArgs) {
         level = log::LevelFilter::Info;
     }
 
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(args.threads)
+        .build_global()
+        .unwrap();
+
+
     simple_logger::SimpleLogger::new()
         .with_level(level)
         .init()
