@@ -194,12 +194,12 @@ fn get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genome
         }
         else {
             if args.individual{
-            let indiv_gn_sketches = sketch_genome_individual(args.c, args.k, genome_file);
+            let indiv_gn_sketches = sketch_genome_individual(args.c, args.k, genome_file, args.min_spacing_kmer);
                 genome_sketches.lock().unwrap().extend(indiv_gn_sketches);
 
             }
             else{
-                let genome_sketch_opt = sketch_genome(args.c, args.k, &genome_file);
+                let genome_sketch_opt = sketch_genome(args.c, args.k, &genome_file, args.min_spacing_kmer);
                 if genome_sketch_opt.is_some() {
                     genome_sketches.lock().unwrap().push(genome_sketch_opt.unwrap());
                 }

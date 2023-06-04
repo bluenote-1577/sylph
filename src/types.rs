@@ -81,7 +81,8 @@ pub struct SequencesSketch{
     pub kmer_counts: MMHashMap<Kmer, u32>,
     pub c: usize,
     pub k: usize,
-    pub file_name: String
+    pub file_name: String,
+    pub paired: bool
 }
 
 //Encoding kmer_counts as vec speeds up serialize/deserialize by
@@ -91,7 +92,8 @@ pub struct SequencesSketchEncode{
     pub kmer_counts: Vec<(Kmer, u32)>,
     pub c: usize,
     pub k: usize,
-    pub file_name: String
+    pub file_name: String,
+    pub paired: bool
 }
 
 impl SequencesSketchEncode{
@@ -100,13 +102,13 @@ impl SequencesSketchEncode{
         for (key,val) in sketch.kmer_counts.into_iter(){
             vec_map.push((key,val));
         }
-        return SequencesSketchEncode{kmer_counts: vec_map, file_name: sketch.file_name, c: sketch.c, k: sketch.k};
+        return SequencesSketchEncode{kmer_counts: vec_map, file_name: sketch.file_name, c: sketch.c, k: sketch.k, paired: sketch.paired};
     }
 }
 
 impl SequencesSketch{
-    pub fn new(file_name: String, c: usize, k: usize) -> SequencesSketch{
-        return SequencesSketch{kmer_counts : HashMap::default(), file_name, c, k}
+    pub fn new(file_name: String, c: usize, k: usize, paired: bool) -> SequencesSketch{
+        return SequencesSketch{kmer_counts : HashMap::default(), file_name, c, k, paired}
     }
     pub fn from_enc(sketch: SequencesSketchEncode) -> SequencesSketch{
         let mut new_map = MMHashMap::default();
@@ -114,7 +116,7 @@ impl SequencesSketch{
         for item in sketch.kmer_counts.into_iter(){
             new_map.insert(item.0, item.1);
         }
-        return SequencesSketch{kmer_counts: new_map, file_name: sketch.file_name, c: sketch.c, k: sketch.k};
+        return SequencesSketch{kmer_counts: new_map, file_name: sketch.file_name, c: sketch.c, k: sketch.k, paired: sketch.paired};
     }
 }
 

@@ -38,8 +38,13 @@ pub struct SketchArgs {
     #[clap(short, default_value_t = 3)]
     pub threads: usize,
     #[clap(long="trace")]
-    pub trace: bool
-
+    pub trace: bool,
+    #[clap(long="min-spacing", default_value_t = 150)]
+    pub min_spacing_kmer: usize,
+    #[clap(short='1',long="first-pair", multiple=true)]
+    pub first_pair: Vec<String>,
+    #[clap(short='2',long="second-pair", multiple=true)]
+    pub second_pair: Vec<String>,
 }
 
 #[derive(Args)]
@@ -70,5 +75,8 @@ pub struct ContainArgs {
     pub no_adj: bool,
     #[clap(short,long="individual-records")]
     pub individual: bool,
+    #[clap(long="min-spacing", default_value_t = 100)]
+    pub min_spacing_kmer: usize
+
 
 }

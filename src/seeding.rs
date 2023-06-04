@@ -283,7 +283,7 @@ pub unsafe fn extract_markers_avx2(string: &[u8], kmer_vec: &mut Vec<u64>, c: us
 }
 
 #[target_feature(enable = "avx2")]
-pub unsafe fn extract_markers_avx2_positions(string: &[u8], kmer_vec: &mut Vec<(usize,u64)>, c: usize, k: usize) {
+pub unsafe fn extract_markers_avx2_positions(string: &[u8], kmer_vec: &mut Vec<(usize, usize,u64)>, c: usize, k: usize, contig_number: usize) {
     if string.len() < k {
         return;
     }
@@ -386,16 +386,16 @@ pub unsafe fn extract_markers_avx2_positions(string: &[u8], kmer_vec: &mut Vec<(
         //        let m4 = _mm256_extract_epi64(threshold_256, 3);
 
         if v1 < threshold_marker {
-            kmer_vec.push((i, v1 as u64));
+            kmer_vec.push((contig_number, i, v1 as u64));
         }
         if v2 < threshold_marker {
-            kmer_vec.push((len + i, v2 as u64));
+            kmer_vec.push((contig_number, len + i, v2 as u64));
         }
         if v3 < threshold_marker {
-            kmer_vec.push((2*len + i, v3 as u64));
+            kmer_vec.push((contig_number, 2*len + i, v3 as u64));
         }
         if v4 < threshold_marker {
-            kmer_vec.push((3*len + i, v4 as u64));
+            kmer_vec.push((contig_number, 3*len + i, v4 as u64));
         }
     }
 }

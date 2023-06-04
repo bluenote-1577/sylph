@@ -1,7 +1,7 @@
 use crate::seeding::*;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-
+use spmc::*;
 use crate::types::*;
 use log::*;
 use needletail::parse_fastx_file;
@@ -44,6 +44,29 @@ pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize) -> Sequences
         file_name: read_file.to_string(),
     };
 }
+
+pub fn sketch_pair_sequences(read_file1: &str, read_file2: &str){
+    let (mut tx, rx) = spmc::channel();
+
+    sdf
+    let mut handles = Vec::new();
+    for n in 0..5 {
+        let rx = rx.clone();
+        handles.push(thread::spawn(move || {
+            let msg = rx.recv().unwrap();
+            println!("worker {} recvd: {}", n, msg);
+        }));
+    }
+
+    for i in 0..5 {
+        tx.send(i * 2).unwrap();
+    }
+
+    for handle in handles {
+      handle.join().unwrap();
+    }
+}
+
 
 pub fn sketch_sequences(read_file: &str) -> SequencesSketch {
     let mut read_sketch = SequencesSketch::new(read_file.to_string());
