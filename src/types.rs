@@ -1,8 +1,12 @@
 use std::collections::HashMap;
+use nohash::IntMap;
+
 // bytecheck can be used to validate your data if you want
 use std::hash::{BuildHasherDefault, Hasher};
 use std::collections::HashSet;
+use smallvec::SmallVec;
 use serde::{Deserialize, Serialize};
+use fxhash::FxHashMap;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub enum AdjustStatus {
@@ -78,7 +82,7 @@ pub type MMHashSet<K> = HashSet<K, MMBuildHasher>;
 
 #[derive(Default, Deserialize, Serialize, Debug, PartialEq)]
 pub struct SequencesSketch{
-    pub kmer_counts: MMHashMap<Kmer, u32>,
+    pub kmer_counts: FxHashMap<Kmer, u32>,
     pub c: usize,
     pub k: usize,
     pub file_name: String,
@@ -111,7 +115,7 @@ impl SequencesSketch{
         return SequencesSketch{kmer_counts : HashMap::default(), file_name, c, k, paired}
     }
     pub fn from_enc(sketch: SequencesSketchEncode) -> SequencesSketch{
-        let mut new_map = MMHashMap::default();
+        let mut new_map = FxHashMap::default();
         new_map.reserve(sketch.kmer_counts.len());
         for item in sketch.kmer_counts.into_iter(){
             new_map.insert(item.0, item.1);
@@ -133,7 +137,7 @@ pub struct GenomeSketch{
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 #[derive(Default, Clone)]
 pub struct MultGenomeSketch{
-    pub genome_kmer_counts: Vec<Vec<Kmer>>,
+    pub genome_kmer_index: Vec<(Kmer,SmallVec<[u32;1]>)>,
     pub file_names: Vec<String>,
     pub contig_names: Vec<String>,
     pub c: usize,

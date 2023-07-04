@@ -33,7 +33,7 @@ pub struct SketchArgs {
     pub list_sequence: Option<String>,
     #[clap(short, default_value_t = 31)]
     pub k: usize,
-    #[clap(short, default_value_t = 1000)]
+    #[clap(short, default_value_t = 100)]
     pub c: usize,
     #[clap(short, default_value_t = 3)]
     pub threads: usize,
@@ -53,7 +53,7 @@ pub struct ContainArgs {
     pub files: Vec<String>,
     #[clap(short, default_value_t = 31)]
     pub k: usize,
-    #[clap(short, default_value_t = 1000)]
+    #[clap(short, default_value_t = 100)]
     pub c: usize,
     #[clap(short, long="minimum-ani", default_value_t = 0.78)]
     pub minimum_ani: f64,
@@ -69,8 +69,8 @@ pub struct ContainArgs {
     pub mle: bool,
     #[clap(long="nb", hidden=true)]
     pub nb: bool,
-    #[clap(long="ci")]
-    pub ci: bool,
+    #[clap(long="no-ci")]
+    pub no_ci: bool,
     #[clap(long="no-adjust")]
     pub no_adj: bool,
     #[clap(short,long="individual-records")]

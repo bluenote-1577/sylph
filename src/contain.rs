@@ -1,4 +1,5 @@
 use crate::cmdline::*;
+use std::time::Instant;
 use log::*;
 use crate::constants::*;
 use crate::inference::*;
@@ -82,14 +83,16 @@ pub fn contain(args: ContainArgs) {
         .build_global()
         .unwrap();
 
+    log::info!("Obtaining sketches...");
     let (sequence_sketches, genome_sketches) = get_sketches_rewrite(&args);
     let genome_index_vec = (0..genome_sketches.len()).collect::<Vec<usize>>();
     let stats_vec: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
+    log::info!("Finished obtaining sketches.");
 
     genome_index_vec.into_par_iter().for_each(|i| {
         let genome_sketch = &genome_sketches[i];
         let sequence_index_vec = (0..sequence_sketches.len()).collect::<Vec<usize>>();
-        sequence_index_vec.into_par_iter().for_each(|j| {
+        sequence_index_vec.into_iter().for_each(|j| {
             let sequence_sketch = &sequence_sketches[j];
             let res = get_stats(&args, &genome_sketch, &sequence_sketch);
             if res.is_some() {
@@ -140,6 +143,23 @@ fn get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genome
     let mut lowest_genome_c = None;
     let mut current_k = None;
 
+    read_sketch_files.into_par_iter().for_each(|read_sketch_file|{
+        let file = 
+                File::open(read_sketch_file.clone()).expect(&format!("Read sketch {} not a valid file", &read_sketch_file));
+        let read_reader = BufReader::with_capacity(10_000_000, file);
+        let read_sketch_enc: SequencesSketchEncode = bincode::deserialize_from(read_reader).expect(&format!(
+            "Read sketch {} is not a valid sketch.",
+            read_sketch_file
+        ));
+        let read_sketch = SequencesSketch::from_enc(read_sketch_enc);
+        if lowest_genome_c.is_some() && read_sketch.c > lowest_genome_c.unwrap(){
+            error!("Value of -c for {} is {} -- greater than the smallest value of -c for a genome sketch {}. Exiting.", read_sketch.c, read_sketch_file, lowest_genome_c.unwrap());
+            std::process::exit(1);
+        }
+        read_sketches.lock().unwrap().push(read_sketch);
+    });
+
+
     for genome_sketch_file in genome_sketch_files{
         let file = 
                 File::open(genome_sketch_file.clone()).expect("Genome sketch {} not a valid file");
@@ -169,22 +189,7 @@ fn get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genome
         genome_sketches.lock().unwrap().extend(genome_sketches_vec);
     }
 
-    read_sketch_files.into_par_iter().for_each(|read_sketch_file|{
-        let file = 
-                File::open(read_sketch_file.clone()).expect(&format!("Read sketch {} not a valid file", &read_sketch_file));
-        let read_reader = BufReader::with_capacity(10_000_000, file);
-        let read_sketch_enc: SequencesSketchEncode = bincode::deserialize_from(read_reader).expect(&format!(
-            "Read sketch {} is not a valid sketch.",
-            read_sketch_file
-        ));
-        let read_sketch = SequencesSketch::from_enc(read_sketch_enc);
-        if lowest_genome_c.is_some() && read_sketch.c > lowest_genome_c.unwrap(){
-            error!("Value of -c for {} is {} -- greater than the smallest value of -c for a genome sketch {}. Exiting.", read_sketch.c, read_sketch_file, lowest_genome_c.unwrap());
-            std::process::exit(1);
-        }
-        read_sketches.lock().unwrap().push(read_sketch);
-    });
-
+    
     genome_files.into_par_iter().for_each(|genome_file|{
         if lowest_genome_c.is_some() && lowest_genome_c.unwrap() < args.c{
             error!("Value of -c for contain is {} -- greater than the smallest value of -c for a genome sketch {}. Continuing without sketching.", args.c, lowest_genome_c.unwrap());
@@ -250,12 +255,16 @@ fn get_stats<'a>(
     let mut contain_count = 0;
     let mut covs = vec![];
     let gn_kmers = &genome_sketch.genome_kmers;
+
+    let start_t_initial = Instant::now();
     for kmer in gn_kmers.iter() {
         if sequence_sketch.kmer_counts.contains_key(kmer) {
             contain_count += 1;
             covs.push(sequence_sketch.kmer_counts[kmer]);
         }
     }
+    log::trace!("Hashing time {:?}", Instant::now() - start_t_initial);
+    let start_t_initial = Instant::now();
     if covs.is_empty() {
         return None;
     }
@@ -334,7 +343,7 @@ fn get_stats<'a>(
         return None;
     }
     let (mut low_ani, mut high_ani, mut low_lambda, mut high_lambda) = (None, None, None, None);
-    if args.ci && opt_lambda.is_some() {
+    if !args.no_ci && opt_lambda.is_some() {
         let bootstrap = bootstrap_interval(&full_covs, sequence_sketch.k as f64, &args);
         low_ani = bootstrap.0;
         high_ani = bootstrap.1;
@@ -364,6 +373,7 @@ fn get_stats<'a>(
         ani_ci: (low_ani, high_ani),
         lambda_ci: (low_lambda, high_lambda),
     };
+    log::trace!("Other time {:?}", Instant::now() - start_t_initial);
 
     return Some(ani_result);
 }

@@ -172,7 +172,7 @@ pub fn sketch(args: SketchArgs) {
                 let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
                 let file_path = pref.join(&read_file_path);
 
-                let file_path_str = format!("{}_paired.prs", file_path.to_str().unwrap());
+                let file_path_str = format!("{}.paired.prs", file_path.to_str().unwrap());
 
                 let mut read_sk_file = BufWriter::new(
                     File::create(&file_path_str)
@@ -225,9 +225,6 @@ pub fn sketch(args: SketchArgs) {
         let counter: Mutex<usize> = Mutex::new(0);
         let pref = Path::new(&args.genome_prefix);
         let file_path_str = format!("{}.pgs", pref.to_str().unwrap());
-        let mut genome_sk_file = BufWriter::new(
-            File::create(&file_path_str).expect(&format!("{} not valid", file_path_str)),
-        );
         let all_genome_sketches = Mutex::new(vec![]);
 
         iter_vec.into_par_iter().for_each(|i| {
@@ -255,6 +252,11 @@ pub fn sketch(args: SketchArgs) {
                 info!("{} genomes processed.", *c);
             }
         });
+
+
+        let mut genome_sk_file = BufWriter::new(
+            File::create(&file_path_str).expect(&format!("{} not valid", file_path_str)),
+        );
 
         bincode::serialize_into(&mut genome_sk_file, &all_genome_sketches).unwrap();
         info!("Wrote all genome sketches to {}", file_path_str);
