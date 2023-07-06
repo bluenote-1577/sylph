@@ -149,7 +149,7 @@ pub struct AniResult<'a>{
     pub naive_ani: f64,
     pub final_est_ani: f64,
     pub final_est_cov: f64,
-    pub seq_name: &'a str,
+    pub seq_name: String,
     pub gn_name: &'a str,
     pub contig_name: &'a str,
     pub mean_cov: f64,
