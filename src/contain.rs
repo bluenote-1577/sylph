@@ -110,7 +110,7 @@ pub fn contain(args: ContainArgs) {
     let genome_sketches = get_genome_sketches(&args, &genome_sketch_files, &genome_files);
     let genome_index_vec = (0..genome_sketches.len()).collect::<Vec<usize>>();
     let stats_vec: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
-    log::info!("Finished obtaining sketches.");
+    log::info!("Finished obtaining genome sketches.");
 
     if genome_sketches.is_empty(){
         log::error!("No genome sketches found. Exiting");
@@ -132,6 +132,7 @@ pub fn contain(args: ContainArgs) {
                 }
             });
         }
+        log::info!("Finished contain for {}.", &read_files[j]);
     });
 
     let mut result_vec = stats_vec.into_inner().unwrap();
