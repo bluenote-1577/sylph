@@ -527,7 +527,7 @@ pub fn sketch_query(
         read_parallel(
             reader,
             threads as u32,
-            100,
+            threads * 100,
             |record_set| {
                 let mut vec = vec![];
                 unsafe {
@@ -569,7 +569,7 @@ pub fn sketch_query(
         read_parallel(
             reader,
             threads as u32,
-            100,
+            threads * 100,
             |record_set| {
                 // this function does the heavy work
                 let mut vec = vec![];

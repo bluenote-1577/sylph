@@ -15,6 +15,10 @@ pub enum AdjustStatus {
     High,
 }
 
+impl Default for AdjustStatus {
+    fn default() -> Self {AdjustStatus::Low }
+}
+
 pub type Kmer = u64;
 pub const BYTE_TO_SEQ: [u8; 256] = [
     0, 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -144,7 +148,7 @@ pub struct MultGenomeSketch{
     pub k: usize,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Default)]
 pub struct AniResult<'a>{
     pub naive_ani: f64,
     pub final_est_ani: f64,
