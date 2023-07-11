@@ -7,30 +7,26 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-puruspe = "0.2.0"
-thiserror = "1.0"
-itertools = "*"
-needletail = "*"
+needletail = "0.5.0"
 simple_logger=  { version = "3", features = ["stderr"] }
 log = "*"
 rayon = "*"
 smallvec = { version = "*", features = ["union","serde","write"] }
 serde = { version = "*", features = ["derive"] }
 bincode = "*"
-tikv-jemallocator = "*"
 seq_io = "*"
 fxhash = "*"
-nohash = "*"
 clap = { version = "3", features = ["derive"] }
 flate2 = { version = "1.0.17", features = ["zlib-ng"], default-features = false }
-rustc-hash="*"
 #nlopt="*"
 statrs="*"
 nalgebra="*"
 rand = "*"
 regex = "1"
 fastrand = "*"
-workctl = "*"
+
+[target.'cfg(target_env = "musl")'.dependencies]
+tikv-jemallocator = "0"
 
 
 [dev-dependencies]

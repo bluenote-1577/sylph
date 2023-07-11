@@ -1,4 +1,3 @@
-use crate::cmdline::*;
 use statrs::function::gamma::*;
 
 fn r_from_moments_lambda(m: f64, v: f64, lambda: f64) -> f64{
@@ -30,13 +29,13 @@ pub fn binary_search_lambda(full_covs: &[u32]) -> Option<f64>{
     }
     let m = mean(full_covs).unwrap();
     let v = var(full_covs).unwrap();
-    let mut nonzero = 0;
+    let mut _nonzero = 0;
     let mut ones = 0;
     let mut twos = 0;
 
     for x in full_covs{
         if *x != 0{
-            nonzero += 1;
+            _nonzero += 1;
         }
         if *x == 1{
             ones += 1;
@@ -46,7 +45,6 @@ pub fn binary_search_lambda(full_covs: &[u32]) -> Option<f64>{
         }
     }
 
-    let zeros = full_covs.len() as f64 - nonzero as f64;
 
 
     let ratio_est = twos as f64 / ones as f64;
@@ -73,8 +71,6 @@ pub fn binary_search_lambda(full_covs: &[u32]) -> Option<f64>{
     let best = best.unwrap();
     let r = r_from_moments_lambda(m,v,best);
     dbg!(m,v, ratio_est, r, best);
-    let zeros_from_nb = f64::powf(r/(r + best), r);
-    let pi = zeros / full_covs.len() as f64 - zeros_from_nb;
 //    let ratio_adj = 1. - pi;
 //    dbg!(best,best_val, r, nonzero, full_covs.len(), f64::powf(nonzero as f64 / full_covs.len() as f64, 1./k));
 //    dbg!(1. - m / best, f64::powf(1. - m/best, 1. / k as f64));

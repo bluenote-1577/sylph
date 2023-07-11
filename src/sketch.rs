@@ -177,9 +177,9 @@ pub fn sketch(args: SketchArgs) {
     let mut read_inputs = vec![];
     let mut genome_inputs = vec![];
     for file in all_files {
-        if args.read_force {
+        if args.sample_force{
             read_inputs.push(file);
-        } else if args.genome_force {
+        } else if args.query_force{
             genome_inputs.push(file);
         } else if is_fastq(&file) {
             read_inputs.push(file);
@@ -202,7 +202,7 @@ pub fn sketch(args: SketchArgs) {
             let read_file2 = &args.second_pair[i];
             let read_sketch_opt = sketch_pair_sequences(read_file1, read_file2, args.c, args.k);
             if read_sketch_opt.is_some() {
-                let pref = Path::new(&args.read_prefix);
+                let pref = Path::new(&args.sample_prefix);
                 let read_sketch = read_sketch_opt.unwrap();
                 let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
                 let file_path = pref.join(&read_file_path);
@@ -231,11 +231,11 @@ pub fn sketch(args: SketchArgs) {
 
     let iter_vec: Vec<usize> = (0..read_inputs.len()).into_iter().collect();
     iter_vec.into_par_iter().for_each(|i| {
-        let pref = Path::new(&args.read_prefix);
+        let pref = Path::new(&args.sample_prefix);
 
         let read_file = &read_inputs[i];
         let read_sketch_opt;
-        if args.read_force {
+        if args.sample_force {
             read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k)
         } else {
             read_sketch_opt = sketch_query(args.c, args.k, args.threads, read_file);
@@ -262,7 +262,7 @@ pub fn sketch(args: SketchArgs) {
         info!("Sketching genomes...");
         let iter_vec: Vec<usize> = (0..genome_inputs.len()).into_iter().collect();
         let counter: Mutex<usize> = Mutex::new(0);
-        let pref = Path::new(&args.genome_prefix);
+        let pref = Path::new(&args.query_prefix);
         let file_path_str = format!("{}{}", pref.to_str().unwrap(), QUERY_FILE_SUFFIX);
         let all_genome_sketches = Mutex::new(vec![]);
 
@@ -334,7 +334,7 @@ pub fn sketch_genome_individual(
                 let mut duplicate_set = MMHashSet::default();
                 let mut new_vec = Vec::with_capacity(kmer_vec.len());
                 kmer_vec.sort();
-                for (_, pos, km) in kmer_vec.iter() {
+                for (_, _pos, km) in kmer_vec.iter() {
                     if !kmer_set.contains(&km) {
                         kmer_set.insert(km);
                     } else {
@@ -565,14 +565,12 @@ pub fn sketch_query(
         read_parallel(
             reader,
             threads as u32,
-            threads * 100,
+            threads * 10,
             |record_set| {
                 let mut vec = vec![];
-                unsafe {
-                    for record in record_set.into_iter() {
-                        //                        dbg!(String::from_utf8(record.seq().to_vec()));
-                        extract_markers(record.seq(), &mut vec, c, k);
-                    }
+                for record in record_set.into_iter() {
+                    //                        dbg!(String::from_utf8(record.seq().to_vec()));
+                    extract_markers(record.seq(), &mut vec, c, k);
                 }
 
                 return vec;
@@ -611,10 +609,8 @@ pub fn sketch_query(
             |record_set| {
                 // this function does the heavy work
                 let mut vec = vec![];
-                unsafe {
-                    for record in record_set.into_iter() {
-                        extract_markers(record.seq(), &mut vec, c, k);
-                    }
+                for record in record_set.into_iter() {
+                    extract_markers(record.seq(), &mut vec, c, k);
                 }
 
                 return vec;

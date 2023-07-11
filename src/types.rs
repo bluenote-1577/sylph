@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use nohash::IntMap;
 
 // bytecheck can be used to validate your data if you want
 use std::hash::{BuildHasherDefault, Hasher};

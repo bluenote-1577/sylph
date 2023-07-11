@@ -8,7 +8,6 @@ use rayon::prelude::*;
 use statrs::distribution::{DiscreteCDF, Poisson};
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Mutex;
@@ -270,7 +269,7 @@ fn get_seq_sketch(
     }
 }
 
-fn get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<GenomeSketch>) {
+fn _get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<GenomeSketch>) {
     let mut read_sketch_files = vec![];
     let mut genome_sketch_files = vec![];
     let mut read_files = vec![];
@@ -529,7 +528,7 @@ fn get_stats<'a>(
     return Some(ani_result);
 }
 
-fn ani_from_lambda_moment(lambda: Option<f64>, mean: f64, k: f64) -> Option<f64> {
+fn _ani_from_lambda_moment(lambda: Option<f64>, mean: f64, k: f64) -> Option<f64> {
     if lambda.is_none() {
         return None;
     }
@@ -549,17 +548,17 @@ fn ani_from_lambda_moment(lambda: Option<f64>, mean: f64, k: f64) -> Option<f64>
     return ret_ani;
 }
 
-fn ani_from_lambda(lambda: Option<f64>, mean: f64, k: f64, full_cov: &[u32]) -> Option<f64> {
+fn ani_from_lambda(lambda: Option<f64>, _mean: f64, k: f64, full_cov: &[u32]) -> Option<f64> {
     if lambda.is_none() {
         return None;
     }
     let mut contain_count = 0;
-    let mut zero_count = 0;
+    let mut _zero_count = 0;
     for x in full_cov {
         if *x != 0 {
             contain_count += 1;
         } else {
-            zero_count += 1;
+            _zero_count += 1;
         }
     }
 
@@ -581,7 +580,7 @@ fn ani_from_lambda(lambda: Option<f64>, mean: f64, k: f64, full_cov: &[u32]) -> 
     return ret_ani;
 }
 
-fn mle_zip(full_covs: &[u32], k: f64) -> Option<f64> {
+fn mle_zip(full_covs: &[u32], _k: f64) -> Option<f64> {
     let mut num_zero = 0;
     let mut count_set: HashSet<_> = HashSet::default();
 
@@ -615,7 +614,7 @@ fn mle_zip(full_covs: &[u32], k: f64) -> Option<f64> {
         ret_lambda = Some(lambda);
     }
 
-    return (ret_lambda);
+    return ret_lambda;
 }
 
 fn newton_raphson(rat: f64, mean: f64) -> f64 {
