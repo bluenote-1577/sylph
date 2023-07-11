@@ -1,4 +1,4 @@
-# sylph -  abundance-corrected minhash for ANI querying against shotgun metagenomes
+# sylph -  abundance-corrected k-mer ANI querying against shotgun metagenomes
 
 ## Introduction
 
