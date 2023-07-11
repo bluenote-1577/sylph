@@ -6,7 +6,7 @@
 
 sylph uses a k-mer containment FracMinHash method, similar to sourmash. However, sylph uses a statistical adjustment correct for low coverage genomes within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples. sylph offers
 
-1. **Accurate ANI queries for genomes of down to 0.1x abundance**: for bacterial species-level ANI queries (> 95%), sylph can give accurate ANI estimates down to 0.1x coverage.
+1. **Accurate ANI queries for genomes of down to 0.1x coverage**: for bacterial species-level ANI queries (> 95%), sylph can give accurate ANI estimates down to 0.1x coverage.
 
 2. **Ultrafast, multithreaded runtimes**: speed is on the scale of Mash or sourmash, but indexing is faster and querying is multithreaded. Entire databases of > 100,000 genomes can be queried against even high-depth samples in seconds.
 
