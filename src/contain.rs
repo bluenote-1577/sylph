@@ -89,9 +89,9 @@ pub fn contain(args: ContainArgs) {
     let mut read_files = vec![];
 
     for file in args.files.iter() {
-        if file.ends_with(".pgs") {
+        if file.ends_with(QUERY_FILE_SUFFIX) {
             genome_sketch_files.push(file);
-        } else if file.ends_with(".prs") {
+        } else if file.ends_with(SAMPLE_FILE_SUFFIX) {
             read_sketch_files.push(file);
         } else if is_fasta(&file) {
             genome_files.push(file);
@@ -276,9 +276,9 @@ fn get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genome
     let mut read_files = vec![];
     let mut genome_files = vec![];
     for file in args.files.iter() {
-        if file.ends_with(".pgs") {
+        if file.ends_with(QUERY_FILE_SUFFIX) {
             genome_sketch_files.push(file);
-        } else if file.ends_with(".prs") {
+        } else if file.ends_with(SAMPLE_FILE_SUFFIX) {
             read_sketch_files.push(file);
         } else if is_fasta(&file) {
             genome_files.push(file);

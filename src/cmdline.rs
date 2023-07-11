@@ -1,9 +1,9 @@
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
-#[clap(author, version, about, long_about = None)]
+#[clap(author, version, about, long_about = None, arg_required_else_help = true, disable_help_subcommand = true)]
 pub struct Cli {
-    #[clap(subcommand)]
+    #[clap(subcommand,)]
     pub mode: Mode,
 }
 
@@ -19,7 +19,7 @@ pub enum Mode {
 pub struct SketchArgs {
     #[clap(multiple=true)]
     pub files: Vec<String>,
-    #[clap(short='o',long="output-genome-prefix", default_value = "prita_genomes")]
+    #[clap(short='o',long="output-genome-prefix", default_value = "sylph_queries")]
     pub genome_prefix: String,
     #[clap(short,long="reads-output-prefix", default_value = "")]
     pub read_prefix: String,

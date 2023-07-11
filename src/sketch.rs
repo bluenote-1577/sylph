@@ -5,24 +5,55 @@ use crate::types::*;
 use flate2::read::GzDecoder;
 use log::*;
 use needletail::parse_fastx_file;
-use needletail::parser::*;
 use rayon::prelude::*;
 use regex::Regex;
+use seq_io;
 use seq_io::fasta::{Reader as ReaderA, Record as ReccordA};
 use seq_io::fastq::{Reader as ReaderQ, Record as RecordQ};
 use seq_io::parallel::read_parallel;
-use seq_io;
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::{prelude::*, BufReader};
 use std::path::Path;
-use std::sync::mpsc::channel;
-use std::sync::Arc;
 use std::sync::Mutex;
-use workctl::{new_syncflag, WorkQueue};
+
+pub fn extract_markers(string: &[u8], kmer_vec: &mut Vec<u64>, c: usize, k: usize) {
+    #[cfg(any(target_arch = "x86_64"))]
+    {
+        if is_x86_feature_detected!("avx2")  && false{
+            use crate::avx2_seeding::*;
+            unsafe {
+                extract_markers_avx2(string, kmer_vec, c, k);
+            }
+        } else {
+            fmh_seeds(string, kmer_vec, c, k);
+        }
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        fmh_seeds(string, kmer_vec, c, k);
+    }
+}
+
+pub fn extract_markers_positions(string: &[u8], kmer_vec: &mut Vec<(usize, usize, u64)>, c: usize, k: usize, contig_number: usize) {
+    #[cfg(any(target_arch = "x86_64"))]
+    {
+        if is_x86_feature_detected!("avx2"){
+            use crate::avx2_seeding::*;
+            unsafe {
+                extract_markers_avx2_positions(string, kmer_vec, c, k, contig_number);
+            }
+        } else {
+            fmh_seeds_positions(string, kmer_vec, c, k, contig_number);
+        }
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        fmh_seeds_positions(string, kmer_vec, c, k, contig_number);
+    }
+}
 
 pub fn is_fastq(file: &str) -> bool {
     if file.ends_with(".fq")
@@ -121,7 +152,11 @@ pub fn sketch(args: SketchArgs) {
         .init()
         .unwrap();
 
-    if args.files.is_empty() && args.list_sequence.is_none() && args.first_pair.is_empty() && args.second_pair.is_empty(){
+    if args.files.is_empty()
+        && args.list_sequence.is_none()
+        && args.first_pair.is_empty()
+        && args.second_pair.is_empty()
+    {
         error!("No input sequences found. Exiting.");
         std::process::exit(1);
     }
@@ -155,9 +190,9 @@ pub fn sketch(args: SketchArgs) {
         }
     }
 
-    if !args.first_pair.is_empty() && !args.second_pair.is_empty(){
+    if !args.first_pair.is_empty() && !args.second_pair.is_empty() {
         info!("Sketching paired sequences...");
-        if args.first_pair.len() != args.second_pair.len(){
+        if args.first_pair.len() != args.second_pair.len() {
             error!("Different number of paired sequences. Exiting.");
             std::process::exit(1);
         }
@@ -172,7 +207,11 @@ pub fn sketch(args: SketchArgs) {
                 let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
                 let file_path = pref.join(&read_file_path);
 
-                let file_path_str = format!("{}.paired.prs", file_path.to_str().unwrap());
+                let file_path_str = format!(
+                    "{}.paired{}",
+                    file_path.to_str().unwrap(),
+                    SAMPLE_FILE_SUFFIX
+                );
 
                 let mut read_sk_file = BufWriter::new(
                     File::create(&file_path_str)
@@ -206,7 +245,7 @@ pub fn sketch(args: SketchArgs) {
             let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
             let file_path = pref.join(&read_file_path);
 
-            let file_path_str = format!("{}.prs", file_path.to_str().unwrap());
+            let file_path_str = format!("{}{}", file_path.to_str().unwrap(), SAMPLE_FILE_SUFFIX);
 
             let mut read_sk_file = BufWriter::new(
                 File::create(&file_path_str)
@@ -224,7 +263,7 @@ pub fn sketch(args: SketchArgs) {
         let iter_vec: Vec<usize> = (0..genome_inputs.len()).into_iter().collect();
         let counter: Mutex<usize> = Mutex::new(0);
         let pref = Path::new(&args.genome_prefix);
-        let file_path_str = format!("{}.pgs", pref.to_str().unwrap());
+        let file_path_str = format!("{}{}", pref.to_str().unwrap(), QUERY_FILE_SUFFIX);
         let all_genome_sketches = Mutex::new(vec![]);
 
         iter_vec.into_par_iter().for_each(|i| {
@@ -252,7 +291,6 @@ pub fn sketch(args: SketchArgs) {
                 info!("{} genomes processed.", *c);
             }
         });
-
 
         let mut genome_sk_file = BufWriter::new(
             File::create(&file_path_str).expect(&format!("{} not valid", file_path_str)),
@@ -289,9 +327,9 @@ pub fn sketch_genome_individual(
                 let contig_name = String::from_utf8_lossy(record.id()).to_string();
                 return_genome_sketch.first_contig_name = contig_name;
                 let seq = record.seq();
-                unsafe {
-                    extract_markers_avx2_positions(&seq, &mut kmer_vec, c, k, 0);
-                }
+
+                extract_markers_positions(&seq, &mut kmer_vec, c, k, 0);
+
                 let mut kmer_set = MMHashSet::default();
                 let mut duplicate_set = MMHashSet::default();
                 let mut new_vec = Vec::with_capacity(kmer_vec.len());
@@ -351,9 +389,9 @@ pub fn sketch_genome(
                     first = false;
                 }
                 let seq = record.seq();
-                unsafe {
-                    extract_markers_avx2_positions(&seq, &mut vec, c, k, contig_number);
-                }
+
+                extract_markers_positions(&seq, &mut vec, c, k, contig_number);
+                
                 contig_number += 1
             } else {
                 warn!("File {} is not a valid fasta/fastq file", ref_file);
@@ -388,56 +426,56 @@ pub fn sketch_genome(
     }
 }
 
-pub fn sketch_pair_sequences(read_file1: &str, read_file2: &str, c:usize, k: usize) -> Option<SequencesSketch> {
-
+pub fn sketch_pair_sequences(
+    read_file1: &str,
+    read_file2: &str,
+    c: usize,
+    k: usize,
+) -> Option<SequencesSketch> {
     let r1o = parse_fastx_file(&read_file1);
     let r2o = parse_fastx_file(&read_file2);
     let mut read_sketch = SequencesSketch::new(read_file1.to_string(), c, k, true);
-    if r1o.is_err() || r2o.is_err(){
+    if r1o.is_err() || r2o.is_err() {
         panic!("Paired end reading failed");
     }
     let mut reader1 = r1o.unwrap();
     let mut reader2 = r2o.unwrap();
 
-    loop{
+    loop {
         let n1 = reader1.next();
         let n2 = reader2.next();
-        if let Some(rec1_o) = n1{
-            if let Some(rec2_o) = n2{
-                if let Ok(rec1) = rec1_o{
-                    if let Ok(rec2) = rec2_o{
-                        unsafe {
-                            let mut temp_vec1 = vec![];
-                            let mut temp_vec2 = vec![];
-                            extract_markers_avx2(&rec1.seq(), &mut temp_vec1, c, k);
-                            extract_markers_avx2(&rec2.seq(), &mut temp_vec2, c, k);
-                            for km in temp_vec1.iter() {
-                                let c = read_sketch.kmer_counts.entry(*km).or_insert(0);
-                                *c += 1;
+        if let Some(rec1_o) = n1 {
+            if let Some(rec2_o) = n2 {
+                if let Ok(rec1) = rec1_o {
+                    if let Ok(rec2) = rec2_o {
+                        let mut temp_vec1 = vec![];
+                        let mut temp_vec2 = vec![];
+                        extract_markers(&rec1.seq(), &mut temp_vec1, c, k);
+                        extract_markers(&rec2.seq(), &mut temp_vec2, c, k);
+                        for km in temp_vec1.iter() {
+                            let c = read_sketch.kmer_counts.entry(*km).or_insert(0);
+                            *c += 1;
+                        }
+                        for km in temp_vec2 {
+                            if temp_vec1.contains(&km) {
+                                continue;
                             }
-                            for km in temp_vec2 {
-                                if temp_vec1.contains(&km){
-                                    continue
-                                }
-                                let c = read_sketch.kmer_counts.entry(km).or_insert(0);
-                                *c += 1;
-                            }
+                            let c = read_sketch.kmer_counts.entry(km).or_insert(0);
+                            *c += 1;
                         }
                     }
-                }
-                else{
-                    return None
+                } else {
+                    return None;
                 }
             }
-        }
-        else{
-            break
+        } else {
+            break;
         }
     }
     return Some(read_sketch);
 }
 
-//This did not work 
+//This did not work
 //pub fn sketch_pair_sequences(read_file1: &str, read_file2: &str) {
 //    let mut queue: WorkQueue<(, _)> = WorkQueue::new();
 //
@@ -533,7 +571,7 @@ pub fn sketch_query(
                 unsafe {
                     for record in record_set.into_iter() {
                         //                        dbg!(String::from_utf8(record.seq().to_vec()));
-                        extract_markers_avx2(record.seq(), &mut vec, c, k);
+                        extract_markers(record.seq(), &mut vec, c, k);
                     }
                 }
 
@@ -575,7 +613,7 @@ pub fn sketch_query(
                 let mut vec = vec![];
                 unsafe {
                     for record in record_set.into_iter() {
-                        extract_markers_avx2(record.seq(), &mut vec, c, k);
+                        extract_markers(record.seq(), &mut vec, c, k);
                     }
                 }
 
@@ -618,9 +656,7 @@ pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize) -> Option<Se
             if record.is_ok() {
                 let record = record.expect(&format!("Invalid record for file {}", ref_file));
                 let seq = record.seq();
-                unsafe {
-                    extract_markers_avx2(&seq, &mut vec, c, k);
-                }
+                extract_markers(&seq, &mut vec, c, k);
             } else {
                 warn!("File {} is not a valid fasta/fastq file", ref_file);
             }
@@ -636,6 +672,6 @@ pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize) -> Option<Se
         file_name: read_file.to_string(),
         c,
         k,
-        paired: false
+        paired: false,
     });
 }
