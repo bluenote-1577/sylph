@@ -53,7 +53,8 @@ Forthcoming TODO.
 ## Quick start
 
 ```sh
-# fastq files are samples (reads) and fasta files are queries (genomes)
+# fastq files are _assumed_ to be samples (reads)
+# fasta files are _assumed_ to be queries (genomes)
 sylph sketch reads.fq genomes/*.fa
 sylph contain *.sylqueries *.sylsample > all-to-all.tsv
 
@@ -62,7 +63,7 @@ sylph contain reads.fq genomes/*.fa
 
 # paired end reads
 sylph sketch -1 pair_1.fq -2 pair_2.fq
-sylph contain pair_1.paired.sylsample queryes.sylqueries > results.tsv
+sylph contain pair_1.paired.sylsample *.sylqueries > results.tsv
 
 # fasta reads
 sylph sketch --sample-force fasta_reads.fa
@@ -142,7 +143,7 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 - Lambda_5-95_percentile: [5%, 95%] confidence intervals for lambda. Same format rules as ANI_5-95_percentile.
 - Median cov: median k-mer multiplicity for k-mers with >= 1 multiplicity.
 - Mean_cov_geq1: mean k-mer multiplicity for k-mers with >= 1 multiplicity.
-- Containment_ind: `int/int` showing the ocntainment index, e.g. `959/1053`.
+- Containment_ind: `int/int` showing the containment index, e.g. `959/1053`.
 - Contig_name: name of the first contig in the fasta or just the contig name for contig queries.
 
 ## Citation
