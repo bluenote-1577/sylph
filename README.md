@@ -130,15 +130,15 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 - Query_file: the filename of the query.
 - Adjusted_ANI: nearest neighbour ANI with coverage adjustment if coverage is low.
 - Naive_ANI: nearest neighbour ANI without coverage adjustment.
-- ANI_5-95_percentile: [5%,95%] confidence intervals.
-   * If coverage is low: `float-float` e.g. `98.52-99.55`
-   * If coverage is high: `NA-NA` is given. 
-- Eff_cov: estimate of the coverage.
-    * If coverage is low: this is Eff_lambda
-    * If coverage is high: this is Mean_cov_geq1
-- Eff_lambda: estimate of the effective coverage parameter
-    * If coverage is low: lambda estimate is given
-    * If coverage is high: `HIGH` is output
+- ANI_5-95_percentile: [5%,95%] confidence intervals. **Not always a decimal number**.
+   * If coverage adjustment is possible: `float-float` e.g. `98.52-99.55`
+   * If coverage is too low/high: `NA-NA` is given. 
+- Eff_cov: estimate of the coverage. Always a decimal number. 
+    * If coverage adjustment is possible: this is Eff_lambda
+    * If coverage is too low/high: this is Mean_cov_geq1
+- Eff_lambda: estimate of the effective coverage parameter. **Not always a decimal number**. 
+    * If coverage adjustment is possible: lambda estimate is given
+    * If coverage is too low/high: `LOW` or `HIGH` is output
 - Lambda_5-95_percentile: [5%, 95%] confidence intervals for lambda. Same format rules as ANI_5-95_percentile.
 - Median cov: median k-mer multiplicity for k-mers with >= 1 multiplicity.
 - Mean_cov_geq1: mean k-mer multiplicity for k-mers with >= 1 multiplicity.
