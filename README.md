@@ -80,15 +80,16 @@ After installation, clone this repository if you have not done so and run the fo
 git clone https://github.com/bluenote-1577/sylph
 cd sylph
 
-# make sure sylph is installed first. use the below command is rust is installed. See above otherwise
-# cargo install --path . --root ~/.cargo
+# install sylph. use the below command is rust is installed; see above otherwise
+cargo install --path . --root ~/.cargo
 
 # sketch reads and genomes. fastq -> samples, fasta -> queries
 sylph sketch test_files/o157_reads.fastq test_files/e.coli*.fa
+
 # query for ANI
 sylph contain o157_reads.fastq.sylsample sylph_queries.sylqueries
 
-# lazy containment without pre-sketching also works 
+# ALTERNATIVE: lazy containment without pre-sketching also works 
 sylph contain test_files/*
 ```
 
@@ -134,7 +135,7 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 - ANI_5-95_percentile: [5%,95%] confidence intervals. **Not always a decimal number**.
    * If coverage adjustment is possible: `float-float` e.g. `98.52-99.55`
    * If coverage is too low/high: `NA-NA` is given. 
-- Eff_cov: estimate of the coverage. Always a decimal number. 
+- Eff_cov: estimate of the coverage. **Always a decimal number.** 
     * If coverage adjustment is possible: this is Eff_lambda
     * If coverage is too low/high: this is Mean_cov_geq1
 - Eff_lambda: estimate of the effective coverage parameter. **Not always a decimal number**. 
