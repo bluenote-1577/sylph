@@ -2,9 +2,9 @@
 
 ## Introduction
 
-**sylph** is a program for quickly estimating the ANI of a query genome against the the nearest neighbour genome in your metagenomic shotgun sample. That is, if we query an E. coli genome and sylph gives an estimate of 97% ANI, then there is a genome in your sample with approximately 97% ANI compared to the queried E. coli genome. 
+**sylph** is a program that quickly estimates the average nucleotide identity (ANI) of a query genome against the the nearest neighbour genome in your metagenomic shotgun sample. That is, if we query an E. coli genome and sylph gives an estimate of 97% ANI, then there is a genome in your sample with approximately 97% ANI compared to the queried E. coli genome. 
 
-sylph uses a k-mer containment FracMinHash method, similar to sourmash. However, **sylph uses a statistical adjustment correct for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples. sylph offers
+sylph uses a k-mer containment FracMinHash method, similar to sourmash. However, **sylph uses a statistical adjustment to correct for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples. sylph offers
 
 1. **Accurate ANI queries for genomes of down to 0.1x coverage**: for bacterial species-level ANI queries (> 95%), sylph can give accurate ANI estimates down to 0.1x coverage.
 
@@ -121,7 +121,7 @@ test_files/e.coli-K12.fasta	99.39	100.00	98.09
 
 So the ANIs should be 98.14, 98.09, and 100.0 for EC590, K12, and O157 respectively against the sample. As you can see, sylphs estimates are quite good and much more reasonable than the Naive ANI.  
 
-## Output
+## Output format
 
 ```sh
 Sample_file	Query_file	Adjusted_ANI	Naive_ANI	ANI_5-95_percentile	Eff_cov	Eff_lambda	Lambda_5-95_percentile	Median_cov	Mean_cov_geq1	Containment_ind Contig_name
@@ -147,6 +147,6 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 - Containment_ind: `int/int` showing the containment index, e.g. `959/1053`.
 - Contig_name: name of the first contig in the fasta or just the contig name for contig queries.
 
-## Citation
+## Citing sylph
 
 Jim Shaw and Yun William Yu. Ultrafast genome similarity queries from low-abundance metagenomic samples with sylph (Preprint to be released soon). 
