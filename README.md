@@ -20,6 +20,7 @@ Requirements:
 1. [rust](https://www.rust-lang.org/tools/install) (version > 1.63) programming language and associated tools such as cargo are required and assumed to be in PATH.
 2. A c compiler (e.g. GCC)
 3. make
+4. cmake
 
 Building takes a few minutes (depending on # of cores).
 
