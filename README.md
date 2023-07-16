@@ -2,15 +2,15 @@
 
 ## Introduction
 
-**sylph** is a program that quickly estimates the average nucleotide identity (ANI) of a query genome against the the nearest neighbour genome in your metagenomic shotgun sample.
+**sylph** is a program that quickly estimates the average nucleotide identity (ANI) of a collection of genomes against their nearest neighbour genome in your metagenomic shotgun sample.
 
 That is, if we query an E. coli genome and sylph gives an estimate of 97% ANI, then there is a genome in your sample with approximately 97% ANI compared to the queried E. coli genome. 
 
-sylph uses a k-mer containment FracMinHash method, similar to sourmash. However, **sylph uses a statistical adjustment to correct for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples. sylph offers
+sylph uses a k-mer containment method, similar to sourmash. However, **sylph uses a statistical adjustment to correct for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples. sylph offers
 
 1. **Accurate ANI queries for genomes of down to 0.1x coverage**: for bacterial species-level ANI queries (> 95%), sylph can give accurate ANI estimates down to 0.1x coverage.
 
-2. **Ultrafast, multithreaded runtimes**: speed is on the scale of Mash or sourmash, but indexing is faster and querying is multithreaded. Entire databases of > 100,000 genomes can be queried against even high-depth samples in seconds.
+2. **Ultrafast, multithreaded runtimes**: speed is on the scale of Mash or sourmash, but indexing is faster and querying is multithreaded. Entire databases of > 100,000 genomes can be queried against even high-depth samples shotgun samples in **seconds**.
 
 ##  Install
 
@@ -20,6 +20,7 @@ Requirements:
 1. [rust](https://www.rust-lang.org/tools/install) (version > 1.63) programming language and associated tools such as cargo are required and assumed to be in PATH.
 2. A c compiler (e.g. GCC)
 3. make
+4. cmake
 
 Building takes a few minutes (depending on # of cores).
 
@@ -58,7 +59,7 @@ Forthcoming TODO.
 # fastq files are _assumed_ to be samples (reads)
 # fasta files are _assumed_ to be queries (genomes)
 sylph sketch reads1.fq reads2.fq.gz genome1.fa genome2.fa.gz
-sylph contain *.sylqueries *.sylsample > all-to-all.tsv
+sylph contain *.sylqueries *.sylsample -t (threads) > all-to-all.tsv
 
 # lazy contain without pre-sketching (convenient, not recommended for large files)
 sylph contain reads.fq genome.fa
