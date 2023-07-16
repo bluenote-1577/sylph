@@ -162,7 +162,7 @@ pub fn contain(args: ContainArgs) {
 
 fn print_header() {
     println!(
-                            "Read_file\tGenome_file\tAdjusted_ANI\tNaive_ANI\tANI_5-95_percentile\tEff_cov\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov\tContainment_ind\tContig_name",
+                            "Sample_file\tQuery_file\tAdjusted_ANI\tNaive_ANI\tANI_5-95_percentile\tEff_cov\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tContig_name",
                             );
 }
 
@@ -475,7 +475,7 @@ fn get_stats<'a>(
     if let AdjustStatus::Lambda(lam) = use_lambda {
         final_est_cov = lam
     } else {
-        if median_cov < MEDIAN_ANI_THRESHOLD {
+        if median_cov <= MEDIAN_ANI_THRESHOLD {
             final_est_cov = geq1_mean_cov;
         } else {
             final_est_cov = geq1_mean_cov;
@@ -490,9 +490,18 @@ fn get_stats<'a>(
     };
 
     let opt_est_ani = ani_from_lambda(opt_lambda, mean_cov, sequence_sketch.k as f64, &full_covs);
-    if naive_ani < args.minimum_ani {
+    
+    let final_est_ani;
+    if opt_lambda.is_none() || opt_est_ani.is_none() || args.no_adj {
+        final_est_ani = naive_ani;
+    } else {
+        final_est_ani = opt_est_ani.unwrap();
+    }
+
+    if final_est_ani < args.minimum_ani {
         return None;
     }
+
     let (mut low_ani, mut high_ani, mut low_lambda, mut high_lambda) = (None, None, None, None);
     if !args.no_ci && opt_lambda.is_some() {
         let bootstrap = bootstrap_interval(&full_covs, sequence_sketch.k as f64, &args);
@@ -502,12 +511,7 @@ fn get_stats<'a>(
         high_lambda = bootstrap.3;
     }
 
-    let final_est_ani;
-    if opt_lambda.is_none() || opt_est_ani.is_none() || args.no_adj {
-        final_est_ani = naive_ani;
-    } else {
-        final_est_ani = opt_est_ani.unwrap();
-    }
+    
 
     let ani_result = AniResult {
         naive_ani,
