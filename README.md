@@ -57,13 +57,13 @@ Forthcoming TODO.
 ```sh
 # fastq files are _assumed_ to be samples (reads)
 # fasta files are _assumed_ to be queries (genomes)
-sylph sketch reads.fq genomes/*.fa
+sylph sketch reads1.fq reads2.fq.gz genome1.fa genome2.fa.gz
 sylph contain *.sylqueries *.sylsample > all-to-all.tsv
 
 # lazy contain without pre-sketching (convenient, not recommended for large files)
-sylph contain reads.fq genomes/*.fa
+sylph contain reads.fq genome.fa
 
-# paired end reads
+# paired end reads mode
 sylph sketch -1 pair_1.fq -2 pair_2.fq
 sylph contain pair_1.paired.sylsample *.sylqueries > results.tsv
 
