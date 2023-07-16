@@ -65,8 +65,10 @@ sylph contain *.sylqueries *.sylsample -t (threads) > all-to-all.tsv
 sylph contain reads.fq genome.fa
 
 # paired end reads mode
-sylph sketch -1 pair_1.fq -2 pair_2.fq
-sylph contain pair_1.paired.sylsample *.sylqueries > results.tsv
+sylph sketch -1 pair_1.fq -2 pair_2.fq -s sample_prefix
+
+# sketch file with fasta files line-by-line
+sylph sketch -l database_file_names.txt -o genomes_output_prefix
 
 # fasta reads
 sylph sketch --sample-force fasta_reads.fa
