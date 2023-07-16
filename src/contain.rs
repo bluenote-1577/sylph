@@ -498,7 +498,7 @@ fn get_stats<'a>(
         final_est_ani = opt_est_ani.unwrap();
     }
 
-    if final_est_ani < args.minimum_ani {
+    if final_est_ani < args.minimum_ani/100. {
         return None;
     }
 

@@ -56,7 +56,7 @@ pub struct ContainArgs {
     pub k: usize,
     #[clap(short, default_value_t = 100, help_heading = "ALGORITHM", help = "Subsampling rate. Only for raw fasta/fastq")]
     pub c: usize,
-    #[clap(short, long="minimum-ani", default_value_t = 0.78, help_heading = "OUTPUT", help = "Minimum adjusted ANI to output" )]
+    #[clap(short, long="minimum-ani", default_value_t = 78., help_heading = "OUTPUT", help = "Minimum adjusted ANI to output (0-100)" )]
     pub minimum_ani: f64,
     #[clap(short, default_value_t = 3, help = "Number of threads")]
     pub threads: usize,

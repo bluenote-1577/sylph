@@ -9,21 +9,21 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 needletail = "0.5.0"
 simple_logger=  { version = "3", features = ["stderr"] }
-log = "*"
-rayon = "*"
-smallvec = { version = "*", features = ["union","serde","write"] }
-serde = { version = "*", features = ["derive"] }
-bincode = "*"
-seq_io = "*"
-fxhash = "*"
+log = "0"
+rayon = "1"
+smallvec = { version = "1", features = ["union","serde","write"] }
+serde = { version = "1", features = ["derive"] }
+bincode = "1"
+seq_io = "0.3"
+fxhash = "0"
 clap = { version = "3", features = ["derive"] }
 flate2 = { version = "1.0.17", features = ["zlib-ng"], default-features = false }
 #nlopt="*"
-statrs="*"
-nalgebra="*"
-rand = "*"
+statrs="0.16"
+nalgebra="0"
+rand = "0"
 regex = "1"
-fastrand = "*"
+fastrand = "2"
 
 [target.'cfg(target_env = "musl")'.dependencies]
 tikv-jemallocator = "0"
