@@ -135,7 +135,9 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 
 - Sample_file: the filename of the sample.
 - Query_file: the filename of the query.
-- Adjusted_ANI: nearest neighbour ANI with coverage adjustment if coverage is low.
+- Adjusted_ANI: nearest neighbour ANI. **Most important value**.
+    * If coverage adjustment is possible (cov is < 3x cov): returns coverage-adjusted ANI
+    * If coverage is too low/high: returns Naive_ANI (see below)
 - Naive_ANI: nearest neighbour ANI without coverage adjustment.
 - ANI_5-95_percentile: [5%,95%] confidence intervals. **Not always a decimal number**.
    * If coverage adjustment is possible: `float-float` e.g. `98.52-99.55`
