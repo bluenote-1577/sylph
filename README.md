@@ -1,4 +1,4 @@
-# sylph -  abundance-corrected k-mer ANI querying against shotgun metagenomes
+# sylph -  ultrafast genome querying against shotgun metagenomes
 
 ## Introduction
 
