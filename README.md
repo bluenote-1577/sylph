@@ -91,9 +91,6 @@ cargo install --path . --root ~/.cargo
 # sketch reads and genomes. fastq -> samples, fasta -> queries
 sylph sketch test_files/o157_reads.fastq test_files/e.coli*.fa
 
-# sketch all files in line-by-line text file
-sylph sketch -l database_fasta_files.txt -o sketch_database_prefix
-
 # query for ANI
 sylph contain o157_reads.fastq.sylsample sylph_queries.sylqueries
 
