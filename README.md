@@ -64,8 +64,8 @@ sylph contain *.sylqueries *.sylsample -t (threads) > all-to-all.tsv
 # lazy contain without pre-sketching (convenient, not recommended for large files)
 sylph contain reads.fq genome.fa
 
-# paired end reads mode
-sylph sketch -1 pair_1.fq -2 pair_2.fq -s sample_prefix
+# paired end reads mode, multi-sample allowed
+sylph sketch -1 pairA_1.fq pairB_1.fq -2 pairA_2.fq pairB_2.fq -s sample_prefix
 
 # sketch file with fasta files line-by-line
 sylph sketch -l database_file_names.txt -o genomes_output_prefix
