@@ -77,22 +77,6 @@ sylph sketch --sample-force fasta_reads.fa
 sylph sketch my_contigs.fa -i -o contig_queries
 ```
 
-## Pre-sketched databases
-
-We have some pre-sketched databases available for download below. 
-
-### Pre-sketched GTDB r214 database (85,202 genomes)
-Two options are available.
-1. `-c 1000` more efficient (2GB), less sensitive sketch settings: https://storage.googleapis.com/sylph-stuff/gtdb_r214_c1000_sylph_v0.0.2.sylqueries.sylqueries.
-2. `-c 100` more sensitive (8GB) sketch settings: https://storage.googleapis.com/sylph-stuff/gtdb_r214_c100_sylph_v0.0.2.sylqueries
-
-Usage example:
-
-```sh
-wget https://storage.googleapis.com/sylph-stuff/gtdb_r214_c100_sylph_v0.0.2.sylqueries
-sylph contain *.sylsample gtdb_r214_c100_sylph_v0.0.2.sylqueries -t 30 > results.tsv
-```
-
 ## 5 minute tutorial
 
 After installation, clone this repository if you have not done so and run the following.
@@ -171,6 +155,22 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 - Mean_cov_geq1: mean k-mer multiplicity for k-mers with >= 1 multiplicity.
 - Containment_ind: `int/int` showing the containment index, e.g. `959/1053`.
 - Contig_name: name of the first contig in the fasta or just the contig name for contig queries.
+
+## Pre-sketched databases
+
+We have some pre-sketched databases available for download below. 
+
+### Pre-sketched GTDB r214 database (85,202 genomes)
+Two options are available.
+1. `-c 1000` more efficient (2GB), less sensitive sketch settings: https://storage.googleapis.com/sylph-stuff/gtdb_r214_c1000_sylph_v0.0.2.sylqueries.sylqueries.
+2. `-c 100` more sensitive (8GB) sketch settings: https://storage.googleapis.com/sylph-stuff/gtdb_r214_c100_sylph_v0.0.2.sylqueries
+
+Usage example:
+
+```sh
+wget https://storage.googleapis.com/sylph-stuff/gtdb_r214_c100_sylph_v0.0.2.sylqueries
+sylph contain *.sylsample gtdb_r214_c100_sylph_v0.0.2.sylqueries -t 30 > results.tsv
+```
 
 ## Citing sylph
 
