@@ -14,7 +14,23 @@ sylph uses a sketched k-mer containment method. sylph's novelty lies in **using 
 
 ##  Install
 
-#### Option 1: Build from source
+#### Option 1: conda install (check [here](https://github.com/bioconda/bioconda-recipes/pull/42051) for availability)
+
+`conda install -c bioconda sylph`
+
+#### Option 2: Pre-built x86-64 linux statically compiled executable
+
+We offer a pre-built statically compiled executable for x86-64 linux systems. That is, if you're on a x86-64 linux system, you can just download the binary and run it without installing anything. 
+
+```sh
+wget https://github.com/bluenote-1577/sylph/releases/download/latest/sylph
+chmod +x sylph
+./sylph -h
+```
+
+Note: the binary is compiled with a different set of libraries (musl instead of glibc), possibly impacting performance (slightly).
+
+#### Option 3: Build from source
 
 Requirements:
 1. [rust](https://www.rust-lang.org/tools/install) (version > 1.63) programming language and associated tools such as cargo are required and assumed to be in PATH.
@@ -36,22 +52,6 @@ sylph contain test_files/*
 #cargo build --release
 #./target/release/sylph -h
 ```
-
-#### Option 2: Pre-built x86-64 linux statically compiled executable
-
-We offer a pre-built statically compiled executable for x86-64 linux systems. That is, if you're on a x86-64 linux system, you can just download the binary and run it without installing anything. 
-
-```sh
-wget https://github.com/bluenote-1577/sylph/releases/download/latest/sylph
-chmod +x sylph
-./sylph -h
-```
-
-Note: the binary is compiled with a different set of libraries (musl instead of glibc), possibly impacting performance (slightly).
-
-#### Option 3: conda install (should be available, check [here](https://github.com/bioconda/bioconda-recipes/pull/42051))
-
-`conda install -c bioconda sylph`
 
 ## Quick start
 
