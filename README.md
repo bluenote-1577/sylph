@@ -90,7 +90,6 @@ Usage example:
 
 ```sh
 wget https://storage.googleapis.com/sylph-stuff/gtdb_r214_c100_sylph_v0.0.2.sylqueries
-sylph sketch -1 paired_1.fq -2 paired_2.fq
 sylph contain *.sylsample gtdb_r214_c100_sylph_v0.0.2.sylqueries -t 30 > results.tsv
 ```
 
