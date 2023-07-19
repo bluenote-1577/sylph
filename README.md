@@ -93,7 +93,7 @@ wget https://storage.googleapis.com/sylph-stuff/gtdb_r214_c100_sylph_v0.0.2.sylq
 sylph contain *.sylsample gtdb_r214_c100_sylph_v0.0.2.sylqueries -t 30 > results.tsv
 ```
 
-## 1 minute tutorial
+## 5 minute tutorial
 
 After installation, clone this repository if you have not done so and run the following.
 
