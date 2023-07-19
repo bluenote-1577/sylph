@@ -101,8 +101,9 @@ After installation, clone this repository if you have not done so and run the fo
 git clone https://github.com/bluenote-1577/sylph
 cd sylph
 
-# install sylph. use the below command is rust is installed; see above otherwise
-cargo install --path . --root ~/.cargo
+# install sylph. see installation instructions
+# cargo install --path . --root ~/.cargo
+# conda install -c bioconda sylph
 
 # sketch reads and genomes. fastq -> samples, fasta -> queries
 sylph sketch test_files/o157_reads.fastq test_files/e.coli*.fa
