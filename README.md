@@ -49,9 +49,9 @@ chmod +x sylph
 
 Note: the binary is compiled with a different set of libraries (musl instead of glibc), possibly impacting performance (slightly).
 
-#### Option 3: conda install
+#### Option 3: conda install (should be available, check [here](https://github.com/bioconda/bioconda-recipes/pull/42051))
 
-Forthcoming TODO. 
+`conda install -c bioconda sylph`
 
 ## Quick start
 
