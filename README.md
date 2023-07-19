@@ -77,6 +77,23 @@ sylph sketch --sample-force fasta_reads.fa
 sylph sketch my_contigs.fa -i -o contig_queries
 ```
 
+## Pre-sketched databases
+
+We have some pre-sketched databases available for download below. 
+
+### Pre-sketched GTDB r214 database (85,202 genomes)
+Two options are available.
+1. `-c 1000` more efficient (2GB), less sensitive sketch settings: https://storage.googleapis.com/sylph-stuff/gtdb_r214_c1000_sylph_v0.0.2.sylqueries.sylqueries.
+2. `-c 100` more sensitive (8GB) sketch settings: https://storage.googleapis.com/sylph-stuff/gtdb_r214_c100_sylph_v0.0.2.sylqueries
+
+Usage example:
+
+```sh
+wget https://storage.googleapis.com/sylph-stuff/gtdb_r214_c100_sylph_v0.0.2.sylqueries
+sylph sketch -1 paired_1.fq -2 paired_2.fq
+sylph contain *.sylsample gtdb_r214_c100_sylph_v0.0.2.sylqueries -t 30 > results.tsv
+```
+
 ## 1 minute tutorial
 
 After installation, clone this repository if you have not done so and run the following.
