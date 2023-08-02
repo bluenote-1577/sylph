@@ -10,8 +10,11 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Mode {
     /// Sketch sequences into samples (reads) and queries (genomes). 
+    /// Ex: sylph sketch reads.fq genomes.fa
     Sketch(SketchArgs),
-    /// Calculate coverage-adjusted containment ANI between queries and samples.
+    /// Calculate coverage-adjusted containment ANI between queries and samples. Can also operate
+    /// on raw fastq/fasta files. 
+    /// Ex: sylph contain reads.fq.sylsample sylph_queries.sylqueries
     Contain(ContainArgs),
 }
 
@@ -28,7 +31,7 @@ pub struct SketchArgs {
     pub individual: bool,
     #[clap(long="sample-force", help_heading = "INPUT", help = "Ignore fasta/fastq and force all inputs to be samples")]
     pub sample_force: bool,
-    #[clap(long="query-force", help_heading = "INPUT", help = "Ignore fasta/fastq and force all inputs to be queries. Does not work for paired reads (-1, -2 options)")]
+    #[clap(long="query-force", help_heading = "INPUT", help = "Ignore fasta/fastq and force all inputs to be queries.e. genomes). Does not work for paired reads (-1, -2 options)")]
     pub query_force: bool,
     #[clap(short,long="list", help_heading = "INPUT", help = "Use files in a newline delimited text file as inputs")]
     pub list_sequence: Option<String>,
@@ -56,6 +59,8 @@ pub struct ContainArgs {
     pub k: usize,
     #[clap(short, default_value_t = 100, help_heading = "ALGORITHM", help = "Subsampling rate. Only for raw fasta/fastq")]
     pub c: usize,
+    #[clap(long,default_value_t = 3., help_heading = "ALGORITHM", help = "Minimum number of k-mers with multiplicity 1 and 2 needed for correction")]
+    pub min_count_correct: f64,
     #[clap(short, long="minimum-ani", default_value_t = 78., help_heading = "OUTPUT", help = "Minimum adjusted ANI to output (0-100)" )]
     pub minimum_ani: f64,
     #[clap(short, default_value_t = 3, help = "Number of threads")]

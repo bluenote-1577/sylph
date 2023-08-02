@@ -110,7 +110,7 @@ pub fn contain(args: ContainArgs) {
     log::info!("Finished obtaining genome sketches.");
 
     if genome_sketches.is_empty() {
-        log::error!("No genome sketches found. Exiting");
+        log::error!("No genome sketches found; see sylph contain -h for help. Exiting");
         std::process::exit(1);
     }
 
@@ -177,11 +177,11 @@ fn get_genome_sketches(
     let genome_sketches = Mutex::new(vec![]);
 
     for genome_sketch_file in genome_sketch_files {
-        let file = File::open(genome_sketch_file).expect("Genome sketch {} not a valid file");
+        let file = File::open(genome_sketch_file).expect(&format!("The sketch `{}` not a valid file ", genome_sketch_file));
         let genome_reader = BufReader::with_capacity(10_000_000, file);
         let genome_sketches_vec: Vec<GenomeSketch> = bincode::deserialize_from(genome_reader)
             .expect(&format!(
-                "Genome sketch {} is not a valid sketch.",
+                "The sketch `{}` is not a valid sketch ",
                 &genome_sketch_file
             ));
         if genome_sketches_vec.is_empty() {
@@ -197,7 +197,7 @@ fn get_genome_sketches(
         if current_k.is_none() {
             current_k = Some(genome_sketches_vec.first().unwrap().k);
         } else if current_k.unwrap() != k {
-            error!("Genome sketches have inconsistent -k. Exiting.");
+            error!("Query sketches have inconsistent -k. Exiting.");
             std::process::exit(1);
         }
         genome_sketches.lock().unwrap().extend(genome_sketches_vec);
@@ -238,12 +238,12 @@ fn get_seq_sketch(
     if is_sketch_file {
         let read_sketch_file = read_file;
         let file = File::open(read_sketch_file.clone()).expect(&format!(
-            "Read sketch {} not a valid file",
+            "The sketch `{}` not a valid file ",
             &read_sketch_file
         ));
         let read_reader = BufReader::with_capacity(10_000_000, file);
         let read_sketch_enc: SequencesSketchEncode = bincode::deserialize_from(read_reader).expect(
-            &format!("Read sketch {} is not a valid sketch.", read_sketch_file),
+            &format!("The sketch `{}` is not a valid sketch ", read_sketch_file),
         );
         let read_sketch = SequencesSketch::from_enc(read_sketch_enc);
         if read_sketch.c > genome_c {
@@ -298,10 +298,10 @@ fn _get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genom
     let mut current_k = None;
 
     read_sketch_files.into_par_iter().for_each(|read_sketch_file|{
-        let file = File::open(read_sketch_file.clone()).expect(&format!("Read sketch {} not a valid file", &read_sketch_file));
+        let file = File::open(read_sketch_file.clone()).expect(&format!("The sketch `{}` not a valid file ", &read_sketch_file));
         let read_reader = BufReader::with_capacity(10_000_000, file);
         let read_sketch_enc: SequencesSketchEncode = bincode::deserialize_from(read_reader).expect(&format!(
-            "Read sketch {} is not a valid sketch.",
+            "The sketch `{}` is not a valid sketch ",
             read_sketch_file
         ));
         let read_sketch = SequencesSketch::from_enc(read_sketch_enc);
@@ -314,11 +314,11 @@ fn _get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genom
 
     for genome_sketch_file in genome_sketch_files {
         let file =
-            File::open(genome_sketch_file.clone()).expect("Genome sketch {} not a valid file");
+            File::open(genome_sketch_file.clone()).expect(&format!("The sketch `{}` not a valid file ", genome_sketch_file));
         let genome_reader = BufReader::with_capacity(10_000_000, file);
         let genome_sketches_vec: Vec<GenomeSketch> = bincode::deserialize_from(genome_reader)
             .expect(&format!(
-                "Genome sketch {} is not a valid sketch.",
+                "The sketch `{}` is not a valid sketch ",
                 &genome_sketch_file
             ));
         if genome_sketches_vec.is_empty() {
@@ -334,7 +334,7 @@ fn _get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genom
         if current_k.is_none() {
             current_k = Some(genome_sketches_vec.first().unwrap().k);
         } else if current_k.unwrap() != k {
-            error!("Genome sketches have inconsistent -k. Exiting.");
+            error!("Query sketches have inconsistent -k. Exiting.");
             std::process::exit(1);
         }
         genome_sketches.lock().unwrap().extend(genome_sketches_vec);
@@ -453,7 +453,7 @@ fn get_stats<'a>(
     } else {
         let test_lambda;
         if args.ratio {
-            test_lambda = ratio_lambda(&full_covs)
+            test_lambda = ratio_lambda(&full_covs, args.min_count_correct)
         } else if args.mme {
             test_lambda = mme_lambda(&full_covs)
         } else if args.nb {
@@ -461,7 +461,7 @@ fn get_stats<'a>(
         } else if args.mle {
             test_lambda = mle_zip(&full_covs, sequence_sketch.k as f64)
         } else {
-            test_lambda = ratio_lambda(&full_covs)
+            test_lambda = ratio_lambda(&full_covs, args.min_count_correct)
         };
         if test_lambda.is_none() {
             use_lambda = AdjustStatus::Low
@@ -675,7 +675,7 @@ fn bootstrap_interval(
         }
         let lambda;
         if args.ratio {
-            lambda = ratio_lambda(&rand_vec);
+            lambda = ratio_lambda(&rand_vec, args.min_count_correct);
         } else if args.mme {
             lambda = mme_lambda(&rand_vec);
         } else if args.nb {
@@ -683,7 +683,7 @@ fn bootstrap_interval(
         } else if args.mle {
             lambda = mle_zip(&rand_vec, k);
         } else {
-            lambda = ratio_lambda(&rand_vec);
+            lambda = ratio_lambda(&rand_vec,args.min_count_correct);
         }
         let ani = ani_from_lambda(lambda, mean(&rand_vec).unwrap().into(), k, &rand_vec);
         if ani.is_some() && lambda.is_some() {
@@ -707,7 +707,7 @@ fn bootstrap_interval(
     return (low_ani, high_ani, low_lambda, high_lambda);
 }
 
-fn ratio_lambda(full_covs: &Vec<u32>) -> Option<f64> {
+fn ratio_lambda(full_covs: &Vec<u32>, min_count_correct: f64) -> Option<f64> {
     let mut num_zero = 0;
     let mut count_map: HashMap<_, _> = HashMap::default();
 
@@ -736,7 +736,7 @@ fn ratio_lambda(full_covs: &Vec<u32>) -> Option<f64> {
         }
         let count_p1 = count_map[&(most_ind + 1)] as f64;
         let count = count_map[&most_ind] as f64;
-        if count_p1 < MINIMUM_COUNT_RATIO || count < MINIMUM_COUNT_RATIO {
+        if count_p1 < min_count_correct || count < min_count_correct{
             return None;
         }
         let lambda = Some(count_p1 / count * ((most_ind + 1) as f64));

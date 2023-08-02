@@ -157,7 +157,7 @@ pub fn sketch(args: SketchArgs) {
         && args.first_pair.is_empty()
         && args.second_pair.is_empty()
     {
-        error!("No input sequences found. Exiting.");
+        error!("No input sequences found; see sylph sketch -h for help. Exiting.");
         std::process::exit(1);
     }
 
@@ -186,7 +186,7 @@ pub fn sketch(args: SketchArgs) {
         } else if is_fasta(&file) {
             genome_inputs.push(file);
         } else {
-            warn!("{} does not have a fasta/fastq/gzip type extension.", file);
+            warn!("{} does not have a fasta/fastq/gzip type extension; skipping", file);
         }
     }
 
@@ -215,7 +215,7 @@ pub fn sketch(args: SketchArgs) {
 
                 let mut read_sk_file = BufWriter::new(
                     File::create(&file_path_str)
-                        .expect(&format!("{} path not valid, exiting.", file_path_str)),
+                        .expect(&format!("{} path not valid; exiting ", file_path_str)),
                 );
 
                 let enc = SequencesSketchEncode::new(read_sketch);
@@ -249,7 +249,7 @@ pub fn sketch(args: SketchArgs) {
 
             let mut read_sk_file = BufWriter::new(
                 File::create(&file_path_str)
-                    .expect(&format!("{} path not valid, exiting.", file_path_str)),
+                    .expect(&format!("{} path not valid; exiting ", file_path_str)),
             );
 
             let enc = SequencesSketchEncode::new(read_sketch);
@@ -292,12 +292,18 @@ pub fn sketch(args: SketchArgs) {
             }
         });
 
-        let mut genome_sk_file = BufWriter::new(
-            File::create(&file_path_str).expect(&format!("{} not valid", file_path_str)),
-        );
 
-        bincode::serialize_into(&mut genome_sk_file, &all_genome_sketches).unwrap();
-        info!("Wrote all genome sketches to {}", file_path_str);
+
+        if all_genome_sketches.lock().unwrap().is_empty(){
+            warn!("No valid queries (e.g. genomes or fasta files) to sketch; {} is not output", file_path_str);
+        }
+        else{
+            let mut genome_sk_file = BufWriter::new(
+                File::create(&file_path_str).expect(&format!("{} not valid ", file_path_str)),
+            );
+            info!("Wrote all genome sketches to {}", file_path_str);
+            bincode::serialize_into(&mut genome_sk_file, &all_genome_sketches).unwrap();
+        }
     }
 
     info!("Finished.");
@@ -323,7 +329,7 @@ pub fn sketch_genome_individual(
             return_genome_sketch.file_name = ref_file.to_string();
             if record.is_ok() {
                 let mut kmer_vec = vec![];
-                let record = record.expect(&format!("Invalid record for file {}", ref_file));
+                let record = record.expect(&format!("Invalid record for file {} ", ref_file));
                 let contig_name = String::from_utf8_lossy(record.id()).to_string();
                 return_genome_sketch.first_contig_name = contig_name;
                 let seq = record.seq();
@@ -382,7 +388,7 @@ pub fn sketch_genome(
         let mut contig_number = 0;
         while let Some(record) = reader.next() {
             if record.is_ok() {
-                let record = record.expect(&format!("Invalid record for file {}", ref_file));
+                let record = record.expect(&format!("Invalid record for file {} ", ref_file));
                 if first {
                     let contig_name = String::from_utf8_lossy(record.id()).to_string();
                     return_genome_sketch.first_contig_name = contig_name;
@@ -650,7 +656,7 @@ pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize) -> Option<Se
         let mut reader = reader.unwrap();
         while let Some(record) = reader.next() {
             if record.is_ok() {
-                let record = record.expect(&format!("Invalid record for file {}", ref_file));
+                let record = record.expect(&format!("Invalid record for file {} ", ref_file));
                 let seq = record.seq();
                 extract_markers(&seq, &mut vec, c, k);
             } else {

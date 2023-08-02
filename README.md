@@ -92,7 +92,7 @@ cd sylph
 # sketch reads and genomes. fastq -> samples, fasta -> queries
 sylph sketch test_files/o157_reads.fastq test_files/e.coli*.fa
 
-# query for ANI
+# query for ANI; *.sylqueries are queried against samples for ANI.
 sylph contain o157_reads.fastq.sylsample sylph_queries.sylqueries
 
 # ALTERNATIVE: lazy containment without pre-sketching also works 

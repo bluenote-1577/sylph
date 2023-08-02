@@ -2,6 +2,7 @@ use clap::Parser;
 use sylph::cmdline::*;
 use sylph::sketch;
 use sylph::contain;
+use std::panic::set_hook;
 
 //Use this allocator when statically compiling
 //instead of the default
@@ -14,6 +15,11 @@ use sylph::contain;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn main() {
+    set_hook(Box::new(|info| {
+        if let Some(s) = info.payload().downcast_ref::<String>() {
+            log::error!("{}", s);
+        }
+    }));
     let cli = Cli::parse();
     match cli.mode {
         Mode::Sketch(sketch_args) => sketch::sketch(sketch_args),
