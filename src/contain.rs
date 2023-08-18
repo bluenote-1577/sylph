@@ -11,7 +11,6 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Mutex;
-use std::time::Instant;
 
 fn print_ani_result(ani_result: &AniResult) {
     let print_final_ani = format!("{:.2}", f64::min(ani_result.final_est_ani * 100., 100.));
@@ -408,15 +407,15 @@ fn get_stats<'a>(
     let mut covs = vec![];
     let gn_kmers = &genome_sketch.genome_kmers;
 
-    let start_t_initial = Instant::now();
+    //let start_t_initial = Instant::now();
     for kmer in gn_kmers.iter() {
         if sequence_sketch.kmer_counts.contains_key(kmer) {
             contain_count += 1;
             covs.push(sequence_sketch.kmer_counts[kmer]);
         }
     }
-    log::trace!("Hashing time {:?}", Instant::now() - start_t_initial);
-    let start_t_initial = Instant::now();
+    //log::trace!("Hashing time {:?}", Instant::now() - start_t_initial);
+    //let start_t_initial = Instant::now();
     if covs.is_empty() {
         return None;
     }
@@ -436,7 +435,7 @@ fn get_stats<'a>(
             break;
         }
     }
-    log::trace!("{:?}, {}", covs, max_cov);
+    log::trace!("COV VECTOR for {}/{}: {:?}, {}", sequence_sketch.file_name, genome_sketch.file_name ,covs, max_cov);
 
     let mut full_covs = vec![0; gn_kmers.len() - contain_count];
     for cov in covs.iter() {
@@ -527,7 +526,7 @@ fn get_stats<'a>(
         ani_ci: (low_ani, high_ani),
         lambda_ci: (low_lambda, high_lambda),
     };
-    log::trace!("Other time {:?}", Instant::now() - start_t_initial);
+    //log::trace!("Other time {:?}", Instant::now() - start_t_initial);
 
     return Some(ani_result);
 }
