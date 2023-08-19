@@ -1,4 +1,7 @@
 use crate::cmdline::*;
+use std::thread;
+use std::time::Duration;
+
 use memory_stats::memory_stats;
 
 use crate::constants::*;
@@ -20,6 +23,24 @@ use std::io::Read;
 use std::io::{prelude::*, BufReader};
 use std::path::Path;
 use std::sync::Mutex;
+
+pub fn check_vram_and_block(max_ram: usize, file: &str){
+    if let Some(usage) = memory_stats() {
+        let mut gb_usage_curr = usage.virtual_mem as f64 / 1_000_000_000 as f64;
+        if (max_ram as f64) < gb_usage_curr{
+            log::debug!("Max memory reached. Blocking sketch for {}. Curr memory {}, max mem {}", file, gb_usage_curr, max_ram);
+        }
+        while (max_ram as f64) < gb_usage_curr{
+            let five_second = Duration::from_secs(3);
+            thread::sleep(five_second);
+            gb_usage_curr = usage.virtual_mem as f64 / 1_000_000_000 as f64;
+            if (max_ram as f64) >= gb_usage_curr{
+                log::debug!("Sketching for {} freed", file);
+            }
+        }
+
+    }
+}
 
 pub fn extract_markers(string: &[u8], kmer_vec: &mut Vec<u64>, c: usize, k: usize) {
     #[cfg(any(target_arch = "x86_64"))]
@@ -195,6 +216,10 @@ pub fn sketch(args: SketchArgs) {
     let mut max_ram = usize::MAX;
     if args.max_ram.is_some(){
         max_ram = args.max_ram.unwrap();
+        if max_ram < 10{
+            log::error!("Max ram must be >= 10. Exiting.");
+            std::process::exit(1);
+        }
     }
 
     if !args.first_pair.is_empty() && !args.second_pair.is_empty() {
@@ -207,13 +232,7 @@ pub fn sketch(args: SketchArgs) {
         iter_vec.into_par_iter().for_each(|i| {
             let read_file1 = &args.first_pair[i];
             let read_file2 = &args.second_pair[i];
-            
-            if let Some(usage) = memory_stats() {
-                let gb_usage_curr = usage.physical_mem as f64 / 1_000_000_000 as f64;
-                while (max_ram as f64) < gb_usage_curr{
-                }
-
-            } 
+            check_vram_and_block(max_ram, read_file1);
 
             let read_sketch_opt = sketch_pair_sequences(read_file1, read_file2, args.c, args.k);
             if read_sketch_opt.is_some() {
@@ -247,19 +266,16 @@ pub fn sketch(args: SketchArgs) {
     let iter_vec: Vec<usize> = (0..read_inputs.len()).into_iter().collect();
     iter_vec.into_par_iter().for_each(|i| {
         let pref = Path::new(&args.sample_prefix);
-
-        if let Some(usage) = memory_stats() {
-            let gb_usage_curr = usage.physical_mem as f64 / 1_000_000_000 as f64;
-            while (max_ram as f64) < gb_usage_curr{
-            }
-        } 
-
         let read_file = &read_inputs[i];
+
+        check_vram_and_block(max_ram, read_file);
+
         let read_sketch_opt;
         if args.sample_force {
             read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k)
         } else {
-            read_sketch_opt = sketch_query(args.c, args.k, args.threads, read_file);
+            read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k)
+            //read_sketch_opt = sketch_query(args.c, args.k, args.threads, read_file);
         }
         if read_sketch_opt.is_some() {
             let read_sketch = read_sketch_opt.unwrap();
@@ -591,8 +607,8 @@ pub fn sketch_query(
         }
         read_parallel(
             reader,
-            threads as u32,
-            threads * 10,
+            10,
+            100,
             |record_set| {
                 let mut vec = vec![];
                 for record in record_set.into_iter() {
@@ -631,8 +647,8 @@ pub fn sketch_query(
         }
         read_parallel(
             reader,
-            threads as u32,
-            threads * 100,
+            10 as u32,
+            2 * 100,
             |record_set| {
                 // this function does the heavy work
                 let mut vec = vec![];
