@@ -1,4 +1,6 @@
 use crate::cmdline::*;
+use memory_stats::memory_stats;
+
 use crate::constants::*;
 use crate::seeding::*;
 use crate::types::*;
@@ -190,6 +192,11 @@ pub fn sketch(args: SketchArgs) {
         }
     }
 
+    let mut max_ram = usize::MAX;
+    if args.max_ram.is_some(){
+        max_ram = args.max_ram.unwrap();
+    }
+
     if !args.first_pair.is_empty() && !args.second_pair.is_empty() {
         info!("Sketching paired sequences...");
         if args.first_pair.len() != args.second_pair.len() {
@@ -200,6 +207,14 @@ pub fn sketch(args: SketchArgs) {
         iter_vec.into_par_iter().for_each(|i| {
             let read_file1 = &args.first_pair[i];
             let read_file2 = &args.second_pair[i];
+            
+            if let Some(usage) = memory_stats() {
+                let gb_usage_curr = usage.physical_mem as f64 / 1_000_000_000 as f64;
+                while (max_ram as f64) < gb_usage_curr{
+                }
+
+            } 
+
             let read_sketch_opt = sketch_pair_sequences(read_file1, read_file2, args.c, args.k);
             if read_sketch_opt.is_some() {
                 let pref = Path::new(&args.sample_prefix);
@@ -232,6 +247,12 @@ pub fn sketch(args: SketchArgs) {
     let iter_vec: Vec<usize> = (0..read_inputs.len()).into_iter().collect();
     iter_vec.into_par_iter().for_each(|i| {
         let pref = Path::new(&args.sample_prefix);
+
+        if let Some(usage) = memory_stats() {
+            let gb_usage_curr = usage.physical_mem as f64 / 1_000_000_000 as f64;
+            while (max_ram as f64) < gb_usage_curr{
+            }
+        } 
 
         let read_file = &read_inputs[i];
         let read_sketch_opt;

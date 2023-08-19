@@ -253,7 +253,7 @@ fn get_seq_sketch(
         return Some(read_sketch);
     } else {
         if genome_c < args.c {
-            error!("{} value of -c for contain is {} -- greater than the smallest value of -c for a genome sketch {}. Continuing without sketching.", read_file, args.c, genome_c);
+            error!("{} error: value of -c for contain = {} -- greater than the smallest value of -c for a genome sketch = {}. Continuing without sketching.", read_file, args.c, genome_c);
             return None;
         } else if genome_k != args.k {
             error!(

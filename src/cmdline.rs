@@ -41,8 +41,13 @@ pub struct SketchArgs {
     pub c: usize,
     #[clap(short, default_value_t = 3, help = "Number of threads")]
     pub threads: usize,
+
+    #[clap(long="max-ram", help = "Approximate max RAM limit for read sketching during multi-threaded mode (GB).")]
+    pub max_ram: Option<usize>,
+
     #[clap(long="trace", help = "Trace output for debugging")]
     pub trace: bool,
+
     #[clap(long="min-spacing", default_value_t = 150, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the queries")]
     pub min_spacing_kmer: usize,
     #[clap(short='1',long="first-pair", multiple=true, help_heading = "INPUT", help = "First pairs in paired end reads e.g. S1_1.fq S2_1.fq")]

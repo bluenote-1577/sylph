@@ -607,6 +607,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "memory-stats"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34f79cf9964c5c9545493acda1263f1912f8d2c56c8a2ffee2606cb960acaacc"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1195,6 +1205,7 @@ dependencies = [
  "flate2",
  "fxhash",
  "log",
+ "memory-stats",
  "nalgebra 0.32.3",
  "needletail",
  "predicates 1.0.8",
