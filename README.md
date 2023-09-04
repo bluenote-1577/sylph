@@ -14,7 +14,7 @@ sylph uses a sketched k-mer containment method. sylph's novelty lies in **using 
 
 ##  Install
 
-#### Option 1: conda install (check [here](https://github.com/bioconda/bioconda-recipes/pull/42051) for availability)
+#### Option 1: conda install 
 
 `conda install -c bioconda sylph`
 
