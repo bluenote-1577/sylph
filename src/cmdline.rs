@@ -66,7 +66,7 @@ pub struct ContainArgs {
     pub c: usize,
     #[clap(long,default_value_t = 3., help_heading = "ALGORITHM", help = "Minimum number of k-mers with multiplicity 1 and 2 needed for correction")]
     pub min_count_correct: f64,
-    #[clap(short, long="minimum-ani", default_value_t = 78., help_heading = "OUTPUT", help = "Minimum adjusted ANI to output (0-100)" )]
+    #[clap(short, long="minimum-ani", default_value_t = 90., help_heading = "OUTPUT", help = "Minimum adjusted ANI to output (0-100)" )]
     pub minimum_ani: f64,
     #[clap(short, default_value_t = 3, help = "Number of threads")]
     pub threads: usize,
@@ -87,5 +87,7 @@ pub struct ContainArgs {
     #[clap(short,long="individual-records", help_heading = "INPUT", help = "Use individual records (e.g. contigs) as queries instead. Only for raw fasta/fastq")]
     pub individual: bool,
     #[clap(long="min-spacing", default_value_t = 150, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the queries. Only for raw fasta/fastq")]
-    pub min_spacing_kmer: usize
+    pub min_spacing_kmer: usize,
+    #[clap(long="pseudotax", hidden=true)]
+    pub pseudotax: bool,
 }

@@ -155,7 +155,7 @@ impl SequencesSketch{
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Hash, PartialOrd, Eq, Ord)]
 #[derive(Default, Clone)]
 pub struct GenomeSketch{
     pub genome_kmers: Vec<Kmer>,
@@ -189,4 +189,5 @@ pub struct AniResult<'a>{
     pub lambda: AdjustStatus,
     pub ani_ci: (Option<f64>,Option<f64>),
     pub lambda_ci: (Option<f64>,Option<f64>),
+    pub genome_sketch_index: usize,
 }

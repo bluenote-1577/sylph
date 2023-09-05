@@ -15,11 +15,11 @@ use std::panic::set_hook;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn main() {
-    set_hook(Box::new(|info| {
-        if let Some(s) = info.payload().downcast_ref::<String>() {
-            log::error!("{}", s);
-        }
-    }));
+//    set_hook(Box::new(|info| {
+//        if let Some(s) = info.payload().downcast_ref::<String>() {
+//            log::error!("{}", s);
+//        }
+//    }));
     let cli = Cli::parse();
     match cli.mode {
         Mode::Sketch(sketch_args) => sketch::sketch(sketch_args),

@@ -5,6 +5,7 @@ use crate::sketch::*;
 use crate::types::*;
 use log::*;
 use rayon::prelude::*;
+use rayon::result;
 use statrs::distribution::{DiscreteCDF, Poisson};
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -116,33 +117,58 @@ pub fn contain(args: ContainArgs) {
     read_files.extend(read_sketch_files.clone());
     let first_write = Mutex::new(true);
     let sequence_index_vec = (0..read_files.len()).collect::<Vec<usize>>();
+
     sequence_index_vec.into_iter().for_each(|j| {
         let is_sketch = j >= read_files.len() - read_sketch_files.len();
         let sequence_sketch = get_seq_sketch(&args, read_files[j], is_sketch, genome_sketches[0].c, genome_sketches[0].k);
         if sequence_sketch.is_some(){
             let sequence_sketch = sequence_sketch.unwrap();
+            let stats_vec_seq: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
             genome_index_vec.par_iter().for_each(|i| {
-            let genome_sketch = &genome_sketches[*i];
-                let res = get_stats(&args, &genome_sketch, &sequence_sketch);
+                let genome_sketch = &genome_sketches[*i];
+                let mut res = get_stats(&args, &genome_sketch, &sequence_sketch, None);
                 if res.is_some() {
-                    let mut inner = stats_vec.lock().unwrap();
-                    inner.push(res.unwrap());
-                    let mut moved_results: Vec<_>;
-                    if inner.len() > 5_000_000{
-                        log::info!("Writing temporary results to stdout. CAUTION: results will not be sorted.");
-                        moved_results = std::mem::take(&mut inner);
-                        moved_results.sort_by(|x, y| y.final_est_ani.partial_cmp(&x.final_est_ani).unwrap());
-                        if *first_write.lock().unwrap(){
-                            *first_write.lock().unwrap() = false;
-                            print_header();
-
-                        }
-                        for res in moved_results {
-                            print_ani_result(&res);
-                        }
-                    }
+                    res.as_mut().unwrap().genome_sketch_index = *i;
+                    stats_vec_seq.lock().unwrap().push(res.unwrap());
+                    
                 }
             });
+            let mut stats_vec_seq = stats_vec_seq.into_inner().unwrap();
+
+            if args.pseudotax{
+                let winner_map = winner_table(&stats_vec_seq, &genome_sketches);
+            //If pseudotax, get k-mer to genome table: table <k_mer, &genome_sketch> = table(results)
+                let remaining_genomes = stats_vec_seq.iter().map(|x| &genome_sketches[x.genome_sketch_index]).collect::<Vec<&GenomeSketch>>();
+                dbg!(remaining_genomes.len());
+                let stats_vec_seq_2 = Mutex::new(vec![]);
+                remaining_genomes.into_par_iter().for_each(|genome_sketch|{
+                    let res = get_stats(&args, &genome_sketch, &sequence_sketch, Some(&winner_map));
+                    if res.is_some() {
+                        stats_vec_seq_2.lock().unwrap().push(res.unwrap());
+                    }
+                });
+                stats_vec_seq = stats_vec_seq_2.into_inner().unwrap();
+            
+            //for loop over genomes in results
+            //Reassign k-mers to genomes: get_stats(table)
+            }
+
+            let mut inner = stats_vec.lock().unwrap();
+            inner.extend(stats_vec_seq);
+            let mut moved_results: Vec<_>;
+            if inner.len() > 5_000_000{
+                log::info!("Writing temporary results to stdout. CAUTION: results will not be sorted.");
+                moved_results = std::mem::take(&mut inner);
+                moved_results.sort_by(|x, y| y.final_est_ani.partial_cmp(&x.final_est_ani).unwrap());
+                if *first_write.lock().unwrap(){
+                    *first_write.lock().unwrap() = false;
+                    print_header();
+
+                }
+                for res in moved_results {
+                    print_ani_result(&res);
+                }
+            }
         }
         log::info!("Finished contain for {}.", &read_files[j]);
     });
@@ -157,6 +183,25 @@ pub fn contain(args: ContainArgs) {
     }
 
     log::info!("Finished contain.");
+}
+
+fn winner_table<'a>(results : &Vec<AniResult>, genome_sketches: &'a Vec<GenomeSketch>) -> HashMap<Kmer, &'a GenomeSketch> {
+    let mut kmer_to_genome_map = HashMap::new();
+    let mut return_map = HashMap::new();
+    for res in results.iter(){
+        let gn_sketch = &genome_sketches[res.genome_sketch_index];
+        for kmer in gn_sketch.genome_kmers.iter(){
+            let v = kmer_to_genome_map.entry(*kmer).or_insert(vec![]);
+            v.push((res.final_est_ani, gn_sketch));
+        }
+    }
+
+    for (kmer, list) in kmer_to_genome_map.iter_mut(){
+        list.sort_by(|a,b| b.partial_cmp(&a).unwrap());
+        return_map.insert(*kmer, list.first().unwrap().1);
+    }
+
+    return return_map;
 }
 
 fn print_header() {
@@ -386,6 +431,7 @@ fn get_stats<'a>(
     args: &ContainArgs,
     genome_sketch: &'a GenomeSketch,
     sequence_sketch: &SequencesSketch,
+    winner_map: Option<&HashMap<Kmer, & GenomeSketch>>
 ) -> Option<AniResult<'a>> {
     if genome_sketch.k != sequence_sketch.k {
         log::error!(
@@ -410,6 +456,11 @@ fn get_stats<'a>(
     //let start_t_initial = Instant::now();
     for kmer in gn_kmers.iter() {
         if sequence_sketch.kmer_counts.contains_key(kmer) {
+            if winner_map.is_some(){
+                if winner_map.unwrap()[kmer] != genome_sketch{
+                    continue
+                }
+            }
             contain_count += 1;
             covs.push(sequence_sketch.kmer_counts[kmer]);
         }
@@ -525,6 +576,7 @@ fn get_stats<'a>(
         lambda: use_lambda,
         ani_ci: (low_ani, high_ani),
         lambda_ci: (low_lambda, high_lambda),
+        genome_sketch_index: usize::MAX 
     };
     //log::trace!("Other time {:?}", Instant::now() - start_t_initial);
 
