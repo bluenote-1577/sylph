@@ -23,15 +23,15 @@ pub enum Mode {
 pub struct SketchArgs {
     #[clap(multiple=true, help = "fasta or fastq file; gzip optional. fastq files will be considered samples (*.sylsample) and fasta files as queries (*.sylqueries) by default")]
     pub files: Vec<String>,
-    #[clap(short='o',long="query-output-prefix", default_value = "sylph_queries", help_heading = "OUTPUT", help = "Prefix for query sketches")]
+    #[clap(short='o',long="query-output-prefix", default_value = "sylph_queries", help_heading = "OUTPUT", help = "Prefix for query sketch. All queries (i.e. genomes) will be aggregated into one file")]
     pub query_prefix: String,
-    #[clap(short,long="sample-output-prefix", default_value = "", help_heading = "OUTPUT", help = "Prefix for sample sketches")]
+    #[clap(short,long="sample-output-prefix", default_value = "", help_heading = "OUTPUT", help = "Prefix for sample sketches. Each sample (i.e. reads) is written to its own file")]
     pub sample_prefix: String,
     #[clap(short,long="individual-records", help_heading = "INPUT", help = "Use individual records (e.g. contigs) as queries instead")]
     pub individual: bool,
-    #[clap(long="sample-force", help_heading = "INPUT", help = "Ignore fasta/fastq and force all inputs to be samples")]
+    #[clap(long="sample-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and force all inputs to be samples (i.e. reads)")]
     pub sample_force: bool,
-    #[clap(long="query-force", help_heading = "INPUT", help = "Ignore fasta/fastq and force all inputs to be queries.e. genomes). Does not work for paired reads (-1, -2 options)")]
+    #[clap(long="query-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and force all inputs to be queries (i.e. genomes). Does not work for paired reads (-1, -2 options)")]
     pub query_force: bool,
     #[clap(short,long="list", help_heading = "INPUT", help = "Use files in a newline delimited text file as inputs")]
     pub list_sequence: Option<String>,
@@ -42,7 +42,7 @@ pub struct SketchArgs {
     #[clap(short, default_value_t = 3, help = "Number of threads")]
     pub threads: usize,
 
-    #[clap(long="ram-barrier", help = "Stop multi-threaded read sketching when (virtual) RAM is past this value (in GB). Does NOT guarantee max RAM limit.")]
+    #[clap(long="ram-barrier", help = "Stop multi-threaded read sketching when (virtual) RAM is past this value (in GB). Does NOT guarantee max RAM limit", hidden=true)]
     pub max_ram: Option<usize>,
 
     #[clap(long="trace", help = "Trace output for debugging")]
@@ -58,16 +58,16 @@ pub struct SketchArgs {
 
 #[derive(Args)]
 pub struct ContainArgs {
-    #[clap(multiple=true, help = "Pre-sketched query or sample files. Raw fastq/fasta also allowed but presketching is recommended; see sylph sketch for more info")]
+    #[clap(multiple=true, help = "Pre-sketched query or sample files. Raw fastq/fasta also allowed but presketching is recommended; see sylph sketch for more info on file extension handling")]
     pub files: Vec<String>,
-    #[clap(short, default_value_t = 31, help_heading = "ALGORITHM", help = "Value of k. Only k = 21, 31 are currently supported. Only for raw fasta/fastq")]
+    #[clap(short, default_value_t = 31, help_heading = "ALGORITHM", help = "Value of k. Only k = 21, 31 are currently supported. -k does nothing for pre-sketched files")]
     pub k: usize,
-    #[clap(short, default_value_t = 100, help_heading = "ALGORITHM", help = "Subsampling rate. Only for raw fasta/fastq")]
+    #[clap(short, default_value_t = 100, help_heading = "ALGORITHM", help = "Subsampling rate. -c does nothing for pre-sketched files.")]
     pub c: usize,
-    #[clap(long,default_value_t = 3., help_heading = "ALGORITHM", help = "Minimum number of k-mers with multiplicity 1 and 2 needed for correction")]
+    #[clap(long,default_value_t = 3., help_heading = "ALGORITHM", help = "Minimum k-mer multiplicity needed for coverage correction. Higher gives more precision but lower sensitivity")]
     pub min_count_correct: f64,
-    #[clap(short, long="minimum-ani", default_value_t = 90., help_heading = "OUTPUT", help = "Minimum adjusted ANI to output (0-100)" )]
-    pub minimum_ani: f64,
+    #[clap(short, long="minimum-ani", help_heading = "OUTPUT", help = "Minimum adjusted ANI to output (0-100). Default is 90; if --pseudotax is enabled then default is 96" )]
+    pub minimum_ani: Option<f64>,
     #[clap(short, default_value_t = 3, help = "Number of threads")]
     pub threads: usize,
     #[clap(long="trace", help = "Trace output for debugging")]
@@ -80,7 +80,7 @@ pub struct ContainArgs {
     pub mle: bool,
     #[clap(long="nb", hidden=true)]
     pub nb: bool,
-    #[clap(long="no-ci", help_heading = "OUTPUT", help = "Do not output confidence intervals")]
+    #[clap(long="no-ci", help_heading = "OUTPUT", help = "Do not output confidence intervals", hidden=true)]
     pub no_ci: bool,
     #[clap(long="no-adjust", hidden=true)]
     pub no_adj: bool,
@@ -88,6 +88,6 @@ pub struct ContainArgs {
     pub individual: bool,
     #[clap(long="min-spacing", default_value_t = 150, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the queries. Only for raw fasta/fastq")]
     pub min_spacing_kmer: usize,
-    #[clap(long="pseudotax", hidden=true)]
+    #[clap(short, long="pseudotax", help_heading = "ALGORITHM", help = "Pseudo taxonomic classification mode. This removes shared k-mers between species by assigning k-mers to the highest ANI species" )]
     pub pseudotax: bool,
 }

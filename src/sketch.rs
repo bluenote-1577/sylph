@@ -588,7 +588,7 @@ pub fn sketch_pair_sequences(
 pub fn sketch_query(
     c: usize,
     k: usize,
-    threads: usize,
+    _threads: usize,
     query_file: &str,
 ) -> Option<SequencesSketch> {
     let read_file = query_file;

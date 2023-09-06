@@ -1,13 +1,12 @@
 use crate::cmdline::*;
+use fxhash::FxHashMap;
 use crate::constants::*;
 use crate::inference::*;
 use crate::sketch::*;
 use crate::types::*;
 use log::*;
 use rayon::prelude::*;
-use rayon::result;
 use statrs::distribution::{DiscreteCDF, Poisson};
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::BufReader;
@@ -136,10 +135,10 @@ pub fn contain(args: ContainArgs) {
             let mut stats_vec_seq = stats_vec_seq.into_inner().unwrap();
 
             if args.pseudotax{
+                log::info!("Pseudotax enabled. Reassigning k-mers for {} genomes...", stats_vec_seq.len());
                 let winner_map = winner_table(&stats_vec_seq, &genome_sketches);
             //If pseudotax, get k-mer to genome table: table <k_mer, &genome_sketch> = table(results)
                 let remaining_genomes = stats_vec_seq.iter().map(|x| &genome_sketches[x.genome_sketch_index]).collect::<Vec<&GenomeSketch>>();
-                dbg!(remaining_genomes.len());
                 let stats_vec_seq_2 = Mutex::new(vec![]);
                 remaining_genomes.into_par_iter().for_each(|genome_sketch|{
                     let res = get_stats(&args, &genome_sketch, &sequence_sketch, Some(&winner_map));
@@ -148,6 +147,7 @@ pub fn contain(args: ContainArgs) {
                     }
                 });
                 stats_vec_seq = stats_vec_seq_2.into_inner().unwrap();
+                log::info!("{} genomes passing reassigned k-mer threshold. ", stats_vec_seq.len());
             
             //for loop over genomes in results
             //Reassign k-mers to genomes: get_stats(table)
@@ -185,9 +185,9 @@ pub fn contain(args: ContainArgs) {
     log::info!("Finished contain.");
 }
 
-fn winner_table<'a>(results : &Vec<AniResult>, genome_sketches: &'a Vec<GenomeSketch>) -> HashMap<Kmer, &'a GenomeSketch> {
-    let mut kmer_to_genome_map = HashMap::new();
-    let mut return_map = HashMap::new();
+fn winner_table<'a>(results : &Vec<AniResult>, genome_sketches: &'a Vec<GenomeSketch>) -> FxHashMap<Kmer, &'a GenomeSketch> {
+    let mut kmer_to_genome_map = FxHashMap::default();
+    let mut return_map = FxHashMap::default();
     for res in results.iter(){
         let gn_sketch = &genome_sketches[res.genome_sketch_index];
         for kmer in gn_sketch.genome_kmers.iter(){
@@ -431,7 +431,7 @@ fn get_stats<'a>(
     args: &ContainArgs,
     genome_sketch: &'a GenomeSketch,
     sequence_sketch: &SequencesSketch,
-    winner_map: Option<&HashMap<Kmer, & GenomeSketch>>
+    winner_map: Option<&FxHashMap<Kmer, & GenomeSketch>>
 ) -> Option<AniResult<'a>> {
     if genome_sketch.k != sequence_sketch.k {
         log::error!(
@@ -548,7 +548,10 @@ fn get_stats<'a>(
         final_est_ani = opt_est_ani.unwrap();
     }
 
-    if final_est_ani < args.minimum_ani/100. {
+    let min_ani = if args.minimum_ani.is_some() {args.minimum_ani.unwrap()/100. }
+        else if args.pseudotax { MIN_ANI_P_DEF } 
+        else { MIN_ANI_DEF };
+    if final_est_ani < min_ani {
         return None;
     }
 
@@ -760,7 +763,7 @@ fn bootstrap_interval(
 
 fn ratio_lambda(full_covs: &Vec<u32>, min_count_correct: f64) -> Option<f64> {
     let mut num_zero = 0;
-    let mut count_map: HashMap<_, _> = HashMap::default();
+    let mut count_map: FxHashMap<_, _> = FxHashMap::default();
 
     for x in full_covs {
         if *x == 0 {

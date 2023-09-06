@@ -2,7 +2,7 @@ use clap::Parser;
 use sylph::cmdline::*;
 use sylph::sketch;
 use sylph::contain;
-use std::panic::set_hook;
+//use std::panic::set_hook;
 
 //Use this allocator when statically compiling
 //instead of the default
