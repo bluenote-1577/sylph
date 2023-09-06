@@ -1,4 +1,4 @@
-# sylph -  ultrafast genome querying against shotgun metagenomes
+# sylph -  ultrafast, coverage-aware genome querying against shotgun metagenomes 
 
 ## Introduction
 
@@ -15,8 +15,12 @@ sylph uses a sketched k-mer containment method. sylph's novelty lies in **using 
 ##  Install
 
 #### Option 1: conda install 
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
+[![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/latest_release_date.svg)](https://anaconda.org/bioconda/sylph)
 
-`conda install -c bioconda sylph`
+```sh
+conda install -c bioconda sylph
+```
 
 #### Option 2: Pre-built x86-64 linux statically compiled executable
 
@@ -127,6 +131,19 @@ test_files/e.coli-K12.fasta	99.39	100.00	98.09
 ```
 
 So the ANIs should be 98.14, 98.09, and 100.0 for EC590, K12, and O157 respectively against the sample. As you can see, sylphs estimates are quite good and much more reasonable than the Naive ANI.  
+
+### Removing redundant queries
+
+In the above example, notice that querying each E. coli genome gave a high ANI value. However, only one E. coli genome is actually present in the sample, not all three. Thus sylph is not a taxonomic classifier; it does not tell you exactly **what genomes** are in your sample, just **how close** your query genome is to the genomes within the sample. 
+
+To remove this redundancy, we can use the ``--pseudotax`` option. This assigns k-mers to the highest ANI genome, so if you have duplicated genomes, only one gets all of the k-mers. 
+```sh
+> sylph contain test_files/* --pseudotax 
+...
+...
+Sample_file	Query_file	Adjusted_ANI	Naive_ANI	ANI_5-95_percentile	Eff_cov	Eff_lambda	Lambda_5-95_percentile	Median_cov	Mean_cov_geq1	Containment_ind	Contig_name
+test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85	0.374	0.374	0.35-0.39	1	1.188	5845/20554	NZ_CP017438.1 Escherichia coli O157:H7 strain 2159 chromosome, complete genome
+```
 
 ## Output format
 
