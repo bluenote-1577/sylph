@@ -299,7 +299,7 @@ pub fn sketch(args: SketchArgs) {
         info!("Sketching genomes...");
         let iter_vec: Vec<usize> = (0..genome_inputs.len()).into_iter().collect();
         let counter: Mutex<usize> = Mutex::new(0);
-        let pref = Path::new(&args.query_prefix);
+        let pref = Path::new(&args.query_out_name);
         let file_path_str = format!("{}{}", pref.to_str().unwrap(), QUERY_FILE_SUFFIX);
         let all_genome_sketches = Mutex::new(vec![]);
 
