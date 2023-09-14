@@ -120,7 +120,7 @@ The o157_reads.fastq is a "sample" containg only E. coli O157 with 1x coverage, 
 
 Notice the big difference between 1. and 2. This is because the reads are only 1x coverage: **MinHash k-mer methods like mash screen and sourmash give biased ANI when coverage is low**. 
 
-However, the Eff_cov gives smaller than 1x: this is because Eff_cov takes into account sequencing error. Sequencing error reduces the k-mer based coverages (errors can cause mutate k-mers). 
+However, the Eff_cov gives smaller than 1x: this is because Eff_cov takes into account sequencing error. Sequencing error reduces the k-mer based coverages (sequencing errors make k-mers erroneous). 
 
 Here are the ANIs computed by [skani](https://github.com/bluenote-1577/skani) between the three genomes:
 
