@@ -482,7 +482,7 @@ fn get_stats<'a>(
     for i in covs.len() / 2..covs.len(){
         let cov = covs[i];
         if pois.cdf(cov.into()) < CUTOFF_PVALUE {
-            max_cov = i as f64;
+            max_cov = cov as f64;
         } else {
             break;
         }
