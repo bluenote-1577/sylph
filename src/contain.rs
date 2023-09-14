@@ -490,13 +490,13 @@ fn get_stats<'a>(
     log::trace!("COV VECTOR for {}/{}: {:?}, {}", sequence_sketch.file_name, genome_sketch.file_name ,covs, max_cov);
 
     let mut full_covs = vec![0; gn_kmers.len() - contain_count];
-    for cov in covs.into_iter() {
-        if (cov as f64) < max_cov {
-            full_covs.push(cov);
+    for cov in covs.iter() {
+        if (*cov as f64) < max_cov {
+            full_covs.push(*cov);
         }
     }
     let mean_cov = full_covs.iter().sum::<u32>() as f64 / full_covs.len() as f64;
-    let geq1_mean_cov = full_covs.iter().sum::<u32>() as f64 / full_covs.len() as f64;
+    let geq1_mean_cov = full_covs.iter().sum::<u32>() as f64 / covs.len() as f64;
 
     let use_lambda;
     if median_cov > MEDIAN_ANI_THRESHOLD {
