@@ -452,6 +452,7 @@ pub fn sketch_genome(
                 duplicate_set.insert(km);
             }
         }
+
         let mut last_pos = 0;
         let mut last_contig = 0;
         for (contig, pos, km) in vec.iter() {

@@ -478,9 +478,10 @@ fn get_stats<'a>(
     //let covs = &covs[0..covs.len() * 99 / 100];
     let median_cov = covs[covs.len() / 2] as f64;
     let pois = Poisson::new(median_cov).unwrap();
-    let mut max_cov = median_cov;
-    for i in covs[covs.len() / 2]..1000000 {
-        if pois.cdf(i.into()) < CUTOFF_PVALUE {
+    let mut max_cov = f64::MAX;
+    for i in covs.len() / 2..covs.len(){
+        let cov = covs[i];
+        if pois.cdf(cov.into()) < CUTOFF_PVALUE {
             max_cov = i as f64;
         } else {
             break;
@@ -489,13 +490,13 @@ fn get_stats<'a>(
     log::trace!("COV VECTOR for {}/{}: {:?}, {}", sequence_sketch.file_name, genome_sketch.file_name ,covs, max_cov);
 
     let mut full_covs = vec![0; gn_kmers.len() - contain_count];
-    for cov in covs.iter() {
-        if (*cov as f64) < max_cov {
-            full_covs.push(*cov);
+    for cov in covs.into_iter() {
+        if (cov as f64) < max_cov {
+            full_covs.push(cov);
         }
     }
     let mean_cov = full_covs.iter().sum::<u32>() as f64 / full_covs.len() as f64;
-    let geq1_mean_cov = covs.iter().sum::<u32>() as f64 / covs.len() as f64;
+    let geq1_mean_cov = full_covs.iter().sum::<u32>() as f64 / full_covs.len() as f64;
 
     let use_lambda;
     if median_cov > MEDIAN_ANI_THRESHOLD {
