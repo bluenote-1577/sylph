@@ -115,7 +115,7 @@ pub fn contain(args: ContainArgs) {
     }
 
     if genome_sketches.first().unwrap().pseudotax_tracked_nonused_kmers.is_none() && args.pseudotax{
-        log::error!("--pseudotax is enabled, but *.sylsample was not sketched with the --pseudotax option. Exiting");
+        log::error!("--pseudotax is enabled, but *.sylsample was not sketched with the --enable-pseudotax option. Exiting");
         std::process::exit(1);
     }
 
