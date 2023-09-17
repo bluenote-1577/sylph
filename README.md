@@ -79,6 +79,10 @@ sylph sketch --sample-force fasta_reads.fa
 
 # query contigs instead of genomes
 sylph sketch my_contigs.fa -i -o contig_queries
+
+# do pseudotaxonomic classification by removing shared k-mers instead of nearest neighbour ANI
+sylph sketch *.fa --enable-pseudotax -o pseudotax-enabled-db
+sylph contain query.fq pseudotax-enabled-db.sylqueries --pseudotax 
 ```
 
 ## 5 minute tutorial
@@ -89,8 +93,9 @@ After installation, clone this repository if you have not done so and run the fo
 git clone https://github.com/bluenote-1577/sylph
 cd sylph
 
-# install sylph. see installation instructions
+## install sylph. see installation instructions
 # cargo install --path . --root ~/.cargo
+## OR
 # conda install -c bioconda sylph
 
 # sketch reads and genomes. fastq -> samples, fasta -> queries
@@ -102,7 +107,12 @@ sylph contain o157_reads.fastq.sylsample sylph_queries.sylqueries
 # ALTERNATIVE: lazy containment without pre-sketching also works 
 sylph contain test_files/*
 ```
-There are two types of files; `*.sylqueries` and `*.sylsample`. FASTQ files are treated as samples and turn into `*.sylsample` automatically, and vice-versa for FASTA files. Genomes are aggregated into one `sylqueries` file, and each genome is queried against all `sylsample`s. See the Quick start section for more options for sketching.
+There are two types of files: `*.sylqueries` and `*.sylsample`.
+- **FASTQ files** are treated as **samples** and turn into `*.sylsample` 
+- **FASTA files** are treated as **queries** and turn into `*.sylqueries`
+- For other behaviour, see the `--sample-force`, `--query-force` and `-1, -2` options. 
+
+Genomes are aggregated into one `sylqueries` file, and each genome is queried against all `sylsample`s. 
 
 You'll see something like the following
 
@@ -132,9 +142,9 @@ test_files/e.coli-K12.fasta	99.39	100.00	98.09
 
 So the ANIs should be 98.14, 98.09, and 100.0 for EC590, K12, and O157 respectively against the sample. As you can see, sylphs estimates are quite good and much more reasonable than the Naive ANI.  
 
-### Removing redundant queries
+### Removing redundant queries with `--pseudotax`
 
-In the above example, notice that querying each E. coli genome gave a high ANI value. However, only one E. coli genome is actually present in the sample, not all three. Thus sylph is not a taxonomic classifier; it does not tell you exactly **what genomes** are in your sample, just **how close** your query genome is to the genomes within the sample. 
+In the above example, notice that querying each E. coli genome gave a high ANI value. However, only one E. coli genome is present in the sample, not all three. Thus sylph is not a taxonomic classifier; it does not tell you **what genomes** are in your sample, just **how close** your query genome is to the genomes within the sample. 
 
 To remove some of this redundancy, we can use the ``--pseudotax`` option. This assigns k-mers to the highest ANI genome, so if you have duplicated genomes, only one gets all of the k-mers. 
 ```sh
@@ -144,8 +154,11 @@ To remove some of this redundancy, we can use the ``--pseudotax`` option. This a
 Sample_file	Query_file	Adjusted_ANI	Naive_ANI	ANI_5-95_percentile	Eff_cov	Eff_lambda	Lambda_5-95_percentile	Median_cov	Mean_cov_geq1	Containment_ind	Contig_name
 test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85	0.374	0.374	0.35-0.39	1	1.188	5845/20554	NZ_CP017438.1 Escherichia coli O157:H7 strain 2159 chromosome, complete genome
 ```
+### `--pseudotax` usage warning
 
-This option is still in beta mode and being tested. 
+You will need to use the `sylph sketch --enable-pseudotax` option when sketching if you want to use `--pseudotax` on a pre-sketched database. The resulting database is 2.5x as large, and can also be used without ``--pseudotax`` as well. 
+
+NOTE: `--pseudotax` option is still in beta mode and being tested. 
 
 ## Output format
 
@@ -180,17 +193,18 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 We have some pre-sketched databases available for download below. 
 
 ### Pre-sketched GTDB r214 database (85,202 genomes)
-Two options are available.
-1. `-c 1000` more efficient (2GB), less sensitive sketch settings: https://storage.googleapis.com/sylph-stuff/gtdb_r214_c1000_sylph_v0.0.2.sylqueries.sylqueries.
-2. `-c 100` more sensitive (8GB) sketch settings: https://storage.googleapis.com/sylph-stuff/gtdb_r214_c100_sylph_v0.0.2.sylqueries
+Options 1 is the same as 2, only it allows `--pseudotax` to be used. 
+1. `-c 100`, more sensitive database (20 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-plus-gtdb-r214.sylqueries
+2. `-c 100`, more sensitive database without `--pseudotax` enabled (8 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-gtdb-r214.sylqueries
+3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c1000-plus-gtdb-r214.sylqueries
 
 Usage example:
 
 ```sh
-wget https://storage.googleapis.com/sylph-stuff/gtdb_r214_c100_sylph_v0.0.2.sylqueries
-sylph contain *.sylsample gtdb_r214_c100_sylph_v0.0.2.sylqueries -t 30 > results.tsv
+wget https://storage.googleapis.com/sylph-stuff/v0.2-c100-plus-gtdb-r214.sylqueries
+sylph contain *.sylsample v0.2-c100-plus-gtdb-r214.sylqueries -t 30 > results.tsv
 ```
 
 ## Citing sylph
 
-Jim Shaw and Yun William Yu. Ultrafast genome similarity queries from low-abundance metagenomic samples with sylph (Preprint to be released soon). 
+Jim Shaw and Yun William Yu. Ultrafast, coverage-corrected genome similarity queries for metagenomic shotgun samples with sylph (Preprint to be released soon). 
