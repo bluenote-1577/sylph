@@ -5,6 +5,7 @@
 
 ### Major
 - Fixed a major bug for the `--pseudotax` option that required redesigning file formats. Please use `--enable-pseudotax` when using using `contain --pseudotax` from now on. 
+- Using a more robust mean that trims off outliers now for displayed coverage calculations
 
 ### Minor
 - Fixed command line ambiguity for sketching outputs. `-s` has been replaced with `-d` for `sylph sketch`. 

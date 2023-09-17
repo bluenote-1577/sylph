@@ -492,12 +492,14 @@ fn get_stats<'a>(
     let median_cov = covs[covs.len() / 2] as f64;
     let pois = Poisson::new(median_cov).unwrap();
     let mut max_cov = f64::MAX;
-    for i in covs.len() / 2..covs.len(){
-        let cov = covs[i];
-        if pois.cdf(cov.into()) < CUTOFF_PVALUE {
-            max_cov = cov as f64;
-        } else {
-            break;
+    if median_cov < 30.{
+        for i in covs.len() / 2..covs.len(){
+            let cov = covs[i];
+            if pois.cdf(cov.into()) < CUTOFF_PVALUE {
+                max_cov = cov as f64;
+            } else {
+                break;
+            }
         }
     }
     log::trace!("COV VECTOR for {}/{}: {:?}, {}", sequence_sketch.file_name, genome_sketch.file_name ,covs, max_cov);
