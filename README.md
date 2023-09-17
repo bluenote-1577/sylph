@@ -193,9 +193,10 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 We have some pre-sketched databases available for download below. 
 
 ### Pre-sketched GTDB r214 database (85,202 genomes)
-Options 1 is the same as 2, only it allows `--pseudotax` to be used. 
+The databases with `*-plus-*` in the title indicate `--pseudotax` can be used. The results are otherwise the same. 
+
 1. `-c 100`, more sensitive database (20 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-plus-gtdb-r214.sylqueries
-2. `-c 100`, more sensitive database without `--pseudotax` enabled (8 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-gtdb-r214.sylqueries
+2. `-c 100`, more sensitive database without `--pseudotax` capabilities (8 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-gtdb-r214.sylqueries
 3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c1000-plus-gtdb-r214.sylqueries
 
 Usage example:
