@@ -2,11 +2,11 @@
 
 ## Introduction
 
-**sylph** is a program that quickly estimates the average nucleotide identity (ANI) of a collection of genomes against their nearest neighbour genome in your metagenomic shotgun sample.
+**sylph** is a program that quickly estimates the average nucleotide identity (ANI) of genomes against their nearest neighbour genome in your metagenomic shotgun sample.
 
 That is, if we query an E. coli genome and sylph gives an estimate of 97% ANI, then there is a genome in your sample with approximately 97% ANI compared to the queried E. coli genome. 
 
-sylph uses a sketched k-mer containment method. sylph's novelty lies in **using a statistical adjustment to correct for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples. sylph offers
+sylph uses a k-mer containment method. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples. sylph offers
 
 1. **Accurate ANI queries for genomes of down to 0.1x coverage**: for bacterial species-level ANI queries (> 95%), sylph can give accurate ANI estimates down to 0.1x coverage.
 
