@@ -155,6 +155,15 @@ pub fn contain(args: ContainArgs) {
                 });
                 stats_vec_seq = stats_vec_seq_2.into_inner().unwrap();
                 log::info!("{} genomes passing reassigned k-mer threshold. ", stats_vec_seq.len());
+                let mut num_bases_seqs = 0;
+                for count in sequence_sketch.kmer_counts.values(){
+                    num_bases_seqs += *count as usize * sequence_sketch.c;
+                }
+
+                let total_cov = stats_vec_seq.iter().map(|x| x.final_est_cov).sum::<f64>();
+                for thing in stats_vec_seq.iter(){
+                    println!("{}\t{}", thing.contig_name, thing.final_est_cov/total_cov * 100.);
+                }
             
             //for loop over genomes in results
             //Reassign k-mers to genomes: get_stats(table)

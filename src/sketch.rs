@@ -399,6 +399,8 @@ pub fn sketch_genome_individual(
                         }
                     }
                 }
+
+                return_genome_sketch.gn_size = record.seq().len();
                 return_genome_sketch.genome_kmers = new_vec;
                 if pseudotax{
                     return_genome_sketch.pseudotax_tracked_nonused_kmers = Some(pseudotax_track_kmers);
@@ -444,6 +446,7 @@ pub fn sketch_genome(
                 }
                 let seq = record.seq();
 
+                return_genome_sketch.gn_size += seq.len();
                 extract_markers_positions(&seq, &mut vec, c, k, contig_number);
                 
                 contig_number += 1
