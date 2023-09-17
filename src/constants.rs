@@ -6,4 +6,4 @@ pub const MEDIAN_ANI_THRESHOLD: f64 = 2.;
 pub const QUERY_FILE_SUFFIX: &str = ".sylqueries";
 pub const SAMPLE_FILE_SUFFIX: &str = ".sylsample";
 pub const MIN_ANI_DEF: f64 = 0.9;
-pub const MIN_ANI_P_DEF: f64 = 0.96;
+pub const MIN_ANI_P_DEF: f64 = 0.95;

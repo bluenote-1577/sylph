@@ -23,15 +23,15 @@ pub enum Mode {
 pub struct SketchArgs {
     #[clap(multiple=true, help = "fasta or fastq file; gzip optional. fastq files will be considered samples (*.sylsample) and fasta files as queries (*.sylqueries) by default")]
     pub files: Vec<String>,
-    #[clap(short='o',long="query-out-name", default_value = "sylph_queries", help_heading = "OUTPUT", help = "Output name for query sketch. All queries (i.e. genomes) will be aggregated into one file")]
+    #[clap(short='o',long="query-out-name", default_value = "sylph_queries", help_heading = "OUTPUT", help = "Output name for query sketch. All queries (genomes) will be aggregated into one file")]
     pub query_out_name: String,
-    #[clap(short='d',long="sample-output-directory", default_value = "", help_heading = "OUTPUT", help = "Output directory for sample sketches. Each sample (i.e. reads) is written to its own file")]
-    pub sample_prefix: String,
+    #[clap(short='d',long="sample-output-directory", default_value = "", help_heading = "OUTPUT", help = "Output directory for sample sketches. Each sample (reads) is written to its own file")]
+    pub sample_output_dir: String,
     #[clap(short,long="individual-records", help_heading = "INPUT", help = "Use individual records (e.g. contigs) as queries instead")]
     pub individual: bool,
-    #[clap(short, long="sample-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and force all inputs to be samples (i.e. reads)")]
+    #[clap(short, long="sample-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and force all inputs to be samples (reads)")]
     pub sample_force: bool,
-    #[clap(short, long="query-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and force all inputs to be queries (i.e. genomes). Does not work for paired reads (-1, -2 options)")]
+    #[clap(short, long="query-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and force all inputs to be queries (genomes). Does not work for paired reads (-1, -2 options)")]
     pub query_force: bool,
     #[clap(short,long="list", help_heading = "INPUT", help = "Use files in a newline delimited text file as inputs")]
     pub list_sequence: Option<String>,
@@ -47,6 +47,9 @@ pub struct SketchArgs {
 
     #[clap(long="trace", help = "Trace output for debugging")]
     pub trace: bool,
+
+    #[clap(short, long="enable-pseudotax", help_heading = "ALGORITHM", help = "Enable pseudotax capabilities for sylph queries; this increases sketch size by 2x with default params")]
+    pub pseudotax: bool,
 
     #[clap(long="min-spacing", default_value_t = 150, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the queries")]
     pub min_spacing_kmer: usize,
@@ -66,7 +69,7 @@ pub struct ContainArgs {
     pub c: usize,
     #[clap(long,default_value_t = 3., help_heading = "ALGORITHM", help = "Minimum k-mer multiplicity needed for coverage correction. Higher gives more precision but lower sensitivity")]
     pub min_count_correct: f64,
-    #[clap(short, long="minimum-ani", help_heading = "OUTPUT", help = "Minimum adjusted ANI to output (0-100). Default is 90; if --pseudotax is enabled then default is 96" )]
+    #[clap(short, long="minimum-ani", help_heading = "OUTPUT", help = "Minimum adjusted ANI to output (0-100). Default is 90; if --pseudotax is enabled then default is 95" )]
     pub minimum_ani: Option<f64>,
     #[clap(short, default_value_t = 3, help = "Number of threads")]
     pub threads: usize,
@@ -88,6 +91,6 @@ pub struct ContainArgs {
     pub individual: bool,
     #[clap(long="min-spacing", default_value_t = 150, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the queries. Only for raw fasta/fastq")]
     pub min_spacing_kmer: usize,
-    #[clap(short, long="pseudotax", help_heading = "ALGORITHM", help = "Pseudo taxonomic classification mode. This removes shared k-mers between species by assigning k-mers to the highest ANI species" )]
+    #[clap(short, long="pseudotax", help_heading = "ALGORITHM", help = "Pseudo taxonomic classification mode. This removes shared k-mers between species by assigning k-mers to the highest ANI species. Requires sketches with --enable-pseudotax option" )]
     pub pseudotax: bool,
 }

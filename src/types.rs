@@ -159,6 +159,7 @@ impl SequencesSketch{
 #[derive(Default, Clone)]
 pub struct GenomeSketch{
     pub genome_kmers: Vec<Kmer>,
+    pub pseudotax_tracked_nonused_kmers: Option<Vec<Kmer>>,
     pub file_name: String,
     pub first_contig_name: String,
     pub c: usize,

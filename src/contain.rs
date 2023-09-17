@@ -108,14 +108,20 @@ pub fn contain(args: ContainArgs) {
     let stats_vec: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
     log::info!("Finished obtaining genome sketches.");
 
+    
     if genome_sketches.is_empty() {
         log::error!("No genome sketches found; see sylph contain -h for help. Exiting");
         std::process::exit(1);
     }
 
+    if genome_sketches.first().unwrap().pseudotax_tracked_nonused_kmers.is_none(){
+        log::error!("--pseudotax is enabled, but *.sylsample was not sketched with the --pseudotax option. Pseudotax will not work properly. Proceed with caution...");
+    }
+
     read_files.extend(read_sketch_files.clone());
     let first_write = Mutex::new(true);
     let sequence_index_vec = (0..read_files.len()).collect::<Vec<usize>>();
+
 
     sequence_index_vec.into_iter().for_each(|j| {
         let is_sketch = j >= read_files.len() - read_sketch_files.len();
@@ -194,6 +200,13 @@ fn winner_table<'a>(results : &Vec<AniResult>, genome_sketches: &'a Vec<GenomeSk
             let v = kmer_to_genome_map.entry(*kmer).or_insert(vec![]);
             v.push((res.final_est_ani, gn_sketch));
         }
+        
+        if gn_sketch.pseudotax_tracked_nonused_kmers.is_some(){
+            for kmer in gn_sketch.pseudotax_tracked_nonused_kmers.as_ref().unwrap().iter(){
+                let v = kmer_to_genome_map.entry(*kmer).or_insert(vec![]);
+                v.push((res.final_est_ani, gn_sketch));
+            }
+        }
     }
 
     for (kmer, list) in kmer_to_genome_map.iter_mut(){
@@ -256,12 +269,12 @@ fn get_genome_sketches(
         }
         else {
             if args.individual{
-            let indiv_gn_sketches = sketch_genome_individual(args.c, args.k, genome_file, args.min_spacing_kmer);
+            let indiv_gn_sketches = sketch_genome_individual(args.c, args.k, genome_file, args.min_spacing_kmer, args.pseudotax);
                 genome_sketches.lock().unwrap().extend(indiv_gn_sketches);
 
             }
             else{
-                let genome_sketch_opt = sketch_genome(args.c, args.k, &genome_file, args.min_spacing_kmer);
+                let genome_sketch_opt = sketch_genome(args.c, args.k, &genome_file, args.min_spacing_kmer, args.pseudotax);
                 if genome_sketch_opt.is_some() {
                     genome_sketches.lock().unwrap().push(genome_sketch_opt.unwrap());
                 }
@@ -393,12 +406,12 @@ fn _get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genom
         }
         else {
             if args.individual{
-            let indiv_gn_sketches = sketch_genome_individual(args.c, args.k, genome_file, args.min_spacing_kmer);
+            let indiv_gn_sketches = sketch_genome_individual(args.c, args.k, genome_file, args.min_spacing_kmer, args.pseudotax);
                 genome_sketches.lock().unwrap().extend(indiv_gn_sketches);
 
             }
             else{
-                let genome_sketch_opt = sketch_genome(args.c, args.k, &genome_file, args.min_spacing_kmer);
+                let genome_sketch_opt = sketch_genome(args.c, args.k, &genome_file, args.min_spacing_kmer, args.pseudotax);
                 if genome_sketch_opt.is_some() {
                     genome_sketches.lock().unwrap().push(genome_sketch_opt.unwrap());
                 }

@@ -236,7 +236,7 @@ pub fn sketch(args: SketchArgs) {
 
             let read_sketch_opt = sketch_pair_sequences(read_file1, read_file2, args.c, args.k);
             if read_sketch_opt.is_some() {
-                let pref = Path::new(&args.sample_prefix);
+                let pref = Path::new(&args.sample_output_dir);
                 let read_sketch = read_sketch_opt.unwrap();
                 let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
                 let file_path = pref.join(&read_file_path);
@@ -265,7 +265,7 @@ pub fn sketch(args: SketchArgs) {
 
     let iter_vec: Vec<usize> = (0..read_inputs.len()).into_iter().collect();
     iter_vec.into_par_iter().for_each(|i| {
-        let pref = Path::new(&args.sample_prefix);
+        let pref = Path::new(&args.sample_output_dir);
         let read_file = &read_inputs[i];
 
         check_vram_and_block(max_ram, read_file);
@@ -307,14 +307,14 @@ pub fn sketch(args: SketchArgs) {
             let genome_file = &genome_inputs[i];
             if args.individual {
                 let indiv_gn_sketches =
-                    sketch_genome_individual(args.c, args.k, genome_file, args.min_spacing_kmer);
+                    sketch_genome_individual(args.c, args.k, genome_file, args.min_spacing_kmer, args.pseudotax);
                 all_genome_sketches
                     .lock()
                     .unwrap()
                     .extend(indiv_gn_sketches);
             } else {
                 let genome_sketch =
-                    sketch_genome(args.c, args.k, genome_file, args.min_spacing_kmer);
+                    sketch_genome(args.c, args.k, genome_file, args.min_spacing_kmer, args.pseudotax);
                 if genome_sketch.is_some() {
                     all_genome_sketches
                         .lock()
@@ -351,6 +351,7 @@ pub fn sketch_genome_individual(
     k: usize,
     ref_file: &str,
     min_spacing: usize,
+    pseudotax: bool
 ) -> Vec<GenomeSketch> {
     let reader = parse_fastx_file(&ref_file);
     if !reader.is_ok() {
@@ -365,6 +366,7 @@ pub fn sketch_genome_individual(
             return_genome_sketch.k = k;
             return_genome_sketch.file_name = ref_file.to_string();
             if record.is_ok() {
+                let mut pseudotax_track_kmers = vec![];
                 let mut kmer_vec = vec![];
                 let record = record.expect(&format!("Invalid record for file {} ", ref_file));
                 let contig_name = String::from_utf8_lossy(record.id()).to_string();
@@ -387,13 +389,20 @@ pub fn sketch_genome_individual(
                 let mut last_pos = 0;
                 for (_, pos, km) in kmer_vec.iter() {
                     if !duplicate_set.contains(&km)
-                        && (last_pos == 0 || pos - last_pos > min_spacing)
                     {
-                        new_vec.push(*km);
-                        last_pos = *pos;
+                        if last_pos == 0 || pos - last_pos > min_spacing{
+                            new_vec.push(*km);
+                            last_pos = *pos;
+                        }
+                        else if pseudotax{
+                            pseudotax_track_kmers.push(*km);
+                        }
                     }
                 }
                 return_genome_sketch.genome_kmers = new_vec;
+                if pseudotax{
+                    return_genome_sketch.pseudotax_tracked_nonused_kmers = Some(pseudotax_track_kmers);
+                }
                 return_vec.push(return_genome_sketch);
             } else {
                 warn!("File {} is not a valid fasta/fastq file", ref_file);
@@ -409,9 +418,11 @@ pub fn sketch_genome(
     k: usize,
     ref_file: &str,
     min_spacing: usize,
+    pseudotax: bool
 ) -> Option<GenomeSketch> {
     let reader = parse_fastx_file(&ref_file);
     let mut vec = vec![];
+    let mut pseudotax_track_kmers = vec![];
     if !reader.is_ok() {
         warn!("{} is not a valid fasta/fastq file; skipping.", ref_file);
         return None;
@@ -456,16 +467,22 @@ pub fn sketch_genome(
         let mut last_pos = 0;
         let mut last_contig = 0;
         for (contig, pos, km) in vec.iter() {
-            if !duplicate_set.contains(&km)
-                && (last_pos == 0 || last_contig != *contig || pos - last_pos > min_spacing)
-            {
-                //if !duplicate_set.contains(&km){
-                new_vec.push(*km);
-                last_contig = *contig;
-                last_pos = *pos;
+            if !duplicate_set.contains(&km){
+                if last_pos == 0 || last_contig != *contig || pos - last_pos > min_spacing
+                {
+                    new_vec.push(*km);
+                    last_contig = *contig;
+                    last_pos = *pos;
+                }
+                else if pseudotax{
+                    pseudotax_track_kmers.push(*km);
+                }
             }
         }
         return_genome_sketch.genome_kmers = new_vec;
+        if pseudotax{
+            return_genome_sketch.pseudotax_tracked_nonused_kmers = Some(pseudotax_track_kmers);
+        }
         return Some(return_genome_sketch);
     }
 }
