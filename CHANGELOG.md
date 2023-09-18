@@ -1,4 +1,4 @@
-## sylph v0.2.0 release: pseudotax improved - 2023-09-XX
+## sylph v0.2.0 release: pseudotax improved - 2023-09-19
 
 ### BREAKING
 - Sylph's *.sylqueries are no longer compatible with older versions of sylph (< v0.2). Files will need to be resketched. 
@@ -10,6 +10,7 @@
 
 ### Minor
 - Fixed command line ambiguity for sketching outputs. `-s` has been replaced with `-d` for `sylph sketch`.
+- Sylph outputs the results after processing every sample, instead of batching results, now
 
 
 ## sylph v0.1.0 release - 2023-09-03
