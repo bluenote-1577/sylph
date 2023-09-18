@@ -188,7 +188,7 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 - Containment_ind: `int/int` showing the containment index, e.g. `959/1053`.
 - Contig_name: name of the first contig in the fasta or just the contig name for contig queries.
 
-## Pre-sketched databases
+<!--## Pre-sketched databases
 
 We have some pre-sketched databases available for download below. 
 
@@ -204,7 +204,7 @@ Usage example:
 ```sh
 wget https://storage.googleapis.com/sylph-stuff/v0.2-c100-plus-gtdb-r214.sylqueries
 sylph contain *.sylsample v0.2-c100-plus-gtdb-r214.sylqueries -t 30 > results.tsv
-```
+```-->
 
 ## Citing sylph
 
