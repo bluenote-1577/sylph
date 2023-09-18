@@ -11,6 +11,8 @@ sylph uses a k-mer containment method. sylph's novelty lies in **using a statist
 1. **Accurate ANI queries for genomes of down to 0.1x coverage**: for bacterial species-level ANI queries (> 95%), sylph can give accurate ANI estimates down to 0.1x coverage.
 
 2. **Ultrafast, multithreaded runtimes**: speed is on the scale of Mash or sourmash, but indexing is faster and querying is multithreaded. Entire databases of > 100,000 genomes can be queried against even high-depth samples shotgun samples in **seconds**.
+   
+4. **(TESTING IN PROGRESS) Fast taxonomic classification**: sylph can be turned into a true taxonomic classifier (with relative abundances) with the `--pseudotax` option. 
 
 ##  Install (current version v0.2.0)
 
