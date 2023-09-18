@@ -96,8 +96,7 @@ sylph sketch my_contigs.fa -i -o contig_queries
 
 ### Tutorials
 
-1. [5-minute sylph tutorial outlining basic usage
-](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
+1. #### [Introduction: 5-minute sylph tutorial outlining basic usage](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
 
 ### Manuals
 
