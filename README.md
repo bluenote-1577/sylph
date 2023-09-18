@@ -147,7 +147,7 @@ Quick usage example
 ```sh
 # faster, less sensitive database
 wget https://storage.googleapis.com/sylph-stuff/v0.2-tax-c1000-gtdb-r214.sylqueries
-sylph contain *.sylsample v0.2-tax-c1000-gtdb-r214.sylqueries -t 30 > results.tsv
+sylph contain your_sample.sylsample v0.2-tax-c1000-gtdb-r214.sylqueries -t 30 > results.tsv
 ```
 
 ## Citing sylph
