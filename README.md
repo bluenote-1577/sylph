@@ -12,7 +12,7 @@ sylph uses a k-mer containment method. sylph's novelty lies in **using a statist
 
 2. **Ultrafast, multithreaded runtimes**: speed is on the scale of Mash or sourmash, but indexing is faster and querying is multithreaded. Entire databases of > 100,000 genomes can be queried against even high-depth samples shotgun samples in **seconds**.
    
-4. **(TESTING IN PROGRESS) Fast taxonomic classification**: sylph can be turned into a true taxonomic classifier (with relative abundances) with the `--pseudotax` option. 
+3. **(TESTING IN PROGRESS) Fast taxonomic classification**: sylph can be turned into a true taxonomic classifier (with relative abundances) with the `--pseudotax` option. 
 
 ##  Install (current version v0.2.0)
 
@@ -92,83 +92,16 @@ sylph sketch my_contigs.fa -i -o contig_queries
 
 ```
 
-## 5 minute tutorial
+## Tutorials and manuals
 
-After installation, clone this repository if you have not done so and run the following.
+### Tutorials
 
-```sh 
-git clone https://github.com/bluenote-1577/sylph
-cd sylph
+1. [5-minute sylph tutorial outlining basic usage
+](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
 
-## install sylph. see installation instructions
-# cargo install --path . --root ~/.cargo
-## OR
-# conda install -c bioconda sylph
+### Manuals
 
-# sketch reads and genomes. fastq -> samples, fasta -> queries
-sylph sketch test_files/o157_reads.fastq test_files/e.coli*.fa
-
-# query for ANI; *.sylqueries are queried against samples for ANI.
-sylph contain o157_reads.fastq.sylsample sylph_queries.sylqueries
-
-# ALTERNATIVE: lazy containment without pre-sketching also works 
-sylph contain test_files/*
-```
-There are two types of files: `*.sylqueries` and `*.sylsample`.
-- **FASTQ files** are treated as **samples** and turn into `*.sylsample` 
-- **FASTA files** are treated as **queries** and turn into `*.sylqueries`
-- For other behaviour, see the `--sample-force`, `--query-force` and `-1, -2` options. 
-
-Genomes are aggregated into one `sylqueries` file, and each genome is queried against all `sylsample`s. 
-
-You'll see something like the following
-
-```sh
-Sample_file     Query_file      Adjusted_ANI    Naive_ANI       ANI_5-95_percentile     Eff_cov Eff_lambda      Lambda_5-95_percentile  Median_cov      Mean_cov_geq1   Containment_ind Contig_name
-test_files/o157_reads.fastq     test_files/e.coli-o157.fasta    99.64   96.02   99.51-99.85     0.374   0.374   0.35-0.39       1       1.188   5845/20554      NZ_CP017438.1 Escherichia coli O157:H7 strain 2159 chromosome, complete genome
-test_files/o157_reads.fastq     test_files/e.coli-EC590.fasta   98.33   94.38   98.08-98.60     0.321   0.321   0.29-0.35       1       1.168   2987/17970      NZ_CP016182.2 Escherichia coli strain EC590 chromosome, complete genome
-test_files/o157_reads.fastq     test_files/e.coli-K12.fasta     98.15   94.30   97.93-98.38     0.334   0.334   0.31-0.35       1       1.171   2938/18124      NC_007779.1 Escherichia coli str. K-12 substr. W3110, complete sequence
-```
-
-The o157_reads.fastq is a "sample" containg only E. coli O157 with 1x coverage, 95% identity reads. We queried the E. coli fasta files against this "sample" and got the above results.
-
-1. The 3rd column gives the coverage adjusted ANI between the genome and this sample. **This is the main number you should care about**.
-2. The 4th column is the Naive ANI -- what you would approximately get without sylph's statistical adjustment (i.e. if you used Mash or Sourmash).
-
-Notice the big difference between 1. and 2. This is because the reads are only 1x coverage: **MinHash k-mer methods like mash screen and sourmash give biased ANI when coverage is low**. 
-
-However, the Eff_cov gives smaller than 1x: this is because Eff_cov takes into account sequencing error. Sequencing error reduces the k-mer based coverages (sequencing errors make k-mers erroneous). 
-
-Here are the ANIs computed by [skani](https://github.com/bluenote-1577/skani) between the three genomes:
-
-```sh
-test_files/e.coli-EC590.fasta	100.00	99.39	98.14
-test_files/e.coli-K12.fasta	99.39	100.00	98.09
-**test_files/e.coli-o157.fasta	98.14	98.09	100.00**
-```
-
-So the ANIs should be 98.14, 98.09, and 100.0 for EC590, K12, and O157 respectively against the sample. As you can see, sylphs estimates are quite good and much more reasonable than the Naive ANI.  
-
-### Taxonomic classifier by removing redundant queries with `--pseudotax`
-
-In the above example, notice that querying each E. coli genome gave a high ANI value. However, only one E. coli genome is present in the sample, not all three. Thus sylph is not a taxonomic classifier; it does not tell you **what genomes** are in your sample, just **how close** your query genome is to the genomes within the sample. 
-
-To remove some of this redundancy, we can use the ``--pseudotax`` option. This assigns k-mers to the highest ANI genome, so if you have duplicated genomes, only one gets all of the k-mers. 
-```sh
-> sylph contain test_files/* --pseudotax 
-...
-...
-Sample_file	Query_file	Relative_abundance   Adjusted_ANI	Naive_ANI	ANI_5-95_percentile	Eff_cov	Eff_lambda	Lambda_5-95_percentile	Median_cov	Mean_cov_geq1	Containment_ind	Contig_name
-test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	100.0000   99.64	96.02	99.51-99.85	0.374	0.374	0.35-0.39	1	1.188	5845/20554	NZ_CP017438.1 Escherichia coli O157:H7 strain 2159 chromosome, complete genome
-```
-
-Notice the new `Relative_abundance` column, which gives the relative abundance as a percentage. 
-
-### `--pseudotax` usage warning
-
-You will need to use the `sylph sketch --enable-pseudotax` option when sketching if you want to use `--pseudotax` on a pre-sketched database. The resulting database is 2.5x as large, and can also be used without ``--pseudotax`` as well. 
-
-NOTE: `--pseudotax` option is still in beta mode and being tested. 
+Manuals forthcoming...
 
 ## Output format
 
