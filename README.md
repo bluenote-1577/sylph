@@ -60,11 +60,19 @@ sylph contain test_files/*
 ## Quick start
 
 ```sh
-# fastq files are _assumed_ to be samples (reads)
-# fasta files are _assumed_ to be queries (genomes)
+# one fastQ -> one *.sylsample; fastQ  assumed to be samples (reads)
+# all fastA -> one *.sylqueries; fastA  assumed to be queries (genomes)
 sylph sketch reads1.fq reads2.fq.gz genome1.fa genome2.fa.gz
 sylph contain *.sylqueries *.sylsample -t (threads) > all-to-all.tsv
 
+# do pseudotaxonomic classification instead of nearest neighbour ANI
+sylph sketch *.fa --enable-pseudotax -o pseudotax-enabled-db
+sylph contain query.fq pseudotax-enabled-db.sylqueries --pseudotax 
+```
+
+Below shows different ways of sketching/indexing samples (reads) or queries (genomes)
+
+```sh
 # lazy contain without pre-sketching (convenient, not recommended for large files)
 sylph contain reads.fq genome.fa
 
@@ -80,9 +88,6 @@ sylph sketch --sample-force fasta_reads.fa
 # query contigs instead of genomes
 sylph sketch my_contigs.fa -i -o contig_queries
 
-# do pseudotaxonomic classification by removing shared k-mers instead of nearest neighbour ANI
-sylph sketch *.fa --enable-pseudotax -o pseudotax-enabled-db
-sylph contain query.fq pseudotax-enabled-db.sylqueries --pseudotax 
 ```
 
 ## 5 minute tutorial
@@ -142,7 +147,7 @@ test_files/e.coli-K12.fasta	99.39	100.00	98.09
 
 So the ANIs should be 98.14, 98.09, and 100.0 for EC590, K12, and O157 respectively against the sample. As you can see, sylphs estimates are quite good and much more reasonable than the Naive ANI.  
 
-### Removing redundant queries with `--pseudotax`
+### Taxonomic classifier by removing redundant queries with `--pseudotax`
 
 In the above example, notice that querying each E. coli genome gave a high ANI value. However, only one E. coli genome is present in the sample, not all three. Thus sylph is not a taxonomic classifier; it does not tell you **what genomes** are in your sample, just **how close** your query genome is to the genomes within the sample. 
 
@@ -151,9 +156,12 @@ To remove some of this redundancy, we can use the ``--pseudotax`` option. This a
 > sylph contain test_files/* --pseudotax 
 ...
 ...
-Sample_file	Query_file	Adjusted_ANI	Naive_ANI	ANI_5-95_percentile	Eff_cov	Eff_lambda	Lambda_5-95_percentile	Median_cov	Mean_cov_geq1	Containment_ind	Contig_name
-test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85	0.374	0.374	0.35-0.39	1	1.188	5845/20554	NZ_CP017438.1 Escherichia coli O157:H7 strain 2159 chromosome, complete genome
+Sample_file	Query_file	Relative_abundance   Adjusted_ANI	Naive_ANI	ANI_5-95_percentile	Eff_cov	Eff_lambda	Lambda_5-95_percentile	Median_cov	Mean_cov_geq1	Containment_ind	Contig_name
+test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	100.0000   99.64	96.02	99.51-99.85	0.374	0.374	0.35-0.39	1	1.188	5845/20554	NZ_CP017438.1 Escherichia coli O157:H7 strain 2159 chromosome, complete genome
 ```
+
+Notice the new `Relative_abundance` column, which gives the relative abundance as a percentage. 
+
 ### `--pseudotax` usage warning
 
 You will need to use the `sylph sketch --enable-pseudotax` option when sketching if you want to use `--pseudotax` on a pre-sketched database. The resulting database is 2.5x as large, and can also be used without ``--pseudotax`` as well. 
@@ -169,6 +177,7 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 
 - Sample_file: the filename of the sample.
 - Query_file: the filename of the query.
+- (*Only if `--pseudotax` enabled*) Relative_abundance: relative abundance as a percentage
 - Adjusted_ANI: nearest neighbour ANI. **Most important value**.
     * If coverage adjustment is possible (cov is < 3x cov): returns coverage-adjusted ANI
     * If coverage is too low/high: returns Naive_ANI (see below)
@@ -178,12 +187,12 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
    * If coverage is too low/high: `NA-NA` is given. 
 - Eff_cov: estimate of the coverage. **Always a decimal number.** 
     * If coverage adjustment is possible: this is Eff_lambda
-    * If coverage is too low/high: this is Mean_cov_geq1
+    * If coverage is too low/high: this is `Median_cov`
 - Eff_lambda: estimate of the effective coverage parameter. **Not always a decimal number**. 
     * If coverage adjustment is possible: lambda estimate is given
     * If coverage is too low/high: `LOW` or `HIGH` is output
 - Lambda_5-95_percentile: [5%, 95%] confidence intervals for lambda. Same format rules as ANI_5-95_percentile.
-- Median cov: median k-mer multiplicity for k-mers with >= 1 multiplicity.
+- Median_cov: median k-mer multiplicity for k-mers with >= 1 multiplicity.
 - Mean_cov_geq1: mean k-mer multiplicity for k-mers with >= 1 multiplicity.
 - Containment_ind: `int/int` showing the containment index, e.g. `959/1053`.
 - Contig_name: name of the first contig in the fasta or just the contig name for contig queries.
