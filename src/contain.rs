@@ -187,6 +187,13 @@ pub fn contain(args: ContainArgs) {
             //Reassign k-mers to genomes: get_stats(table)
             }
 
+            if args.pseudotax{
+                stats_vec_seq.sort_by(|x,y| y.rel_abund.unwrap().partial_cmp(&x.rel_abund.unwrap()).unwrap());
+            }
+            else{
+                stats_vec_seq.sort_by(|x,y| y.final_est_ani.partial_cmp(&x.final_est_ani).unwrap());
+            }
+
             if *first_write.lock().unwrap(){
                 *first_write.lock().unwrap() = false;
                 print_header(args.pseudotax);
@@ -560,11 +567,7 @@ fn get_stats<'a>(
     if let AdjustStatus::Lambda(lam) = use_lambda {
         final_est_cov = lam
     } else {
-        if median_cov <= MEDIAN_ANI_THRESHOLD {
-            final_est_cov = geq1_mean_cov;
-        } else {
-            final_est_cov = geq1_mean_cov;
-        }
+        final_est_cov = median_cov;
     }
 
     let opt_lambda;
