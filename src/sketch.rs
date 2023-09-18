@@ -402,6 +402,7 @@ pub fn sketch_genome_individual(
 
                 return_genome_sketch.gn_size = record.seq().len();
                 return_genome_sketch.genome_kmers = new_vec;
+                return_genome_sketch.min_spacing = min_spacing;
                 if pseudotax{
                     return_genome_sketch.pseudotax_tracked_nonused_kmers = Some(pseudotax_track_kmers);
                 }
@@ -483,6 +484,7 @@ pub fn sketch_genome(
             }
         }
         return_genome_sketch.genome_kmers = new_vec;
+        return_genome_sketch.min_spacing = min_spacing;
         if pseudotax{
             return_genome_sketch.pseudotax_tracked_nonused_kmers = Some(pseudotax_track_kmers);
         }

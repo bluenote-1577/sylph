@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::sync::Mutex;
 
-fn print_ani_result(ani_result: &AniResult) {
+fn print_ani_result(ani_result: &AniResult, pseudotax: bool) {
     let print_final_ani = format!("{:.2}", f64::min(ani_result.final_est_ani * 100., 100.));
     let lambda_print;
     if let AdjustStatus::Lambda(lambda) = ani_result.lambda {
@@ -45,22 +45,44 @@ fn print_ani_result(ani_result: &AniResult) {
         ci_lambda = format!("{:.2}-{:.2}", low_lambda.unwrap(), high_lambda.unwrap());
     }
 
+    if !pseudotax{
+        println!(
+            "{}\t{}\t{}\t{:.2}\t{}\t{:.3}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{}",
+            ani_result.seq_name,
+            ani_result.gn_name,
+            print_final_ani,
+            ani_result.naive_ani * 100.,
+            ci_ani,
+            ani_result.final_est_cov,
+            lambda_print,
+            ci_lambda,
+            ani_result.median_cov,
+            ani_result.mean_cov,
+            ani_result.containment_index.0,
+            ani_result.containment_index.1,
+            ani_result.contig_name,
+        );
+    }
+    else{
     println!(
-        "{}\t{}\t{}\t{:.2}\t{}\t{:.3}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{}",
-        ani_result.seq_name,
-        ani_result.gn_name,
-        print_final_ani,
-        ani_result.naive_ani * 100.,
-        ci_ani,
-        ani_result.final_est_cov,
-        lambda_print,
-        ci_lambda,
-        ani_result.median_cov,
-        ani_result.mean_cov,
-        ani_result.containment_index.0,
-        ani_result.containment_index.1,
-        ani_result.contig_name,
-    );
+            "{}\t{}\t{:.4}\t{}\t{:.2}\t{}\t{:.3}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{}",
+            ani_result.seq_name,
+            ani_result.gn_name,
+            ani_result.rel_abund.unwrap(),
+            print_final_ani,
+            ani_result.naive_ani * 100.,
+            ci_ani,
+            ani_result.final_est_cov,
+            lambda_print,
+            ci_lambda,
+            ani_result.median_cov,
+            ani_result.mean_cov,
+            ani_result.containment_index.0,
+            ani_result.containment_index.1,
+            ani_result.contig_name,
+        );
+
+    }
 }
 
 pub fn contain(args: ContainArgs) {
@@ -105,7 +127,6 @@ pub fn contain(args: ContainArgs) {
 
     let genome_sketches = get_genome_sketches(&args, &genome_sketch_files, &genome_files);
     let genome_index_vec = (0..genome_sketches.len()).collect::<Vec<usize>>();
-    let stats_vec: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
     log::info!("Finished obtaining genome sketches.");
 
     
@@ -120,6 +141,7 @@ pub fn contain(args: ContainArgs) {
     }
 
     read_files.extend(read_sketch_files.clone());
+    let write_mutex = Mutex::new(true);
     let first_write = Mutex::new(true);
     let sequence_index_vec = (0..read_files.len()).collect::<Vec<usize>>();
 
@@ -155,48 +177,28 @@ pub fn contain(args: ContainArgs) {
                 });
                 stats_vec_seq = stats_vec_seq_2.into_inner().unwrap();
                 log::info!("{} genomes passing reassigned k-mer threshold. ", stats_vec_seq.len());
-                let mut num_bases_seqs = 0;
-                for count in sequence_sketch.kmer_counts.values(){
-                    num_bases_seqs += *count as usize * sequence_sketch.c;
-                }
 
                 let total_cov = stats_vec_seq.iter().map(|x| x.final_est_cov).sum::<f64>();
-                for thing in stats_vec_seq.iter(){
-                    println!("{}\t{}", thing.contig_name, thing.final_est_cov/total_cov * 100.);
+                for thing in stats_vec_seq.iter_mut(){
+                    thing.rel_abund = Some(thing.final_est_cov/total_cov * 100.);
                 }
             
             //for loop over genomes in results
             //Reassign k-mers to genomes: get_stats(table)
             }
 
-            let mut inner = stats_vec.lock().unwrap();
-            inner.extend(stats_vec_seq);
-            let mut moved_results: Vec<_>;
-            if inner.len() > 5_000_000{
-                log::info!("Writing temporary results to stdout. CAUTION: results will not be sorted.");
-                moved_results = std::mem::take(&mut inner);
-                moved_results.sort_by(|x, y| y.final_est_ani.partial_cmp(&x.final_est_ani).unwrap());
-                if *first_write.lock().unwrap(){
-                    *first_write.lock().unwrap() = false;
-                    print_header();
+            if *first_write.lock().unwrap(){
+                *first_write.lock().unwrap() = false;
+                print_header(args.pseudotax);
 
-                }
-                for res in moved_results {
-                    print_ani_result(&res);
-                }
+            }
+            let _tmp = write_mutex.lock().unwrap();
+            for res in stats_vec_seq{
+                print_ani_result(&res, args.pseudotax);
             }
         }
         log::info!("Finished contain for {}.", &read_files[j]);
     });
-
-    if *first_write.lock().unwrap(){
-        print_header();
-    }
-    let mut result_vec = stats_vec.into_inner().unwrap();
-    result_vec.sort_by(|x, y| y.final_est_ani.partial_cmp(&x.final_est_ani).unwrap());
-    for res in result_vec {
-        print_ani_result(&res);
-    }
 
     log::info!("Finished contain.");
 }
@@ -227,10 +229,17 @@ fn winner_table<'a>(results : &Vec<AniResult>, genome_sketches: &'a Vec<GenomeSk
     return return_map;
 }
 
-fn print_header() {
+fn print_header(pseudotax: bool) {
+    if !pseudotax{
     println!(
-                            "Sample_file\tQuery_file\tAdjusted_ANI\tNaive_ANI\tANI_5-95_percentile\tEff_cov\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tContig_name",
-                            );
+            "Sample_file\tQuery_file\tAdjusted_ANI\tNaive_ANI\tANI_5-95_percentile\tEff_cov\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tContig_name",
+            );
+    }
+    else{
+    println!(
+            "Sample_file\tQuery_file\tRelative_abundance\tAdjusted_ANI\tNaive_ANI\tANI_5-95_percentile\tEff_cov\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tContig_name",
+            );
+    }
 }
 
 fn get_genome_sketches(
@@ -605,7 +614,8 @@ fn get_stats<'a>(
         lambda: use_lambda,
         ani_ci: (low_ani, high_ani),
         lambda_ci: (low_lambda, high_lambda),
-        genome_sketch_index: usize::MAX 
+        genome_sketch_index: usize::MAX,
+        rel_abund: None
     };
     //log::trace!("Other time {:?}", Instant::now() - start_t_initial);
 
