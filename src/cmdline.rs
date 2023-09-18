@@ -51,7 +51,7 @@ pub struct SketchArgs {
     #[clap(short, long="enable-pseudotax", help_heading = "ALGORITHM", help = "Enable pseudotax capabilities for sylph queries; this increases sketch size by 2x with default params")]
     pub pseudotax: bool,
 
-    #[clap(long="min-spacing", default_value_t = 150, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the queries")]
+    #[clap(long="min-spacing", default_value_t = 150, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the genomes")]
     pub min_spacing_kmer: usize,
     #[clap(short='1',long="first-pair", multiple=true, help_heading = "INPUT", help = "First pairs in paired end reads e.g. S1_1.fq S2_1.fq")]
     pub first_pair: Vec<String>,

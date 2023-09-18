@@ -164,6 +164,8 @@ pub struct GenomeSketch{
     pub first_contig_name: String,
     pub c: usize,
     pub k: usize,
+    pub gn_size: usize,
+    pub min_spacing: usize,
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
@@ -191,4 +193,5 @@ pub struct AniResult<'a>{
     pub ani_ci: (Option<f64>,Option<f64>),
     pub lambda_ci: (Option<f64>,Option<f64>),
     pub genome_sketch_index: usize,
+    pub rel_abund: Option<f64>
 }
