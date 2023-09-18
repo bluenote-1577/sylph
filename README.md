@@ -12,7 +12,7 @@ sylph uses a k-mer containment method. sylph's novelty lies in **using a statist
 
 2. **Ultrafast, multithreaded runtimes**: speed is on the scale of Mash or sourmash, but indexing is faster and querying is multithreaded. Entire databases of > 100,000 genomes can be queried against even high-depth samples shotgun samples in **seconds**.
 
-##  Install
+##  Install (current version v0.2.0)
 
 #### Option 1: conda install 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
@@ -197,23 +197,24 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 - Containment_ind: `int/int` showing the containment index, e.g. `959/1053`.
 - Contig_name: name of the first contig in the fasta or just the contig name for contig queries.
 
-<!--## Pre-sketched databases
+## Pre-sketched databases
 
 We have some pre-sketched databases available for download below. 
 
 ### Pre-sketched GTDB r214 database (85,202 genomes)
-The databases with `*-plus-*` in the title indicate `--pseudotax` can be used. The results are otherwise the same. These sketches work only for sylph v0.2 and above and not v0.1.
+The databases with `*-tax-*` in the title indicate `--pseudotax` can be used. The results are otherwise the same. These sketches work only for sylph v0.2 and above. 
 
-1. `-c 100`, more sensitive database (20 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-plus-gtdb-r214.sylqueries
-2. `-c 100`, more sensitive database without `--pseudotax` capabilities (8 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-gtdb-r214.sylqueries
-3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c1000-plus-gtdb-r214.sylqueries
+1. `-c 100`, more sensitive database (20 GB): https://storage.googleapis.com/sylph-stuff/v0.2-tax-c100-gtdb-r214.sylqueries
+2. `-c 100`, more sensitive database without `--pseudotax` capabilities (8 GB): https://storage.googleapis.com/sylph-stuff/v0.2-standard-c100-gtdb-r214.sylqueries
+3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.2-tax-c1000-gtdb-r214.sylqueries
 
-Usage example:
+Quick usage example
 
 ```sh
-wget https://storage.googleapis.com/sylph-stuff/v0.2-c100-plus-gtdb-r214.sylqueries
-sylph contain *.sylsample v0.2-c100-plus-gtdb-r214.sylqueries -t 30 > results.tsv
-```-->
+# faster, less sensitive database
+wget https://storage.googleapis.com/sylph-stuff/v0.2-tax-c1000-gtdb-r214.sylqueries
+sylph contain *.sylsample v0.2-tax-c1000-gtdb-r214.sylqueries -t 30 > results.tsv
+```
 
 ## Citing sylph
 
