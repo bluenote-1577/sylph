@@ -16,7 +16,12 @@ sylph uses a k-mer containment method. sylph's novelty lies in **using a statist
 
 ## WARNING EARLY DEVELOPMENT
 
-sylph is being developed rapidly. It appears this repository is now being discovered, which is great, but be aware that I will have no qualms about making breaking changes until the official release. 
+sylph is being developed rapidly. It has not been officially released yet. I am planning on releasing sylph officially in the next 1-3 months (October-December 2023).  
+
+I have confidence in sylph's results right now, and I believe it works quite well. But be aware that 
+
+- I will have no qualms about making breaking changes until the official release.
+- Parameters will change. 
 
 ##  Install (current version v0.2.0)
 
