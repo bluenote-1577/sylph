@@ -14,6 +14,10 @@ sylph uses a k-mer containment method. sylph's novelty lies in **using a statist
    
 3. **(EXPERIMENTAL) Fast taxonomic classification**: sylph can be turned into a true taxonomic classifier (with relative abundances) with the `--pseudotax` option. This is experimental, but seems to work quite well from brief testing.
 
+## WARNING EARLY DEVELOPMENT
+
+sylph is being developed rapidly. It appears this repository is now being discovered, which is great, but be aware that I will have no qualms about making breaking changes until the official release. 
+
 ##  Install (current version v0.2.0)
 
 #### Option 1: conda install 
