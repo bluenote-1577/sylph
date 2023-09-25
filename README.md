@@ -20,7 +20,7 @@ sylph is being developed rapidly. It has not been officially released yet. I am 
 
 I have confidence in sylph's results right now, and I believe it works quite well. But be aware that 
 
-- I will have no qualms about making breaking changes until the official release.
+- I will have no qualms about making breaking changes until the official release. That is, any sketches you use will probably not work by the next release. 
 - Parameters will change. 
 
 ##  Install (current version v0.2.0)
