@@ -6,7 +6,7 @@
 
 **Nearest neighbour containment search (sylph contain)**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
 
-**ANI-based taxonomic profiling (sylph profile)**: sylph can assess what species-level genomes from a database are contained in your sample and their abundances (like Kraken or MetaPhlAn) while **giving ANI estimates for the classifications**. 
+**ANI-based taxonomic profiling (sylph profile)**: sylph can determine what species from a database are contained in your sample as well as their abundances (like Kraken or MetaPhlAn), while also **giving ANI estimates for the classifications**. 
 
 ### Why sylph?
 
