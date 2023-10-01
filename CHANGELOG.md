@@ -1,4 +1,4 @@
-## sylph v0.3.0 release: first class support for pseudotax, now called "profile" - 2023-XX-XX
+## sylph v0.3.0 release: first class support for pseudotax, now called "profile" - 2023-10-XX
 
 Continuing development of sylph taxonomic profiling. 
 
@@ -6,10 +6,13 @@ Continuing development of sylph taxonomic profiling.
 
 - `--pseudotax` option in previous version is now a new command called `profile`.
 - Databases are enabled for profiling by default. 
+- Changed file suffices to `syldb` and `sylsp`.
 
 ### Major
 - Default parameter changes. --min-spacing is set to 30 now. 
 - Made profiling faster with some algorithmic tweaks. 
+- Coverage calculated slightly differently
+- Many small software changes with respect to threading and outputs
 
 ## sylph v0.2.0 release: pseudotax improved - 2023-09-19
 

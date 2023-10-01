@@ -353,7 +353,7 @@ pub fn sketch(args: SketchArgs) {
 
 
         if all_genome_sketches.lock().unwrap().is_empty(){
-            warn!("No valid queries (e.g. genomes or fasta files) to sketch; {} is not output", file_path_str);
+            warn!("No valid genomes to sketch; {} is not output", file_path_str);
         }
         else{
             let mut genome_sk_file = BufWriter::new(

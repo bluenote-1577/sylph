@@ -1,20 +1,35 @@
-# sylph -  ultrafast, coverage-aware genome querying against shotgun metagenomes 
+# sylph -  ANI genome searching and taxonomic profiling for shotgun metagenomes 
 
 ## Introduction
 
-**sylph** is a program that quickly estimates the average nucleotide identity (ANI) of genomes against their nearest neighbour genome in your metagenomic shotgun sample. An experimental taxonomic classifier option is available. 
+**sylph** is a program that can perform ultrafast **nearest neighbour ANI search** or **taxonomic profiling** for metagenomic shotgun samples. sylph can search tens of thousands of genomes against gigabases of reads in seconds.
 
-That is, if we query an E. coli genome and sylph gives an estimate of 97% ANI, then there is a genome in your sample with approximately 97% ANI compared to the queried E. coli genome. 
+**Nearest neighbour containment search (sylph contain)**: sylph can query a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then there is a genome in your contained within your sample with 97% ANI to the queried E. coli genome. 
 
-sylph uses a k-mer containment method. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples. sylph offers:
+**ANI-based taxonomic profiling (sylph profile)**: sylph can assess what species-level genomes from a database are contained in your sample and their abundances (like Kraken or MetaPhlAn) while **giving ANI estimates for the classifications**. 
 
-1. **Accurate ANI queries for genomes of down to 0.1x coverage**: for bacterial species-level ANI queries (> 95%), sylph can give accurate ANI estimates down to 0.1x coverage.
+### Why sylph?
 
-2. **Ultrafast, multithreaded runtimes**: speed is on the scale of Mash or sourmash, but indexing is faster and querying is multithreaded. Entire databases of > 100,000 genomes can be queried against even high-depth samples shotgun samples in **seconds**.
-   
-3. **(EXPERIMENTAL) Fast taxonomic classification**: sylph can be turned into a true taxonomic classifier (with relative abundances) with the `--pseudotax` option. This is experimental, but seems to work quite well from brief testing.
+1. **Accurate ANI-based genome search down to 0.1x coverage**: for bacterial species-level ANI queries (> 95%), sylph can give accurate ANI estimates down to 0.1x coverage and often even lower.
 
-##  Install (current version v0.2.0)
+2. **Precise ANI-based taxonomic profiling**: our preliminary results show sylph is as precise and sensitive as MetaPhlAn4 with better abundance estimates. Database choice is flexible and even viruses/eukaryotes can be profiled.  
+
+3. **Ultrafast, multithreaded runtimes**: sylph is **50x faster than MetaPhlAN** and **10x faster than Kraken**. sylph only takes 10GB of RAM for classifying against the entire GTDB-R214 database (85k genomes). 
+
+sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples.
+
+## WARNING EARLY DEVELOPMENT
+
+sylph is being developed rapidly. It has not been officially released yet. I am planning on releasing sylph officially in the next 1-3 months (October-December 2023).  
+
+I have confidence in sylph's results right now, and I believe it works quite well. But be aware that I will have no qualms about making breaking changes until the official release.
+
+That is:
+   - any sketches you use may not work by the next release.
+   - the command line will change.
+   - Parameters will change. 
+
+##  Install (current version v0.3.0)
 
 #### Option 1: conda install 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
@@ -62,32 +77,33 @@ sylph contain test_files/*
 ## Quick start
 
 ```sh
-# one fastQ -> one *.sylsample; fastQ  assumed to be samples (reads)
-# all fastA -> one *.sylqueries; fastA  assumed to be queries (genomes)
-sylph sketch reads1.fq reads2.fq.gz genome1.fa genome2.fa.gz
-sylph contain *.sylqueries *.sylsample -t (threads) > all-to-all.tsv
+# one fastq -> one *.sylsp; fastq are assumed to be samples (reads)
+# all fasta -> one *.syldb; fasta are assumed to be genomes
+sylph sketch reads1.fq reads2.fq.gz genome1.fa genome2.fa.gz -o database
 
-# do pseudotaxonomic classification instead of nearest neighbour ANI
-sylph sketch *.fa --enable-pseudotax -o pseudotax-enabled-db
-sylph contain query.fq pseudotax-enabled-db.sylqueries --pseudotax 
+# nearest neighbour containment search 
+sylph contain database.syldb *.sylsample -t (threads) > containment.tsv
+
+# taxonomic profiling 
+sylph profile database.syldb *.sylsample -t (threads) > profiling.tsv
 ```
 
-Below shows different ways of sketching/indexing samples (reads) or queries (genomes)
+Below shows different ways of sketching/indexing samples (reads) or constructing databases
 
 ```sh
-# lazy contain without pre-sketching (convenient, not recommended for large files)
-sylph contain reads.fq genome.fa
+# lazy inputs without pre-sketching (convenient, not recommended for large files)
+sylph profile reads.fq genome1.fa genome2.fa
 
 # paired end reads mode, multi-sample allowed
-sylph sketch -1 pairA_1.fq pairB_1.fq -2 pairA_2.fq pairB_2.fq -s sample_prefix
+sylph sketch -1 pairA_1.fq pairB_1.fq -2 pairA_2.fq pairB_2.fq -d read_sketches
 
 # sketch file with fasta files line-by-line
-sylph sketch -l database_file_names.txt -o genomes_output_prefix
+sylph sketch -l database_file_names.txt -o my_database
 
-# fasta reads
+# fasta reads need to be forced to be samples
 sylph sketch --sample-force fasta_reads.fa
 
-# query contigs instead of genomes
+# database of contigs instead of genomes
 sylph sketch my_contigs.fa -i -o contig_queries
 
 ```
@@ -107,30 +123,31 @@ Manuals forthcoming...
 ## Output format
 
 ```sh
-Sample_file	Query_file	Adjusted_ANI	Naive_ANI	ANI_5-95_percentile	Eff_cov	Eff_lambda	Lambda_5-95_percentile	Median_cov	Mean_cov_geq1	Containment_ind Contig_name
-test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85	0.374	0.374	0.35-0.39	1	1.188	5845/20554	NZ_CP017438.1 Escherichia coli O157:H7 strain 2159 chromosome, complete genome
+Sample_file     Genome_file      Taxonomic_abundance     Sequence_abundance      Adjusted_ANI    Eff_cov ANI_5-95_percentile     Eff_lambda      Lambda_5-95_percentile  Median_cov      Mean_cov_geq1   Containment_ind Naive_ANI       Contig_name
+parks_bench_data/ani95_cLOW_stFalse_r8_R1.fq.gz release89/bacteria/RS_GCF_000178875.2_genomic.fna.gz    78.1242 81.8234 97.53   264.000 NA-NA   HIGH    NA-NA   264     264.143 10281/22299     97.53   NC_016901.1 Shewanella baltica OS678, complete genome
 ```
 
 - Sample_file: the filename of the sample.
-- Query_file: the filename of the query.
-- (*Only if `--pseudotax` enabled*) Relative_abundance: relative abundance as a percentage
+- Genome_file: the filename of the genome.
+- (*Not present for `contain`*) Taxonomic_abundance: normalized taxnomic abundance as a percentage (i.e. not scaled by sequence length, same as MetaPhlAn)
+- (*Not present for `contain`*) Sequence_abundance: normalized sequence abundance as a percentage (i.e. scaled by sequence length, same as Kraken)
 - Adjusted_ANI: nearest neighbour ANI. **Most important value**.
     * If coverage adjustment is possible (cov is < 3x cov): returns coverage-adjusted ANI
     * If coverage is too low/high: returns Naive_ANI (see below)
-- Naive_ANI: nearest neighbour ANI without coverage adjustment.
-- ANI_5-95_percentile: [5%,95%] confidence intervals. **Not always a decimal number**.
-   * If coverage adjustment is possible: `float-float` e.g. `98.52-99.55`
-   * If coverage is too low/high: `NA-NA` is given. 
 - Eff_cov: estimate of the coverage. **Always a decimal number.** 
     * If coverage adjustment is possible: this is Eff_lambda
     * If coverage is too low/high: this is `Median_cov`
+- ANI_5-95_percentile: [5%,95%] confidence intervals. **Not always a decimal number**.
+   * If coverage adjustment is possible: `float-float` e.g. `98.52-99.55`
+   * If coverage is too low/high: `NA-NA` is given. 
 - Eff_lambda: estimate of the effective coverage parameter. **Not always a decimal number**. 
     * If coverage adjustment is possible: lambda estimate is given
     * If coverage is too low/high: `LOW` or `HIGH` is output
 - Lambda_5-95_percentile: [5%, 95%] confidence intervals for lambda. Same format rules as ANI_5-95_percentile.
 - Median_cov: median k-mer multiplicity for k-mers with >= 1 multiplicity.
 - Mean_cov_geq1: mean k-mer multiplicity for k-mers with >= 1 multiplicity.
-- Containment_ind: `int/int` showing the containment index, e.g. `959/1053`.
+- Containment_ind: `int/int` showing the containment index (number of k-mers contained divided by total k-mers), e.g. `959/1053`.
+- Naive_ANI: nearest neighbour ANI without coverage adjustment.
 - Contig_name: name of the first contig in the fasta or just the contig name for contig queries.
 
 <a name="pre-databases"></a>
@@ -139,20 +156,19 @@ test_files/o157_reads.fastq	test_files/e.coli-o157.fasta	99.64	96.02	99.51-99.85
 We have some pre-sketched databases available for download below. 
 
 ### Pre-sketched GTDB r214 database (85,202 genomes)
-The databases with `*-tax-*` in the title indicate `--pseudotax` can be used. The results are otherwise the same. These sketches work only for sylph v0.2 and above. 
 
-1. `-c 100`, more sensitive database (20 GB): https://storage.googleapis.com/sylph-stuff/v0.2-tax-c100-gtdb-r214.sylqueries
-2. `-c 100`, more sensitive database without `--pseudotax` capabilities (8 GB): https://storage.googleapis.com/sylph-stuff/v0.2-standard-c100-gtdb-r214.sylqueries
-3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.2-tax-c1000-gtdb-r214.sylqueries
+1. `-c 200`, more sensitive database (10 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c200-gtdb-r214.sylqueries
+3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-gtdb-r214.sylqueries
 
 Quick usage example
 
 ```sh
 # faster, less sensitive database
-wget https://storage.googleapis.com/sylph-stuff/v0.2-tax-c1000-gtdb-r214.sylqueries
-sylph contain your_sample.sylsample v0.2-tax-c1000-gtdb-r214.sylqueries -t 30 > results.tsv
+wget https://storage.googleapis.com/sylph-stuff/v0.3-tax-c1000-gtdb-r214.syldb
+sylph profile reads.fq v0.3-c200-gtdb-r214.syldb -t 30 > results.tsv
 ```
 
 ## Citing sylph
 
 Jim Shaw and Yun William Yu. Ultrafast, coverage-corrected genome similarity queries for metagenomic shotgun samples with sylph (Preprint to be released soon). 
+

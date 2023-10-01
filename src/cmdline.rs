@@ -20,17 +20,17 @@ pub enum Mode {
 
 #[derive(Args, Default)]
 pub struct SketchArgs {
-    #[clap(multiple=true, help = "fasta or fastq files; gzip optional. Each fastq file produces a sample sketch (*.sylsp) while fasta files are combined into a database (*.syldb)")]
+    #[clap(multiple=true, help = "fasta/fastq files; gzip optional. Each fastq file produces a sample sketch (*.sylsp) while fasta files are combined into a database (*.syldb)")]
     pub files: Vec<String>,
-    #[clap(short='o',long="out-name-db", default_value = "database", help_heading = "OUTPUT", help = "Output name for database sketch (with .syldb appended).")]
+    #[clap(short='o',long="out-name-db", default_value = "database", help_heading = "OUTPUT", help = "Output name for database sketch (with .syldb appended)")]
     pub db_out_name: String,
-    #[clap(short='d',long="sample-output-directory", default_value = "", help_heading = "OUTPUT", help = "Output directory for sample sketches.")]
+    #[clap(short='d',long="sample-output-directory", default_value = "./", help_heading = "OUTPUT", help = "Output directory for sample sketches")]
     pub sample_output_dir: String,
-    #[clap(short,long="individual-records", help_heading = "INPUT", help = "Use individual records (contigs) for database construction.")]
+    #[clap(short,long="individual-records", help_heading = "INPUT", help = "Use individual records (contigs) for database construction")]
     pub individual: bool,
-    #[clap(short,long="sample-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and consider inputs as samples (reads).")]
+    #[clap(short,long="sample-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and consider inputs as samples (reads)")]
     pub sample_force: bool,
-    #[clap(short='g', long="db-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and consider inputs as genomes for a database.")]
+    #[clap(short='g', long="db-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and consider inputs as genomes for a database")]
     pub db_force: bool,
     #[clap(short,long="list", help_heading = "INPUT", help = "Use files in a newline delimited text file as inputs")]
     pub list_sequence: Option<String>,
@@ -50,19 +50,19 @@ pub struct SketchArgs {
     pub min_spacing_kmer: usize,
     #[clap(short='1',long="first-pair", multiple=true, help_heading = "INPUT", help = "First pairs in paired end reads e.g. S1_1.fq S2_1.fq")]
     pub first_pair: Vec<String>,
-    #[clap(short='2',long="second-pair", multiple=true, help_heading = "INPUT", help = "Second pairs in paried end reads e.g. S1_2.fq S2_2.fq")]
+    #[clap(short='2',long="second-pair", multiple=true, help_heading = "INPUT", help = "Second pairs in paired end reads e.g. S1_2.fq S2_2.fq")]
     pub second_pair: Vec<String>,
 }
 
 #[derive(Args)]
 pub struct ContainArgs {
-    #[clap(multiple=true, help = "Pre-sketched *.syldb or *.sylsp files. Raw fastq/fasta allowed -- automatically sketched to .sylsp/.syldb")]
+    #[clap(multiple=true, help = "Pre-sketched *.syldb/*.sylsp files. Raw fastq/fasta are allowed and will be automatically sketched to .sylsp/.syldb")]
     pub files: Vec<String>,
-    #[clap(long,default_value_t = 3., help_heading = "ALGORITHM", help = "Minimum k-mer multiplicity needed for coverage correction. Higher gives more precision but lower sensitivity")]
+    #[clap(long,default_value_t = 3., help_heading = "ALGORITHM", help = "Minimum k-mer multiplicity needed for coverage correction. Higher values gives more precision but lower sensitivity")]
     pub min_count_correct: f64,
-    #[clap(long,default_value_t = 50., help_heading = "ALGORITHM", help = "Exclude genomes with < this number of sampled k-mers")]
+    #[clap(long,default_value_t = 50., help_heading = "ALGORITHM", help = "Exclude genomes with less than this number of sampled k-mers")]
     pub min_number_kmers: f64,
-    #[clap(short, long="minimum-ani", help_heading = "ALGORITHM", help = "Minimum adjusted ANI to consider (0-100). Default is 90 for contain and 95 for profile." )]
+    #[clap(short, long="minimum-ani", help_heading = "ALGORITHM", help = "Minimum adjusted ANI to consider (0-100). Default is 90 for contain and 95 for profile" )]
     pub minimum_ani: Option<f64>,
     #[clap(short, default_value_t = 3, help = "Number of threads")]
     pub threads: usize,
@@ -72,13 +72,13 @@ pub struct ContainArgs {
     pub trace: bool,
 
 
-    #[clap(short, default_value_t = 200, help_heading = "SKETCHING", help = "Subsampling rate. Does nothing for pre-sketched files.")]
+    #[clap(short, default_value_t = 200, help_heading = "SKETCHING", help = "Subsampling rate. Does nothing for pre-sketched files")]
     pub c: usize,
     #[clap(short, default_value_t = 31, help_heading = "SKETCHING", help = "Value of k. Only k = 21, 31 are currently supported. Does nothing for pre-sketched files")]
     pub k: usize,
-    #[clap(short,long="individual-records", help_heading = "SKETCHING", help = "Use individual records (e.g. contigs) as queries instead. Does nothing for pre-sketched files")]
+    #[clap(short,long="individual-records", help_heading = "SKETCHING", help = "Use individual records (e.g. contigs) for database construction instead. Does nothing for pre-sketched files")]
     pub individual: bool,
-    #[clap(long="min-spacing", default_value_t = 30, help_heading = "SKETCHING", help = "Minimum spacing between selected k-mers on the queries. Does nothing for pre-sketched files")]
+    #[clap(long="min-spacing", default_value_t = 30, help_heading = "SKETCHING", help = "Minimum spacing between selected k-mers on the database genomes. Does nothing for pre-sketched files")]
     pub min_spacing_kmer: usize,
 
     //Hidden options that are embedded in the args but no longer used... 
