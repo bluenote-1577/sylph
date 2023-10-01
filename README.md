@@ -164,7 +164,7 @@ Quick usage example
 
 ```sh
 # faster, less sensitive database
-wget https://storage.googleapis.com/sylph-stuff/v0.3-tax-c1000-gtdb-r214.syldb
+wget https://storage.googleapis.com/sylph-stuff/v0.3-c1000-gtdb-r214.syldb
 sylph profile reads.fq v0.3-c200-gtdb-r214.syldb -t 30 > results.tsv
 ```
 
