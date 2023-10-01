@@ -134,7 +134,7 @@ parks_bench_data/ani95_cLOW_stFalse_r8_R1.fq.gz release89/bacteria/RS_GCF_000178
 - Adjusted_ANI: nearest neighbour ANI. **Most important value**.
     * If coverage adjustment is possible (cov is < 3x cov): returns coverage-adjusted ANI
     * If coverage is too low/high: returns Naive_ANI (see below)
-- Eff_cov: estimate of the coverage. **Always a decimal number.** 
+- Eff_cov: estimate of the coverage. *This is an underestimate of the true coverage*. **Always a decimal number.** 
     * If coverage adjustment is possible: this is Eff_lambda
     * If coverage is too low/high: this is `Median_cov`
 - ANI_5-95_percentile: [5%,95%] confidence intervals. **Not always a decimal number**.
