@@ -4,7 +4,7 @@
 
 **sylph** is a program that can perform ultrafast **nearest neighbour ANI search** or **taxonomic profiling** for metagenomic shotgun samples. sylph can search tens of thousands of genomes against gigabases of reads in seconds.
 
-**Nearest neighbour containment search (sylph contain)**: sylph can query a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then there is a genome in your contained within your sample with 97% ANI to the queried E. coli genome. 
+**Nearest neighbour containment search (sylph contain)**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then there is a genome in your contained within your sample with 97% ANI to the queried E. coli genome. 
 
 **ANI-based taxonomic profiling (sylph profile)**: sylph can assess what species-level genomes from a database are contained in your sample and their abundances (like Kraken or MetaPhlAn) while **giving ANI estimates for the classifications**. 
 
