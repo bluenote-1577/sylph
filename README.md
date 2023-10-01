@@ -76,7 +76,7 @@ sylph contain test_files/*
 # one fastq -> one *.sylsp; fastq are assumed to be samples (reads)
 # all fasta -> one *.syldb; fasta are assumed to be genomes
 sylph sketch reads1.fq reads2.fq.gz genome1.fa genome2.fa.gz -o database
-ls reads1.fq.sylsp reads2.fq.gz.sylsp genomes.syldb
+ls reads1.fq.sylsp reads2.fq.gz.sylsp database.syldb
 
 # nearest neighbour containment search 
 sylph contain database.syldb *.sylsp -t (threads) > containment.tsv
