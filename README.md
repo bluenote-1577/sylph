@@ -2,19 +2,21 @@
 
 ## Introduction
 
-**sylph** is a program that can perform ultrafast **nearest neighbour ANI search** or **taxonomic profiling** for metagenomic shotgun samples. sylph can search tens of thousands of genomes against gigabases of reads in seconds.
+**sylph** is a program that can perform ultrafast (1) **nearest neighbour ANI search** or (2) **taxonomic profiling** for metagenomic shotgun samples. 
 
-**Nearest neighbour containment search (sylph contain)**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
+**Nearest neighbour ANI search**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
 
-**ANI-based taxonomic profiling (sylph profile)**: sylph can determine what species are in your sample as well as their abundances (like Kraken or MetaPhlAn), while also **giving ANI estimates for the classifications**. 
+**ANI-based taxonomic profiling**: sylph can determine what species are in your sample as well as their abundances (like Kraken or MetaPhlAn) as well as their ANI to the database.
 
 ### Why sylph?
 
-1. **Accurate ANI-based genome search down to 0.1x coverage**: for bacterial species-level ANI queries (> 95%), sylph can give accurate ANI estimates down to 0.1x coverage and often even lower.
+1. **Accurate ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can give accurate ANI estimates down to 0.1x coverage and often even lower.
 
-2. **Precise ANI-based taxonomic profiling**: our preliminary results show sylph is as precise and sensitive as MetaPhlAn4 with better abundance estimates. Database choice is flexible and even viruses/eukaryotes can be profiled.  
+2. **Precise, flexible taxonomic profiling**: Our tests show that sylph is as precise and sensitive as MetaPhlAn4, but with better abundance estimates. Compared to MetaPhlAn4, database choice and read technology (e.g. nanopore) are flexible. Even viruses/eukaryotes can be profiled.  
 
 3. **Ultrafast, multithreaded runtimes**: sylph is **50x faster than MetaPhlAn** and **10x faster than Kraken**. sylph only takes 10GB of RAM for classifying against the entire GTDB-R214 database (85k genomes). 
+
+### How does sylph work?
 
 sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples.
 
@@ -22,12 +24,10 @@ sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's nove
 
 sylph is being developed rapidly. It has not been officially released yet. I am planning on releasing sylph officially in the next 1-3 months (October-December 2023).  
 
-I have confidence in sylph's results right now, and I believe it works quite well. But be aware that I will have no qualms about making breaking changes until the official release.
-
-That is:
-   - any sketches you use may not work by the next release.
-   - the command line will change.
-   - Parameters will change. 
+The following may change:
+   - any sketches you use may not work by the next release
+   - the command line options
+   - Parameters will change 
 
 ##  Install (current version v0.3.0)
 
@@ -68,10 +68,6 @@ cd sylph
 # If default rust install directory is ~/.cargo
 cargo install --path . --root ~/.cargo
 sylph contain test_files/*
-
-# If ~/.cargo doesn't exist use below commands instead
-#cargo build --release
-#./target/release/sylph -h
 ```
 
 ## Quick start
@@ -80,12 +76,13 @@ sylph contain test_files/*
 # one fastq -> one *.sylsp; fastq are assumed to be samples (reads)
 # all fasta -> one *.syldb; fasta are assumed to be genomes
 sylph sketch reads1.fq reads2.fq.gz genome1.fa genome2.fa.gz -o database
+ls reads1.fq.sylsp reads2.fq.gz.sylsp genomes.syldb
 
 # nearest neighbour containment search 
-sylph contain database.syldb *.sylsample -t (threads) > containment.tsv
+sylph contain database.syldb *.sylsp -t (threads) > containment.tsv
 
 # taxonomic profiling 
-sylph profile database.syldb *.sylsample -t (threads) > profiling.tsv
+sylph profile database.syldb *.sylsp -t (threads) > profiling.tsv
 ```
 
 Below shows different ways of sketching/indexing samples (reads) or constructing databases
@@ -129,9 +126,9 @@ parks_bench_data/ani95_cLOW_stFalse_r8_R1.fq.gz release89/bacteria/RS_GCF_000178
 
 - Sample_file: the filename of the sample.
 - Genome_file: the filename of the genome.
-- (*Not present for `contain`*) Taxonomic_abundance: normalized taxnomic abundance as a percentage (i.e. not scaled by sequence length, same as MetaPhlAn)
-- (*Not present for `contain`*) Sequence_abundance: normalized sequence abundance as a percentage (i.e. scaled by sequence length, same as Kraken)
-- Adjusted_ANI: nearest neighbour ANI. **Most important value**.
+- (*Not present for `contain`*) Taxonomic_abundance: normalized taxnomic abundance as a percentage (i.e. not scaled by sequence length; same as MetaPhlAn)
+- (*Not present for `contain`*) Sequence_abundance: normalized sequence abundance as a percentage (i.e. scaled by sequence length; same as Kraken)
+- Adjusted_ANI: nearest neighbour ANI.
     * If coverage adjustment is possible (cov is < 3x cov): returns coverage-adjusted ANI
     * If coverage is too low/high: returns Naive_ANI (see below)
 - Eff_cov: estimate of the coverage. *This is an underestimate of the true coverage*. **Always a decimal number.** 
