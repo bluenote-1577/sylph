@@ -148,7 +148,7 @@ parks_bench_data/ani95_cLOW_stFalse_r8_R1.fq.gz release89/bacteria/RS_GCF_000178
 - Mean_cov_geq1: mean k-mer multiplicity for k-mers with >= 1 multiplicity.
 - Containment_ind: `int/int` showing the containment index (number of k-mers contained divided by total k-mers), e.g. `959/1053`.
 - Naive_ANI: nearest neighbour ANI without coverage adjustment.
-- Contig_name: name of the first contig in the fasta or just the contig name for contig queries.
+- Contig_name: name of the first contig in the fasta or just the contig name for the -i option.
 
 <a name="pre-databases"></a>
 ## Pre-sketched databases
@@ -157,8 +157,8 @@ We have some pre-sketched databases available for download below.
 
 ### Pre-sketched GTDB r214 database (85,202 genomes)
 
-1. `-c 200`, more sensitive database (10 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c200-gtdb-r214.sylqueries
-3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-gtdb-r214.sylqueries
+1. `-c 200`, more sensitive database (10 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c200-gtdb-r214.syldb
+3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-gtdb-r214.syldb
 
 Quick usage example
 
