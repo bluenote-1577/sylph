@@ -158,7 +158,7 @@ We have some pre-sketched databases available for download below.
 ### Pre-sketched GTDB r214 database (85,202 genomes)
 
 1. `-c 200`, more sensitive database (10 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c200-gtdb-r214.syldb
-3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c100-gtdb-r214.syldb
+3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.2-c1000-gtdb-r214.syldb
 
 Quick usage example
 
