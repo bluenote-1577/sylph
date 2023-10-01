@@ -14,7 +14,7 @@
 
 2. **Precise ANI-based taxonomic profiling**: our preliminary results show sylph is as precise and sensitive as MetaPhlAn4 with better abundance estimates. Database choice is flexible and even viruses/eukaryotes can be profiled.  
 
-3. **Ultrafast, multithreaded runtimes**: sylph is **50x faster than MetaPhlAN** and **10x faster than Kraken**. sylph only takes 10GB of RAM for classifying against the entire GTDB-R214 database (85k genomes). 
+3. **Ultrafast, multithreaded runtimes**: sylph is **50x faster than MetaPhlAn** and **10x faster than Kraken**. sylph only takes 10GB of RAM for classifying against the entire GTDB-R214 database (85k genomes). 
 
 sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples.
 
