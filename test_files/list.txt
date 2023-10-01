@@ -1,0 +1,4 @@
+test_files/e.coli-EC590.fasta
+test_files/e.coli-K12.fasta
+test_files/e.coli-o157.fasta
+test_files/o157_reads.fastq

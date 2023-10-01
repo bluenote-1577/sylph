@@ -45,47 +45,75 @@ fn print_ani_result(ani_result: &AniResult, pseudotax: bool) {
         ci_lambda = format!("{:.2}-{:.2}", low_lambda.unwrap(), high_lambda.unwrap());
     }
 
+
+    //"Sample_file\tQuery_file\tTaxonomic_abundance\tSequence_abundance\tAdjusted_ANI\tEff_cov\tANI_5-95_percentile\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tNaive_ANI\tContig_name",
+
     if !pseudotax{
         println!(
-            "{}\t{}\t{}\t{:.2}\t{}\t{:.3}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{}",
+            "{}\t{}\t{}\t{:.3}\t{}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{:.2}\t{}",
             ani_result.seq_name,
             ani_result.gn_name,
             print_final_ani,
-            ani_result.naive_ani * 100.,
-            ci_ani,
             ani_result.final_est_cov,
+            ci_ani,
             lambda_print,
             ci_lambda,
             ani_result.median_cov,
             ani_result.mean_cov,
             ani_result.containment_index.0,
             ani_result.containment_index.1,
+            ani_result.naive_ani * 100.,
             ani_result.contig_name,
         );
     }
     else{
     println!(
-            "{}\t{}\t{:.4}\t{}\t{:.2}\t{}\t{:.3}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{}",
+            "{}\t{}\t{:.4}\t{:.4}\t{}\t{:.3}\t{}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{:.2}\t{}",
             ani_result.seq_name,
             ani_result.gn_name,
             ani_result.rel_abund.unwrap(),
+            ani_result.seq_abund.unwrap(),
             print_final_ani,
-            ani_result.naive_ani * 100.,
-            ci_ani,
             ani_result.final_est_cov,
+            ci_ani,
             lambda_print,
             ci_lambda,
             ani_result.median_cov,
             ani_result.mean_cov,
             ani_result.containment_index.0,
             ani_result.containment_index.1,
+            ani_result.naive_ani * 100.,
             ani_result.contig_name,
         );
 
     }
 }
 
-pub fn contain(args: ContainArgs) {
+fn get_chunks(indices: &Vec<usize>, steps: usize) -> Vec<Vec<usize>>{
+    let mut start = 0;
+    let mut end = steps;
+    let len = indices.len();
+    let mut return_chunks = vec![];
+
+    while start < len {
+        if end > len {
+            end = len;
+        }
+
+        let chunk: Vec<usize> = (start..end).collect();
+        start = end;
+        end += steps;
+        return_chunks.push(chunk);
+    }
+    return_chunks
+}
+
+pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
+
+    if pseudotax_in{
+        args.pseudotax = true;
+    }
+
     let level;
     if args.trace {
         level = log::LevelFilter::Trace;
@@ -109,9 +137,26 @@ pub fn contain(args: ContainArgs) {
     let mut read_files = vec![];
 
     for file in args.files.iter() {
-        if file.ends_with(QUERY_FILE_SUFFIX) {
+
+        let mut genome_sketch_good_suffix = false;
+        for suff in QUERY_FILE_SUFFIX_VALID{
+            if file.ends_with(suff){
+                genome_sketch_good_suffix = true;
+                break
+            }
+        }
+
+        let mut sample_sketch_good_suffix = false;
+        for suff in SAMPLE_FILE_SUFFIX_VALID{
+            if file.ends_with(suff){
+                sample_sketch_good_suffix = true;
+                break
+            }
+        }
+
+        if genome_sketch_good_suffix{
             genome_sketch_files.push(file);
-        } else if file.ends_with(SAMPLE_FILE_SUFFIX) {
+        } else if sample_sketch_good_suffix{
             read_sketch_files.push(file);
         } else if is_fasta(&file) {
             genome_files.push(file);
@@ -131,13 +176,26 @@ pub fn contain(args: ContainArgs) {
 
     
     if genome_sketches.is_empty() {
-        log::error!("No genome sketches found; see sylph contain -h for help. Exiting");
+        log::error!("No genome sketches found; see sylph contain/profile -h for help. Exiting");
         std::process::exit(1);
     }
 
     if genome_sketches.first().unwrap().pseudotax_tracked_nonused_kmers.is_none() && args.pseudotax{
-        log::error!("--pseudotax is enabled, but *.sylsample was not sketched with the --enable-pseudotax option. Exiting");
+        log::error!("Attempting profiling, but *.syldb was sketched with the --disable-profiling option. Exiting");
         std::process::exit(1);
+    }
+
+    let step;
+    if let Some(sample_threads) = args.sample_threads{
+        if sample_threads > 0{
+            step = sample_threads;
+        }
+        else{
+            step = 1;
+        }
+    }
+    else{
+        step = args.threads/3 + 1;
     }
 
     read_files.extend(read_sketch_files.clone());
@@ -145,106 +203,110 @@ pub fn contain(args: ContainArgs) {
     let first_write = Mutex::new(true);
     let sequence_index_vec = (0..read_files.len()).collect::<Vec<usize>>();
 
+    let chunks = get_chunks(&sequence_index_vec, step);
 
-    sequence_index_vec.into_iter().for_each(|j| {
-        let is_sketch = j >= read_files.len() - read_sketch_files.len();
-        let sequence_sketch = get_seq_sketch(&args, read_files[j], is_sketch, genome_sketches[0].c, genome_sketches[0].k);
-        if sequence_sketch.is_some(){
-            let sequence_sketch = sequence_sketch.unwrap();
-            let stats_vec_seq: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
-            genome_index_vec.par_iter().for_each(|i| {
-                let genome_sketch = &genome_sketches[*i];
-                let mut res = get_stats(&args, &genome_sketch, &sequence_sketch, None);
-                if res.is_some() {
-                    res.as_mut().unwrap().genome_sketch_index = *i;
-                    stats_vec_seq.lock().unwrap().push(res.unwrap());
-                    
-                }
-            });
-            let mut stats_vec_seq = stats_vec_seq.into_inner().unwrap();
-
-            if args.pseudotax{
-                log::info!("Pseudotax enabled. Reassigning k-mers for {} genomes...", stats_vec_seq.len());
-                let winner_map = winner_table(&stats_vec_seq, &genome_sketches);
-            //If pseudotax, get k-mer to genome table: table <k_mer, &genome_sketch> = table(results)
-                let remaining_genomes = stats_vec_seq.iter().map(|x| &genome_sketches[x.genome_sketch_index]).collect::<Vec<&GenomeSketch>>();
-                let stats_vec_seq_2 = Mutex::new(vec![]);
-                remaining_genomes.into_par_iter().for_each(|genome_sketch|{
-                    let res = get_stats(&args, &genome_sketch, &sequence_sketch, Some(&winner_map));
+    chunks.into_iter().for_each(|chunk| {
+    //sequence_index_vec.into_iter().for_each(|j| {
+        chunk.into_par_iter().for_each(|j|{
+            let is_sketch = j >= read_files.len() - read_sketch_files.len();
+            let sequence_sketch = get_seq_sketch(&args, read_files[j], is_sketch, genome_sketches[0].c, genome_sketches[0].k);
+            if sequence_sketch.is_some(){
+                let sequence_sketch = sequence_sketch.unwrap();
+                let stats_vec_seq: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
+                genome_index_vec.par_iter().for_each(|i| {
+                    let genome_sketch = &genome_sketches[*i];
+                    let res = get_stats(&args, &genome_sketch, &sequence_sketch, None);
                     if res.is_some() {
-                        stats_vec_seq_2.lock().unwrap().push(res.unwrap());
+                        //res.as_mut().unwrap().genome_sketch_index = *i;
+                        stats_vec_seq.lock().unwrap().push(res.unwrap());
+                        
                     }
                 });
-                stats_vec_seq = stats_vec_seq_2.into_inner().unwrap();
-                log::info!("{} genomes passing reassigned k-mer threshold. ", stats_vec_seq.len());
+                let mut stats_vec_seq = stats_vec_seq.into_inner().unwrap();
 
-                let total_cov = stats_vec_seq.iter().map(|x| x.final_est_cov).sum::<f64>();
-                for thing in stats_vec_seq.iter_mut(){
-                    thing.rel_abund = Some(thing.final_est_cov/total_cov * 100.);
+                if args.pseudotax{
+                    log::info!("Taxonomic profiling {}. Reassigning k-mers for {} genomes...", &read_files[j], stats_vec_seq.len());
+                    let winner_map = winner_table(&stats_vec_seq);
+                    let remaining_genomes = stats_vec_seq.iter().map(|x| x.genome_sketch).collect::<Vec<&GenomeSketch>>();
+                    let stats_vec_seq_2 = Mutex::new(vec![]);
+                    remaining_genomes.into_par_iter().for_each(|genome_sketch|{
+                        let res = get_stats(&args, &genome_sketch, &sequence_sketch, Some(&winner_map));
+                        if res.is_some() {
+                            stats_vec_seq_2.lock().unwrap().push(res.unwrap());
+                        }
+                    });
+                    stats_vec_seq = stats_vec_seq_2.into_inner().unwrap();
+                    log::info!("{} genomes passing reassigned k-mer threshold for {}. ", stats_vec_seq.len(), &read_files[j]);
+
+                    let total_cov = stats_vec_seq.iter().map(|x| x.final_est_cov).sum::<f64>();
+                    let total_seq_cov = stats_vec_seq.iter().map(|x| x.final_est_cov * x.genome_sketch.gn_size as f64).sum::<f64>();
+                    for thing in stats_vec_seq.iter_mut(){
+                        thing.rel_abund = Some(thing.final_est_cov/total_cov * 100.);
+                    }
+                    for thing in stats_vec_seq.iter_mut(){
+                        thing.seq_abund = Some(thing.final_est_cov * thing.genome_sketch.gn_size as f64 / total_seq_cov * 100.);
+                    }
                 }
-            
-            //for loop over genomes in results
-            //Reassign k-mers to genomes: get_stats(table)
-            }
 
-            if args.pseudotax{
-                stats_vec_seq.sort_by(|x,y| y.rel_abund.unwrap().partial_cmp(&x.rel_abund.unwrap()).unwrap());
-            }
-            else{
-                stats_vec_seq.sort_by(|x,y| y.final_est_ani.partial_cmp(&x.final_est_ani).unwrap());
-            }
+                if args.pseudotax{
+                    stats_vec_seq.sort_by(|x,y| y.rel_abund.unwrap().partial_cmp(&x.rel_abund.unwrap()).unwrap());
+                }
+                else{
+                    stats_vec_seq.sort_by(|x,y| y.final_est_ani.partial_cmp(&x.final_est_ani).unwrap());
+                }
 
-            if *first_write.lock().unwrap(){
-                *first_write.lock().unwrap() = false;
-                print_header(args.pseudotax);
+                if *first_write.lock().unwrap(){
+                    *first_write.lock().unwrap() = false;
+                    print_header(args.pseudotax);
 
+                }
+                let _tmp = write_mutex.lock().unwrap();
+                for res in stats_vec_seq{
+                    print_ani_result(&res, args.pseudotax);
+                }
             }
-            let _tmp = write_mutex.lock().unwrap();
-            for res in stats_vec_seq{
-                print_ani_result(&res, args.pseudotax);
-            }
-        }
-        log::info!("Finished contain for {}.", &read_files[j]);
+            log::info!("Finished sample {}.", &read_files[j]);
+        });
     });
 
-    log::info!("Finished contain.");
+    log::info!("sylph finished.");
 }
 
-fn winner_table<'a>(results : &Vec<AniResult>, genome_sketches: &'a Vec<GenomeSketch>) -> FxHashMap<Kmer, &'a GenomeSketch> {
-    let mut kmer_to_genome_map = FxHashMap::default();
-    let mut return_map = FxHashMap::default();
+fn winner_table<'a>(results : &'a Vec<AniResult>) -> FxHashMap<Kmer, (f64,&'a GenomeSketch)> {
+    let mut kmer_to_genome_map : FxHashMap<_,_> = FxHashMap::default();
     for res in results.iter(){
-        let gn_sketch = &genome_sketches[res.genome_sketch_index];
+        //let gn_sketch = &genome_sketches[res.genome_sketch_index];
+        let gn_sketch = res.genome_sketch;
         for kmer in gn_sketch.genome_kmers.iter(){
-            let v = kmer_to_genome_map.entry(*kmer).or_insert(vec![]);
-            v.push((res.final_est_ani, gn_sketch));
+            let v = kmer_to_genome_map.entry(*kmer).or_insert((0.0, res.genome_sketch));
+            if res.final_est_ani > v.0{
+                *v = (res.final_est_ani, gn_sketch);
+            }
         }
         
         if gn_sketch.pseudotax_tracked_nonused_kmers.is_some(){
             for kmer in gn_sketch.pseudotax_tracked_nonused_kmers.as_ref().unwrap().iter(){
-                let v = kmer_to_genome_map.entry(*kmer).or_insert(vec![]);
-                v.push((res.final_est_ani, gn_sketch));
+                let v = kmer_to_genome_map.entry(*kmer).or_insert((0.0, res.genome_sketch));
+                if res.final_est_ani > v.0{
+                    *v = (res.final_est_ani, gn_sketch);
+                }
             }
         }
     }
 
-    for (kmer, list) in kmer_to_genome_map.iter_mut(){
-        list.sort_by(|a,b| b.partial_cmp(&a).unwrap());
-        return_map.insert(*kmer, list.first().unwrap().1);
-    }
-
-    return return_map;
+    return kmer_to_genome_map;
 }
 
 fn print_header(pseudotax: bool) {
     if !pseudotax{
     println!(
-            "Sample_file\tQuery_file\tAdjusted_ANI\tNaive_ANI\tANI_5-95_percentile\tEff_cov\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tContig_name",
+            //"Sample_file\tQuery_file\tAdjusted_ANI\tNaive_ANI\tANI_5-95_percentile\tEff_cov\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tContig_name",
+            "Sample_file\tQuery_file\tAdjusted_ANI\tEff_cov\tANI_5-95_percentile\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tNaive_ANI\tContig_name",
             );
     }
     else{
     println!(
-            "Sample_file\tQuery_file\tRelative_abundance\tAdjusted_ANI\tNaive_ANI\tANI_5-95_percentile\tEff_cov\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tContig_name",
+            "Sample_file\tQuery_file\tTaxonomic_abundance\tSequence_abundance\tAdjusted_ANI\tEff_cov\tANI_5-95_percentile\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tNaive_ANI\tContig_name",
             );
     }
 }
@@ -470,7 +532,7 @@ fn get_stats<'a>(
     args: &ContainArgs,
     genome_sketch: &'a GenomeSketch,
     sequence_sketch: &SequencesSketch,
-    winner_map: Option<&FxHashMap<Kmer, & GenomeSketch>>
+    winner_map: Option<&FxHashMap<Kmer, (f64,& GenomeSketch)>>
 ) -> Option<AniResult<'a>> {
     if genome_sketch.k != sequence_sketch.k {
         log::error!(
@@ -491,12 +553,15 @@ fn get_stats<'a>(
     let mut contain_count = 0;
     let mut covs = vec![];
     let gn_kmers = &genome_sketch.genome_kmers;
+    if (gn_kmers.len() as f64) < args.min_number_kmers{
+        return None
+    }
 
     //let start_t_initial = Instant::now();
     for kmer in gn_kmers.iter() {
         if sequence_sketch.kmer_counts.contains_key(kmer) {
             if winner_map.is_some(){
-                if winner_map.unwrap()[kmer] != genome_sketch{
+                if winner_map.unwrap()[kmer].1 != genome_sketch{
                     continue
                 }
             }
@@ -528,7 +593,7 @@ fn get_stats<'a>(
             }
         }
     }
-    log::trace!("COV VECTOR for {}/{}: {:?}, {}", sequence_sketch.file_name, genome_sketch.file_name ,covs, max_cov);
+    log::trace!("COV VECTOR for {}/{}: {:?}, MAX_COV_THRESHOLD: {}", sequence_sketch.file_name, genome_sketch.file_name ,covs, max_cov);
 
     let mut full_covs = vec![0; gn_kmers.len() - contain_count];
     for cov in covs.iter() {
@@ -617,8 +682,10 @@ fn get_stats<'a>(
         lambda: use_lambda,
         ani_ci: (low_ani, high_ani),
         lambda_ci: (low_lambda, high_lambda),
-        genome_sketch_index: usize::MAX,
-        rel_abund: None
+        genome_sketch: genome_sketch,
+        rel_abund: None,
+        seq_abund: None,
+
     };
     //log::trace!("Other time {:?}", Instant::now() - start_t_initial);
 

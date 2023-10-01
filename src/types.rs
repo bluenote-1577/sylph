@@ -155,8 +155,7 @@ impl SequencesSketch{
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Hash, PartialOrd, Eq, Ord)]
-#[derive(Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Hash, PartialOrd, Eq, Ord, Default, Clone)]
 pub struct GenomeSketch{
     pub genome_kmers: Vec<Kmer>,
     pub pseudotax_tracked_nonused_kmers: Option<Vec<Kmer>>,
@@ -178,7 +177,7 @@ pub struct MultGenomeSketch{
     pub k: usize,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq)]
 pub struct AniResult<'a>{
     pub naive_ani: f64,
     pub final_est_ani: f64,
@@ -192,6 +191,8 @@ pub struct AniResult<'a>{
     pub lambda: AdjustStatus,
     pub ani_ci: (Option<f64>,Option<f64>),
     pub lambda_ci: (Option<f64>,Option<f64>),
-    pub genome_sketch_index: usize,
-    pub rel_abund: Option<f64>
+    pub genome_sketch: &'a GenomeSketch,
+    pub rel_abund: Option<f64>,
+    pub seq_abund: Option<f64>
+
 }

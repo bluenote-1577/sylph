@@ -1,4 +1,5 @@
 use crate::cmdline::*;
+use std::fs;
 use std::thread;
 use std::time::Duration;
 
@@ -202,7 +203,7 @@ pub fn sketch(args: SketchArgs) {
     for file in all_files {
         if args.sample_force{
             read_inputs.push(file);
-        } else if args.query_force{
+        } else if args.db_force{
             genome_inputs.push(file);
         } else if is_fastq(&file) {
             read_inputs.push(file);
@@ -222,6 +223,16 @@ pub fn sketch(args: SketchArgs) {
         }
     }
 
+    if args.first_pair.is_empty() && !args.second_pair.is_empty(){
+        error!("Different number of paired sequences. Exiting.");
+        std::process::exit(1);
+
+    }
+    if !args.first_pair.is_empty() && args.second_pair.is_empty(){
+        error!("Different number of paired sequences. Exiting.");
+        std::process::exit(1);
+    }
+
     if !args.first_pair.is_empty() && !args.second_pair.is_empty() {
         info!("Sketching paired sequences...");
         if args.first_pair.len() != args.second_pair.len() {
@@ -236,6 +247,11 @@ pub fn sketch(args: SketchArgs) {
 
             let read_sketch_opt = sketch_pair_sequences(read_file1, read_file2, args.c, args.k);
             if read_sketch_opt.is_some() {
+                let res = fs::create_dir_all(&args.sample_output_dir);
+                if res.is_err(){
+                    error!("Could not create directory at {}", args.sample_output_dir);
+                    std::process::exit(1);
+                }
                 let pref = Path::new(&args.sample_output_dir);
                 let read_sketch = read_sketch_opt.unwrap();
                 let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
@@ -266,6 +282,8 @@ pub fn sketch(args: SketchArgs) {
     let iter_vec: Vec<usize> = (0..read_inputs.len()).into_iter().collect();
     iter_vec.into_par_iter().for_each(|i| {
         let pref = Path::new(&args.sample_output_dir);
+        std::fs::create_dir_all(pref).expect("Could not create directory for output sample files (-d). Exiting...");
+
         let read_file = &read_inputs[i];
 
         check_vram_and_block(max_ram, read_file);
@@ -299,22 +317,25 @@ pub fn sketch(args: SketchArgs) {
         info!("Sketching genomes...");
         let iter_vec: Vec<usize> = (0..genome_inputs.len()).into_iter().collect();
         let counter: Mutex<usize> = Mutex::new(0);
-        let pref = Path::new(&args.query_out_name);
+        let pref = Path::new(&args.db_out_name);
         let file_path_str = format!("{}{}", pref.to_str().unwrap(), QUERY_FILE_SUFFIX);
+        let path = std::path::Path::new(&file_path_str);
+        let prefix = path.parent().unwrap();
+        std::fs::create_dir_all(prefix).expect("Could not create directory for output database file (-o). Exiting...");
         let all_genome_sketches = Mutex::new(vec![]);
 
         iter_vec.into_par_iter().for_each(|i| {
             let genome_file = &genome_inputs[i];
             if args.individual {
                 let indiv_gn_sketches =
-                    sketch_genome_individual(args.c, args.k, genome_file, args.min_spacing_kmer, args.pseudotax);
+                    sketch_genome_individual(args.c, args.k, genome_file, args.min_spacing_kmer, !args.no_pseudotax);
                 all_genome_sketches
                     .lock()
                     .unwrap()
                     .extend(indiv_gn_sketches);
             } else {
                 let genome_sketch =
-                    sketch_genome(args.c, args.k, genome_file, args.min_spacing_kmer, args.pseudotax);
+                    sketch_genome(args.c, args.k, genome_file, args.min_spacing_kmer, !args.no_pseudotax);
                 if genome_sketch.is_some() {
                     all_genome_sketches
                         .lock()
