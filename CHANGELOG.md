@@ -1,4 +1,4 @@
-## sylph v0.3.0 release: first class support for pseudotax, now called "profile" - 2023-10-XX
+## sylph v0.3.0 release: first class support for pseudotax, now called "profile" - 2023-10-01
 
 Continuing development of sylph taxonomic profiling. 
 
