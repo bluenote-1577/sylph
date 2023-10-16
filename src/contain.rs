@@ -266,8 +266,10 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                 }
 
                 if *first_write.lock().unwrap(){
-                    *first_write.lock().unwrap() = false;
-                    print_header(args.pseudotax);
+                    if !stats_vec_seq.is_empty(){
+                        *first_write.lock().unwrap() = false;
+                        print_header(args.pseudotax);
+                    }
 
                 }
                 let _tmp = write_mutex.lock().unwrap();
