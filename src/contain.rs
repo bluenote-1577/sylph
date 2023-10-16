@@ -117,9 +117,13 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
     let level;
     if args.trace {
         level = log::LevelFilter::Trace;
-    } else {
+    } else if args.debug {
+        level = log::LevelFilter::Debug;
+    }
+    else{
         level = log::LevelFilter::Info;
     }
+    
     simple_logger::SimpleLogger::new()
         .with_level(level)
         .init()
@@ -195,7 +199,12 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
         }
     }
     else{
-        step = args.threads/3 + 1;
+        if args.pseudotax{
+            step = args.threads/3 + 1;
+        }
+        else{
+            step = 1
+        }
     }
 
     read_files.extend(read_sketch_files.clone());
@@ -212,6 +221,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
             let sequence_sketch = get_seq_sketch(&args, read_files[j], is_sketch, genome_sketches[0].c, genome_sketches[0].k);
             if sequence_sketch.is_some(){
                 let sequence_sketch = sequence_sketch.unwrap();
+                log::debug!("Read file {} has estimated error rate {:?}.", &read_files[j], get_error_rate(&sequence_sketch));
                 let stats_vec_seq: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
                 genome_index_vec.par_iter().for_each(|i| {
                     let genome_sketch = &genome_sketches[*i];
@@ -586,7 +596,7 @@ fn get_stats<'a>(
     if median_cov < 30.{
         for i in covs.len() / 2..covs.len(){
             let cov = covs[i];
-            if pois.cdf(cov.into()) < CUTOFF_PVALUE {
+            if pois.cdf(cov.into()) <= CUTOFF_PVALUE {
                 max_cov = cov as f64;
             } else {
                 break;
@@ -932,5 +942,25 @@ fn mme_lambda(full_covs: &[u32]) -> Option<f64> {
         return None;
     } else {
         return Some(lambda as f64);
+    }
+}
+
+fn get_error_rate(seq_sketch: &SequencesSketch) -> Option<f64>{
+    let mut num_1s = 0;
+    let mut num_not1s = 0;
+    for count in seq_sketch.kmer_counts.values(){
+        if *count == 1{
+            num_1s += 1;
+        }
+        else{
+            num_not1s += 1;
+        }
+    }
+    let eps = num_1s as f64 / (num_not1s as f64 + num_1s as f64);
+    if eps < 1.{
+        return Some(eps)
+    }
+    else{
+        return None
     }
 }

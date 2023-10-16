@@ -44,6 +44,9 @@ pub struct SketchArgs {
     pub max_ram: Option<usize>,
     #[clap(long="trace", help = "Trace output (caution: very verbose)")]
     pub trace: bool,
+    #[clap(long="debug", help = "Debug output")]
+    pub debug: bool,
+
     #[clap(long="disable-profiling", help_heading = "ALGORITHM", help = "Disable profiling capabilities for databases; may decrease size and make containment slightly faster")]
     pub no_pseudotax: bool,
     #[clap(long="min-spacing", default_value_t = 30, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the genomes")]
@@ -70,6 +73,9 @@ pub struct ContainArgs {
     pub sample_threads: Option<usize>,
     #[clap(long="trace", help = "Trace output (caution: very verbose)")]
     pub trace: bool,
+    #[clap(long="debug", help = "Debug output")]
+    pub debug: bool,
+
 
 
     #[clap(short, default_value_t = 200, help_heading = "SKETCHING", help = "Subsampling rate. Does nothing for pre-sketched files")]

@@ -2,6 +2,7 @@ use crate::types::*;
 
 #[inline]
 pub fn mm_hash64(kmer: u64) -> u64 {
+    //TODO this is bugged. Fix after release
     let mut key = kmer;
     key = !key.wrapping_add(key << 21); // key = (key << 21) - key - 1;
     key = key ^ key >> 24;
@@ -10,6 +11,43 @@ pub fn mm_hash64(kmer: u64) -> u64 {
     key = (key.wrapping_add(key << 2)).wrapping_add(key << 4); // key * 21
     key = key ^ key >> 28;
     key = key.wrapping_add(key << 31);
+    key
+}
+
+#[inline]
+pub fn rev_hash_64(hashed_key: u64) -> u64 {
+    let mut key = hashed_key;
+
+    // Invert h_key = h_key.wrapping_add(h_key << 31)
+    let mut tmp: u64 = key.wrapping_sub(key << 31);
+    key = key.wrapping_sub(tmp << 31);
+
+    // Invert h_key = h_key ^ h_key >> 28;
+    tmp = key ^ key >> 28;
+    key = key ^ tmp >> 28;
+
+    // Invert h_key = h_key.wrapping_add(h_key << 2).wrapping_add(h_key << 4)
+    key = key.wrapping_mul(14933078535860113213u64);
+
+    // Invert h_key = h_key ^ h_key >> 14;
+    tmp = key ^ key >> 14;
+    tmp = key ^ tmp >> 14;
+    tmp = key ^ tmp >> 14;
+    key = key ^ tmp >> 14;
+
+    // Invert h_key = h_key.wrapping_add(h_key << 3).wrapping_add(h_key << 8)
+    key = key.wrapping_mul(15244667743933553977u64);
+
+    // Invert h_key = h_key ^ h_key >> 24
+    tmp = key ^ key >> 24;
+    key = key ^ tmp >> 24;
+
+    // Invert h_key = (!h_key).wrapping_add(h_key << 21)
+    tmp = !key;
+    tmp = !(key.wrapping_sub(tmp << 21));
+    tmp = !(key.wrapping_sub(tmp << 21));
+    key = !(key.wrapping_sub(tmp << 21));
+
     key
 }
 

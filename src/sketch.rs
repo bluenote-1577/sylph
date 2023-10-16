@@ -46,7 +46,7 @@ pub fn check_vram_and_block(max_ram: usize, file: &str){
 pub fn extract_markers(string: &[u8], kmer_vec: &mut Vec<u64>, c: usize, k: usize) {
     #[cfg(any(target_arch = "x86_64"))]
     {
-        if is_x86_feature_detected!("avx2")  && false{
+        if is_x86_feature_detected!("avx2"){
             use crate::avx2_seeding::*;
             unsafe {
                 extract_markers_avx2(string, kmer_vec, c, k);
@@ -162,7 +162,10 @@ pub fn sketch(args: SketchArgs) {
     let level;
     if args.trace {
         level = log::LevelFilter::Trace;
-    } else {
+    } else if args.debug {
+        level = log::LevelFilter::Debug;
+    }
+    else{
         level = log::LevelFilter::Info;
     }
 

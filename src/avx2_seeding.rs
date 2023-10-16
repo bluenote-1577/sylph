@@ -7,6 +7,7 @@ pub unsafe fn mm_hash256(kmer: __m256i) -> __m256i {
     let mut key = kmer;
     let s1 = _mm256_slli_epi64(key, 21);
     key = _mm256_add_epi64(key, s1);
+    //TODO this is bugged. Fix after release...
     key = _mm256_xor_si256(key, _mm256_cmpeq_epi64(key, key));
 
     key = _mm256_xor_si256(key, _mm256_srli_epi64(key, 24));
