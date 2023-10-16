@@ -257,7 +257,6 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                     let mut bases_explained = 1.;
                     if args.estimate_unknown{
                         bases_explained = estimate_covered_bases(&stats_vec_seq, &sequence_sketch);
-                        dbg!(bases_explained);
                         log::debug!("Read file {} has approx. {}% reads mapped to profiled species", &read_files[j], bases_explained * 100.);
                     }
 
@@ -309,7 +308,6 @@ fn estimate_true_cov(results: &mut Vec<AniResult>, kmer_id_opt: Option<f64>, est
 fn estimate_covered_bases(results: &Vec<AniResult>, sequence_sketch: &SequencesSketch) -> f64{
     let mut num_covered_bases = 0.;
     for res in results.iter(){
-        dbg!(res.genome_sketch.gn_size as f64, res.final_est_cov);
         num_covered_bases += (res.genome_sketch.gn_size as f64) * res.final_est_cov
     }
     let mut num_total_counts = 0;
@@ -320,7 +318,6 @@ fn estimate_covered_bases(results: &Vec<AniResult>, sequence_sketch: &SequencesS
     if num_tentative_bases == 0{
         return 0.;
     }
-    dbg!(num_covered_bases, num_tentative_bases);
     return f64::min(num_covered_bases as f64 / num_tentative_bases as f64, 1.);
 }
 
