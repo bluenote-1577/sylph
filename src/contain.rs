@@ -598,7 +598,7 @@ fn get_stats<'a>(
     if median_cov < 30.{
         for i in covs.len() / 2..covs.len(){
             let cov = covs[i];
-            if pois.cdf(cov.into()) <= CUTOFF_PVALUE {
+            if pois.cdf(cov.into()) < CUTOFF_PVALUE {
                 max_cov = cov as f64;
             } else {
                 break;
@@ -609,7 +609,7 @@ fn get_stats<'a>(
 
     let mut full_covs = vec![0; gn_kmers.len() - contain_count];
     for cov in covs.iter() {
-        if (*cov as f64) < max_cov {
+        if (*cov as f64) <= max_cov {
             full_covs.push(*cov);
         }
     }
