@@ -76,7 +76,8 @@ pub struct ContainArgs {
     #[clap(long="debug", help = "Debug output")]
     pub debug: bool,
 
-
+    #[clap(short='u', long="estimate-unknown", help_heading = "ALGORITHM", help = "Estimates true coverage and scales sequence abundance in `profile` by estimated unknown sequence percentage" )]
+    pub estimate_unknown: bool,
 
     #[clap(short, default_value_t = 200, help_heading = "SKETCHING", help = "Subsampling rate. Does nothing for pre-sketched files")]
     pub c: usize,

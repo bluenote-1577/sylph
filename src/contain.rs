@@ -221,7 +221,10 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
             let sequence_sketch = get_seq_sketch(&args, read_files[j], is_sketch, genome_sketches[0].c, genome_sketches[0].k);
             if sequence_sketch.is_some(){
                 let sequence_sketch = sequence_sketch.unwrap();
-                log::debug!("Read file {} has estimated error rate {:?}.", &read_files[j], get_error_rate(&sequence_sketch));
+                
+                let kmer_id_opt = get_kmer_identity(&sequence_sketch, args.estimate_unknown);
+                log::debug!("Read file {} has estimated kmer identity {:?}.", &read_files[j], kmer_id_opt);
+                
                 let stats_vec_seq: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
                 genome_index_vec.par_iter().for_each(|i| {
                     let genome_sketch = &genome_sketches[*i];
@@ -232,7 +235,9 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                         
                     }
                 });
+
                 let mut stats_vec_seq = stats_vec_seq.into_inner().unwrap();
+                estimate_true_cov(&mut stats_vec_seq, kmer_id_opt, args.estimate_unknown);
 
                 if args.pseudotax{
                     log::info!("Taxonomic profiling {}. Reassigning k-mers for {} genomes...", &read_files[j], stats_vec_seq.len());
@@ -246,7 +251,15 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                         }
                     });
                     stats_vec_seq = stats_vec_seq_2.into_inner().unwrap();
+                    estimate_true_cov(&mut stats_vec_seq, kmer_id_opt, args.estimate_unknown);
                     log::info!("{} genomes passing reassigned k-mer threshold for {}. ", stats_vec_seq.len(), &read_files[j]);
+
+                    let mut bases_explained = 1.;
+                    if args.estimate_unknown{
+                        bases_explained = estimate_covered_bases(&stats_vec_seq, &sequence_sketch);
+                        dbg!(bases_explained);
+                        log::debug!("Read file {} has approx. {}% reads mapped to profiled species", &read_files[j], bases_explained * 100.);
+                    }
 
                     let total_cov = stats_vec_seq.iter().map(|x| x.final_est_cov).sum::<f64>();
                     let total_seq_cov = stats_vec_seq.iter().map(|x| x.final_est_cov * x.genome_sketch.gn_size as f64).sum::<f64>();
@@ -254,7 +267,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                         thing.rel_abund = Some(thing.final_est_cov/total_cov * 100.);
                     }
                     for thing in stats_vec_seq.iter_mut(){
-                        thing.seq_abund = Some(thing.final_est_cov * thing.genome_sketch.gn_size as f64 / total_seq_cov * 100.);
+                        thing.seq_abund = Some(thing.final_est_cov * thing.genome_sketch.gn_size as f64 / total_seq_cov * 100. * bases_explained);
                     }
                 }
 
@@ -282,6 +295,33 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
     });
 
     log::info!("sylph finished.");
+}
+
+fn estimate_true_cov(results: &mut Vec<AniResult>, kmer_id_opt: Option<f64>, estimate_unknown: bool){
+    if estimate_unknown && kmer_id_opt.is_some(){
+        let id = kmer_id_opt.unwrap();
+        for res in results.iter_mut(){
+            res.final_est_cov /= id;
+        }
+    }
+}
+
+fn estimate_covered_bases(results: &Vec<AniResult>, sequence_sketch: &SequencesSketch) -> f64{
+    let mut num_covered_bases = 0.;
+    for res in results.iter(){
+        dbg!(res.genome_sketch.gn_size as f64, res.final_est_cov);
+        num_covered_bases += (res.genome_sketch.gn_size as f64) * res.final_est_cov
+    }
+    let mut num_total_counts = 0;
+    for count in sequence_sketch.kmer_counts.values(){
+        num_total_counts += *count as usize;
+    }
+    let num_tentative_bases = sequence_sketch.c * num_total_counts;
+    if num_tentative_bases == 0{
+        return 0.;
+    }
+    dbg!(num_covered_bases, num_tentative_bases);
+    return f64::min(num_covered_bases as f64 / num_tentative_bases as f64, 1.);
 }
 
 fn winner_table<'a>(results : &'a Vec<AniResult>) -> FxHashMap<Kmer, (f64,&'a GenomeSketch)> {
@@ -947,7 +987,11 @@ fn mme_lambda(full_covs: &[u32]) -> Option<f64> {
     }
 }
 
-fn get_error_rate(seq_sketch: &SequencesSketch) -> Option<f64>{
+fn get_kmer_identity(seq_sketch: &SequencesSketch, estimate_unknown: bool) -> Option<f64>{
+    if !estimate_unknown{
+        return None
+    }
+
     let mut num_1s = 0;
     let mut num_not1s = 0;
     for count in seq_sketch.kmer_counts.values(){
@@ -955,10 +999,10 @@ fn get_error_rate(seq_sketch: &SequencesSketch) -> Option<f64>{
             num_1s += 1;
         }
         else{
-            num_not1s += 1;
+            num_not1s += *count;
         }
     }
-    let eps = num_1s as f64 / (num_not1s as f64 + num_1s as f64);
+    let eps = num_not1s as f64 / (num_not1s as f64 + num_1s as f64);
     if eps < 1.{
         return Some(eps)
     }
