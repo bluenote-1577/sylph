@@ -223,7 +223,14 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                 let sequence_sketch = sequence_sketch.unwrap();
                 
                 let kmer_id_opt = get_kmer_identity(&sequence_sketch, args.estimate_unknown);
-                log::debug!("Read file {} has estimated kmer identity {:?}.", &read_files[j], kmer_id_opt);
+                if args.estimate_unknown{
+                    if kmer_id_opt.is_some() && kmer_id_opt.unwrap() > 0.1{
+                        log::info!("Read file {} has estimated kmer identity {:.2}.", &read_files[j], kmer_id_opt.unwrap());
+                    }
+                    else{
+                        log::warn!("Read file {} has estimated kmer identity < 0.1, indicating low-depth of coverage or very noisy reads. Beware of results for low-depth samples ", &read_files[j]);
+                    }
+                }
                 
                 let stats_vec_seq: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
                 genome_index_vec.par_iter().for_each(|i| {
@@ -257,7 +264,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                     let mut bases_explained = 1.;
                     if args.estimate_unknown{
                         bases_explained = estimate_covered_bases(&stats_vec_seq, &sequence_sketch);
-                        log::debug!("Read file {} has approx. {}% reads mapped to profiled species", &read_files[j], bases_explained * 100.);
+                        log::info!("Read file {} has approximately {:.2}% reads explained by present species", &read_files[j], bases_explained * 100.);
                     }
 
                     let total_cov = stats_vec_seq.iter().map(|x| x.final_est_cov).sum::<f64>();
