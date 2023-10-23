@@ -14,7 +14,7 @@
 
 2. **Precise, flexible taxonomic profiling**: Our tests show that sylph is as precise and sensitive as MetaPhlAn4, but with better abundance estimates. Compared to MetaPhlAn4, database choice and read technology (e.g. nanopore) are flexible. Even viruses/eukaryotes can be profiled.  
 
-3. **Ultrafast, multithreaded runtimes**: sylph is **50x faster than MetaPhlAn** and **10x faster than Kraken**. sylph only takes 10GB of RAM for classifying against the entire GTDB-R214 database (85k genomes). 
+3. **Ultrafast, multithreaded, multi-sample**: sylph is **50x faster than MetaPhlAn** and **10x faster than Kraken**. sylph only takes 10GB of RAM for classifying against the entire GTDB-R214 database (85k genomes). 
 
 ### How does sylph work?
 
@@ -39,19 +39,7 @@ The following may change:
 conda install -c bioconda sylph
 ```
 
-#### Option 2: Pre-built x86-64 linux statically compiled executable
-
-We offer a pre-built statically compiled executable for x86-64 linux systems. That is, if you're on a x86-64 linux system, you can just download the binary and run it without installing anything. 
-
-```sh
-wget https://github.com/bluenote-1577/sylph/releases/download/latest/sylph
-chmod +x sylph
-./sylph -h
-```
-
-Note: the binary is compiled with a different set of libraries (musl instead of glibc), possibly impacting performance (slightly).
-
-#### Option 3: Build from source
+#### Option 2: Build from source
 
 Requirements:
 1. [rust](https://www.rust-lang.org/tools/install) (version > 1.63) programming language and associated tools such as cargo are required and assumed to be in PATH.
@@ -69,6 +57,17 @@ cd sylph
 cargo install --path . --root ~/.cargo
 sylph contain test_files/*
 ```
+#### Option 3: Pre-built x86-64 linux statically compiled executable
+
+If you're on an x86-64 system, you can download the binary and use it without any installation. 
+
+```sh
+wget https://github.com/bluenote-1577/sylph/releases/download/latest/sylph
+chmod +x sylph
+./sylph -h
+```
+
+Note: the binary is compiled with a different set of libraries (musl instead of glibc), possibly impacting performance. 
 
 ## Quick start
 
@@ -120,8 +119,8 @@ Manuals forthcoming...
 ## Output format
 
 ```sh
-Sample_file     Genome_file      Taxonomic_abundance     Sequence_abundance      Adjusted_ANI    Eff_cov ANI_5-95_percentile     Eff_lambda      Lambda_5-95_percentile  Median_cov      Mean_cov_geq1   Containment_ind Naive_ANI       Contig_name
-parks_bench_data/ani95_cLOW_stFalse_r8_R1.fq.gz release89/bacteria/RS_GCF_000178875.2_genomic.fna.gz    78.1242 81.8234 97.53   264.000 NA-NA   HIGH    NA-NA   264     264.143 10281/22299     97.53   NC_016901.1 Shewanella baltica OS678, complete genome
+Sample_file   Genome_file   Taxonomic_abundance   Sequence_abundance   Adjusted_ANI   Eff_cov   ANI_5-95_percentile   Eff_lambda   Lambda_5-95_percentile   Median_cov   Mean_cov_geq1   Containment_ind   Naive_ANI   Contig_name
+reads.fq   genome.fa   78.1242   81.8234   97.53   264.000   NA-NA   HIGH   NA-NA   264   264.143   10281/22299   97.53   NC_016901.1 Shewanella baltica OS678, complete genome
 ```
 
 - Sample_file: the filename of the sample.
