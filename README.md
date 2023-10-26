@@ -14,7 +14,7 @@
 
 2. **Precise, flexible taxonomic profiling**: Our tests show that sylph is as precise and sensitive as MetaPhlAn4, but with better abundance estimates. Compared to MetaPhlAn4, database choice and read technology (e.g. nanopore) are flexible. Even viruses/eukaryotes can be profiled.  
 
-3. **Ultrafast, multithreaded, multi-sample**: sylph is **50x faster than MetaPhlAn** and **10x faster than Kraken**. sylph only takes 10GB of RAM for classifying against the entire GTDB-R214 database (85k genomes). 
+3. **Ultrafast, multithreaded, multi-sample**: sylph is > 100x faster than MetaPhlAn for multi-sample processing. sylph only takes 10GB of RAM for classifying against the entire GTDB-R214 database (85k genomes). 
 
 ### How does sylph work?
 
