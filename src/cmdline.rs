@@ -1,7 +1,7 @@
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
-#[clap(author, version, about = "Ultrafast genome ANI queries and taxonomic profiling for genomes against metagenomic shotgun samples.\n\n--- Preparing inputs by sketching (indexing)\nsylph sketch sample1.fq sample2.fq genome1.fa genome2.fa -o genomes -d sample_dir \nls sample_dir/sample1.fq.sylsp sample_dir/sample2.fq.sylsp genomes.syldb \n\n--- Nearest neighbour containment ANI\nsylph contain *.syldb *.sylsp > all-to-all-contain.tsv\n\n--- Taxonomic profiling with relative abundances and ANI\nsylph profile *.syldb *.sylsp > all-to-all-profile.tsv", arg_required_else_help = true, disable_help_subcommand = true)]
+#[clap(author, version, about = "Ultrafast genome ANI queries and taxonomic profiling for metagenomic shotgun samples.\n\n--- Preparing inputs by sketching (indexing)\n## fastq (reads) and fasta (genomes all at once\n## *.sylsp found in -d; *.syldb given by -o\nsylph sketch -t 5 sample1.fq sample2.fq genome1.fa genome2.fa -o genome1+genome2 -d sample_dir\n\n## paired-end reads\nsylph sketch -1 a_1.fq b_1.fq -2 b_2.fq b_2.fq -d paired_sketches\n\n--- Nearest neighbour containment ANI\nsylph query *.syldb *.sylsp > all-to-all-query.tsv\n\n--- Taxonomic profiling with relative abundances and ANI\nsylph profile *.syldb *.sylsp > all-to-all-profile.tsv", arg_required_else_help = true, disable_help_subcommand = true)]
 pub struct Cli {
     #[clap(subcommand,)]
     pub mode: Mode,
@@ -11,16 +11,16 @@ pub struct Cli {
 pub enum Mode {
     /// Sketch sequences into samples (reads) and databases (genomes). Each sample.fq -> sample.sylsp. All *.fa -> *.syldb. 
     Sketch(SketchArgs),
-    /// Calculate coverage-adjusted containment ANI between databases and samples.
-    Contain(ContainArgs),
-    ///Species-level taxonomic profiling with relative abundance and coverage-adjusted ANI output. 
+    /// Coverage-adjusted ANI querying between databases and samples.
+    Query(ContainArgs),
+    ///Species-level taxonomic profiling with abundances and ANIs. 
     Profile(ContainArgs),
 }
 
 
 #[derive(Args, Default)]
 pub struct SketchArgs {
-    #[clap(multiple=true, help = "fasta/fastq files; gzip optional. Each fastq file produces a sample sketch (*.sylsp) while fasta files are combined into a database (*.syldb)")]
+    #[clap(multiple=true, help = "fasta/fastq files; gzip optional. Default: fastq file produces a sample sketch (*.sylsp) while fasta files are combined into a database (*.syldb).")]
     pub files: Vec<String>,
     #[clap(short='o',long="out-name-db", default_value = "database", help_heading = "OUTPUT", help = "Output name for database sketch (with .syldb appended)")]
     pub db_out_name: String,
@@ -28,12 +28,20 @@ pub struct SketchArgs {
     pub sample_output_dir: String,
     #[clap(short,long="individual-records", help_heading = "INPUT", help = "Use individual records (contigs) for database construction")]
     pub individual: bool,
-    #[clap(short,long="sample-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and consider inputs as samples (reads)")]
-    pub sample_force: bool,
-    #[clap(short='g', long="db-force", help_heading = "INPUT", help = "Ignore fasta/fastq extension and consider inputs as genomes for a database")]
-    pub db_force: bool,
-    #[clap(short,long="list", help_heading = "INPUT", help = "Use files in a newline delimited text file as inputs")]
+    #[clap(multiple=true,short,long="reads", help_heading = "INPUT", help = "Single-end fasta/fastq reads")]
+    pub reads: Option<Vec<String>>,
+    #[clap(multiple=true,short='g', long="genomes", help_heading = "INPUT", help = "Genomes in fasta format")]
+    pub genomes: Option<Vec<String>>,
+    #[clap(short,long="list", help_heading = "INPUT", help = "Newline delimited file with inputs; fastas -> database, fastq -> sample")]
     pub list_sequence: Option<String>,
+
+    #[clap(long="rl", hidden=true, help_heading = "INPUT", help = "Newline delimited file; inputs assumed reads")]
+    pub list_reads: Option<String>,
+
+    #[clap(long="gl", help_heading = "INPUT", help = "Newline delimited file; inputs assumed genomes")]
+    pub list_genomes: Option<String>,
+
+
     #[clap(short, default_value_t = 31,help_heading = "ALGORITHM", help ="Value of k. Only k = 21, 31 are currently supported")]
     pub k: usize,
     #[clap(short, default_value_t = 200, help_heading = "ALGORITHM", help = "Subsampling rate")]
@@ -47,13 +55,13 @@ pub struct SketchArgs {
     #[clap(long="debug", help = "Debug output")]
     pub debug: bool,
 
-    #[clap(long="disable-profiling", help_heading = "ALGORITHM", help = "Disable profiling capabilities for databases; may decrease size and make containment slightly faster")]
+    #[clap(long="disable-profiling", help_heading = "ALGORITHM", help = "Disable sylph profile usage for databases; may decrease size and make sylph query slightly faster")]
     pub no_pseudotax: bool,
     #[clap(long="min-spacing", default_value_t = 30, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the genomes")]
     pub min_spacing_kmer: usize,
-    #[clap(short='1',long="first-pair", multiple=true, help_heading = "INPUT", help = "First pairs in paired end reads e.g. S1_1.fq S2_1.fq")]
+    #[clap(short='1',long="first-pairs", multiple=true, help_heading = "INPUT", help = "First pairs for paired end reads")]
     pub first_pair: Vec<String>,
-    #[clap(short='2',long="second-pair", multiple=true, help_heading = "INPUT", help = "Second pairs in paired end reads e.g. S1_2.fq S2_2.fq")]
+    #[clap(short='2',long="second-pairs", multiple=true, help_heading = "INPUT", help = "Second pairs for paired end reads")]
     pub second_pair: Vec<String>,
 }
 
@@ -65,11 +73,11 @@ pub struct ContainArgs {
     pub min_count_correct: f64,
     #[clap(long,default_value_t = 50., help_heading = "ALGORITHM", help = "Exclude genomes with less than this number of sampled k-mers")]
     pub min_number_kmers: f64,
-    #[clap(short, long="minimum-ani", help_heading = "ALGORITHM", help = "Minimum adjusted ANI to consider (0-100). Default is 90 for contain and 95 for profile" )]
+    #[clap(short, long="minimum-ani", help_heading = "ALGORITHM", help = "Minimum adjusted ANI to consider (0-100). Default is 90 for query and 95 for profile" )]
     pub minimum_ani: Option<f64>,
     #[clap(short, default_value_t = 3, help = "Number of threads")]
     pub threads: usize,
-    #[clap(short='r', long="sample-threads", help = "Number of samples to be processed concurrently. Default: (# of total threads / 3) + 1 for profile, 1 for contain")]
+    #[clap(short='s', long="sample-threads", help = "Number of samples to be processed concurrently. Default: (# of total threads / 3) + 1 for profile, 1 for query")]
     pub sample_threads: Option<usize>,
     #[clap(long="trace", help = "Trace output (caution: very verbose)")]
     pub trace: bool,
@@ -78,6 +86,12 @@ pub struct ContainArgs {
 
     #[clap(short='u', long="estimate-unknown", help_heading = "ALGORITHM", help = "Estimates true coverage and scales sequence abundance in `profile` by estimated unknown sequence percentage" )]
     pub estimate_unknown: bool,
+
+    #[clap(long="read-seq-id", help_heading = "ALGORITHM", help = "Mean sequence identity of reads (0-100). Only used if --estimate-unknown is toggled. Consider this if automatic identity estimate fails" )]
+    pub seq_id: Option<f64>,
+
+    #[clap(short='l', long="read-length", help_heading = "ALGORITHM", help = "Read length (single-end length for pairs). Only necessary for short-read coverages when using --estimate-unknown. Not needed for long-reads" )]
+    pub read_length: Option<usize>,
 
     #[clap(short, default_value_t = 200, help_heading = "SKETCHING", help = "Subsampling rate. Does nothing for pre-sketched files")]
     pub c: usize,
@@ -99,9 +113,13 @@ pub struct ContainArgs {
     pub mle: bool,
     #[clap(long="nb", hidden=true)]
     pub nb: bool,
-    #[clap(long="no-ci", help_heading = "OUTPUT", help = "Do not output confidence intervals", hidden=true)]
+    #[clap(long="no-ci", help = "Do not output confidence intervals", hidden=true)]
     pub no_ci: bool,
     #[clap(long="no-adjust", hidden=true)]
     pub no_adj: bool,
+
+    #[clap(short='o',long="output-file", help = "Output to this file instead of stdout")]
+    pub out_file_name: Option<String>,
+
 
 }

@@ -1,4 +1,8 @@
 use crate::cmdline::*;
+use std::path::Path;
+use std::io::prelude::*;
+use std::io;
+use std::io::BufWriter;
 use fxhash::FxHashMap;
 use crate::constants::*;
 use crate::inference::*;
@@ -12,7 +16,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::sync::Mutex;
 
-fn print_ani_result(ani_result: &AniResult, pseudotax: bool) {
+fn print_ani_result(ani_result: &AniResult, pseudotax: bool, writer: &mut Box<dyn Write + Send>) {
     let print_final_ani = format!("{:.2}", f64::min(ani_result.final_est_ani * 100., 100.));
     let lambda_print;
     if let AdjustStatus::Lambda(lambda) = ani_result.lambda {
@@ -49,7 +53,7 @@ fn print_ani_result(ani_result: &AniResult, pseudotax: bool) {
     //"Sample_file\tQuery_file\tTaxonomic_abundance\tSequence_abundance\tAdjusted_ANI\tEff_cov\tANI_5-95_percentile\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tNaive_ANI\tContig_name",
 
     if !pseudotax{
-        println!(
+        writeln!(writer, 
             "{}\t{}\t{}\t{:.3}\t{}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{:.2}\t{}",
             ani_result.seq_name,
             ani_result.gn_name,
@@ -64,10 +68,10 @@ fn print_ani_result(ani_result: &AniResult, pseudotax: bool) {
             ani_result.containment_index.1,
             ani_result.naive_ani * 100.,
             ani_result.contig_name,
-        );
+        ).expect("Error writing to file");
     }
     else{
-    println!(
+        writeln!(writer,
             "{}\t{}\t{:.4}\t{:.4}\t{}\t{:.3}\t{}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{:.2}\t{}",
             ani_result.seq_name,
             ani_result.gn_name,
@@ -84,7 +88,7 @@ fn print_ani_result(ani_result: &AniResult, pseudotax: bool) {
             ani_result.containment_index.1,
             ani_result.naive_ani * 100.,
             ani_result.contig_name,
-        );
+        ).expect("Error writing to file");
 
     }
 }
@@ -134,6 +138,14 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
         .build_global()
         .unwrap();
 
+    let out_writer = match args.out_file_name {
+        Some(ref x) => {
+            let path = Path::new(&x);
+            Box::new(BufWriter::new(File::create(&path).unwrap())) as Box<dyn Write + Send>
+        }
+        None => Box::new(BufWriter::new(io::stdout())) as Box<dyn Write + Send>,
+    };
+
     log::info!("Obtaining sketches...");
     let mut genome_sketch_files = vec![];
     let mut genome_files = vec![];
@@ -180,7 +192,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
 
     
     if genome_sketches.is_empty() {
-        log::error!("No genome sketches found; see sylph contain/profile -h for help. Exiting");
+        log::error!("No genome sketches found; see sylph query/profile -h for help. Exiting");
         std::process::exit(1);
     }
 
@@ -207,10 +219,19 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
         }
     }
 
+    if args.estimate_unknown{
+        if args.read_length.is_none(){
+            log::info!("--estimate-unknown specified but --read-length is not. If using short-reads, set -l to get better coverage estimate.");
+        }
+        if args.seq_id.is_none(){
+            log::info!("--estimate-unknown specified but --read-seq-id is not. Estimating sequence identity from reads.");
+        }
+    }
+
     read_files.extend(read_sketch_files.clone());
-    let write_mutex = Mutex::new(true);
     let first_write = Mutex::new(true);
     let sequence_index_vec = (0..read_files.len()).collect::<Vec<usize>>();
+    let out_writer:Mutex<Box<dyn Write + Send>> = Mutex::new(out_writer);
 
     let chunks = get_chunks(&sequence_index_vec, step);
 
@@ -222,13 +243,19 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
             if sequence_sketch.is_some(){
                 let sequence_sketch = sequence_sketch.unwrap();
                 
-                let kmer_id_opt = get_kmer_identity(&sequence_sketch, args.estimate_unknown);
+                let kmer_id_opt;
+                if args.seq_id.is_some(){
+                    kmer_id_opt = Some((args.seq_id.unwrap()/100.).powf(sequence_sketch.k as f64));
+                }
+                else{
+                    kmer_id_opt = get_kmer_identity(&sequence_sketch, args.estimate_unknown);
+                }
                 if args.estimate_unknown{
-                    if kmer_id_opt.is_some() && kmer_id_opt.unwrap() > 0.1{
-                        log::info!("Read file {} has estimated kmer identity {:.2}.", &read_files[j], kmer_id_opt.unwrap());
+                    log::debug!("{} has estimated kmer identity {:.3}.", &read_files[j], kmer_id_opt.unwrap());
+                    if kmer_id_opt.is_some() && kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) > 0.98{
                     }
-                    else{
-                        log::warn!("Read file {} has estimated kmer identity < 0.1, indicating low-depth of coverage or very noisy reads. Beware of results for low-depth samples ", &read_files[j]);
+                    else if args.seq_id.is_none(){
+                        log::warn!("{} has estimated identity {:.3} < 98%, indicating low-depth of coverage, highly diverse samples, or noisy reads. If using accurate reads (> 98% id), --estimate-unknown option is unreliable. Strongly consider using --read-seq-id.",  &read_files[j], kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) * 100.);
                     }
                 }
                 
@@ -244,10 +271,10 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                 });
 
                 let mut stats_vec_seq = stats_vec_seq.into_inner().unwrap();
-                estimate_true_cov(&mut stats_vec_seq, kmer_id_opt, args.estimate_unknown);
+                estimate_true_cov(&mut stats_vec_seq, kmer_id_opt, args.estimate_unknown, args.read_length, sequence_sketch.k);
 
                 if args.pseudotax{
-                    log::info!("Taxonomic profiling {}. Reassigning k-mers for {} genomes...", &read_files[j], stats_vec_seq.len());
+                    log::info!("{} taxonomic profiling; reassigning k-mers for {} genomes...", &read_files[j], stats_vec_seq.len());
                     let winner_map = winner_table(&stats_vec_seq);
                     let remaining_genomes = stats_vec_seq.iter().map(|x| x.genome_sketch).collect::<Vec<&GenomeSketch>>();
                     let stats_vec_seq_2 = Mutex::new(vec![]);
@@ -258,13 +285,13 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                         }
                     });
                     stats_vec_seq = stats_vec_seq_2.into_inner().unwrap();
-                    estimate_true_cov(&mut stats_vec_seq, kmer_id_opt, args.estimate_unknown);
-                    log::info!("{} genomes passing reassigned k-mer threshold for {}. ", stats_vec_seq.len(), &read_files[j]);
+                    estimate_true_cov(&mut stats_vec_seq, kmer_id_opt, args.estimate_unknown, args.read_length, sequence_sketch.k);
+                    log::info!("{} has {} genomes passing profiling threshold. ", &read_files[j], stats_vec_seq.len());
 
                     let mut bases_explained = 1.;
                     if args.estimate_unknown{
-                        bases_explained = estimate_covered_bases(&stats_vec_seq, &sequence_sketch);
-                        log::info!("Read file {} has approximately {:.2}% reads explained by present species", &read_files[j], bases_explained * 100.);
+                        bases_explained = estimate_covered_bases(&stats_vec_seq, &sequence_sketch, args.read_length, sequence_sketch.k);
+                        log::info!("{} has {:.2}% reads assigned by profile", &read_files[j], bases_explained * 100.);
                     }
 
                     let total_cov = stats_vec_seq.iter().map(|x| x.final_est_cov).sum::<f64>();
@@ -287,13 +314,13 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                 if *first_write.lock().unwrap(){
                     if !stats_vec_seq.is_empty(){
                         *first_write.lock().unwrap() = false;
-                        print_header(args.pseudotax);
+                        print_header(args.pseudotax,&mut *out_writer.lock().unwrap(), args.estimate_unknown);
                     }
 
                 }
-                let _tmp = write_mutex.lock().unwrap();
+                let mut out_writer = out_writer.lock().unwrap();
                 for res in stats_vec_seq{
-                    print_ani_result(&res, args.pseudotax);
+                    print_ani_result(&res, args.pseudotax, &mut *out_writer);
                 }
             }
             log::info!("Finished sample {}.", &read_files[j]);
@@ -303,16 +330,26 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
     log::info!("sylph finished.");
 }
 
-fn estimate_true_cov(results: &mut Vec<AniResult>, kmer_id_opt: Option<f64>, estimate_unknown: bool){
+fn estimate_true_cov(results: &mut Vec<AniResult>, kmer_id_opt: Option<f64>, 
+                     estimate_unknown: bool, read_length: Option<usize>, k: usize){
+    let mut multiplier = 1.;
+    if read_length.is_some(){
+        multiplier = read_length.unwrap() as f64 / (read_length.unwrap() - k + 1) as f64;
+    }
     if estimate_unknown && kmer_id_opt.is_some(){
         let id = kmer_id_opt.unwrap();
         for res in results.iter_mut(){
-            res.final_est_cov /= id;
+            res.final_est_cov = res.final_est_cov / id * multiplier ;
         }
     }
 }
 
-fn estimate_covered_bases(results: &Vec<AniResult>, sequence_sketch: &SequencesSketch) -> f64{
+fn estimate_covered_bases(results: &Vec<AniResult>, sequence_sketch: &SequencesSketch, read_length: Option<usize>, k: usize) -> f64{
+    let mut multiplier = 1.;
+     if read_length.is_some(){
+        multiplier = read_length.unwrap() as f64 / (read_length.unwrap() - k + 1) as f64;
+    }
+
     let mut num_covered_bases = 0.;
     for res in results.iter(){
         num_covered_bases += (res.genome_sketch.gn_size as f64) * res.final_est_cov
@@ -322,10 +359,11 @@ fn estimate_covered_bases(results: &Vec<AniResult>, sequence_sketch: &SequencesS
         num_total_counts += *count as usize;
     }
     let num_tentative_bases = sequence_sketch.c * num_total_counts;
-    if num_tentative_bases == 0{
+    let num_tentative_bases = num_tentative_bases as f64 * multiplier;
+    if num_tentative_bases == 0.{
         return 0.;
     }
-    return f64::min(num_covered_bases as f64 / num_tentative_bases as f64, 1.);
+    return f64::min(num_covered_bases as f64 / num_tentative_bases, 1.);
 }
 
 fn winner_table<'a>(results : &'a Vec<AniResult>) -> FxHashMap<Kmer, (f64,&'a GenomeSketch)> {
@@ -353,17 +391,24 @@ fn winner_table<'a>(results : &'a Vec<AniResult>) -> FxHashMap<Kmer, (f64,&'a Ge
     return kmer_to_genome_map;
 }
 
-fn print_header(pseudotax: bool) {
+fn print_header(pseudotax: bool, writer: &mut Box<dyn Write + Send>, estimate_unknown: bool) {
     if !pseudotax{
-    println!(
+        writeln!(writer,
             //"Sample_file\tQuery_file\tAdjusted_ANI\tNaive_ANI\tANI_5-95_percentile\tEff_cov\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tContig_name",
             "Sample_file\tGenome_file\tAdjusted_ANI\tEff_cov\tANI_5-95_percentile\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tNaive_ANI\tContig_name",
-            );
+            ).expect("Error writing to file.");
     }
     else{
-    println!(
-            "Sample_file\tGenome_file\tTaxonomic_abundance\tSequence_abundance\tAdjusted_ANI\tEff_cov\tANI_5-95_percentile\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tNaive_ANI\tContig_name",
-            );
+        let cov_head;
+        if estimate_unknown{
+            cov_head = "True_cov";
+        }
+        else{
+            cov_head = "Eff_cov";
+        }
+        writeln!(writer,
+            "Sample_file\tGenome_file\tTaxonomic_abundance\tSequence_abundance\tAdjusted_ANI\t{}\tANI_5-95_percentile\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tNaive_ANI\tContig_name", cov_head
+            ).expect("Error writing to file.");
     }
 }
 
@@ -687,7 +732,9 @@ fn get_stats<'a>(
 
     if let AdjustStatus::Lambda(lam) = use_lambda {
         final_est_cov = lam
-    } else {
+    } else if median_cov < MAX_MEDIAN_FOR_MEAN_FINAL_EST{
+        final_est_cov = mean_cov;
+    } else{
         final_est_cov = median_cov;
     }
 

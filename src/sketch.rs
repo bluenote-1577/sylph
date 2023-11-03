@@ -183,6 +183,10 @@ pub fn sketch(args: SketchArgs) {
         && args.list_sequence.is_none()
         && args.first_pair.is_empty()
         && args.second_pair.is_empty()
+        && args.genomes.is_none()
+        && args.reads.is_none()
+        && args.list_genomes.is_none()
+        && args.list_reads.is_none()
     {
         error!("No input sequences found; see sylph sketch -h for help. Exiting.");
         std::process::exit(1);
@@ -203,17 +207,43 @@ pub fn sketch(args: SketchArgs) {
 
     let mut read_inputs = vec![];
     let mut genome_inputs = vec![];
+
     for file in all_files {
-        if args.sample_force{
-            read_inputs.push(file);
-        } else if args.db_force{
-            genome_inputs.push(file);
-        } else if is_fastq(&file) {
+        if is_fastq(&file) {
             read_inputs.push(file);
         } else if is_fasta(&file) {
             genome_inputs.push(file);
         } else {
             warn!("{} does not have a fasta/fastq/gzip type extension; skipping", file);
+        }
+    }
+
+    if let Some(genomes_syl_in) = args.genomes{
+        for gn_file in genomes_syl_in{
+            genome_inputs.push(gn_file);
+        }
+    }
+    if let Some(reads_syl_in) = args.reads{
+        for rd_file in reads_syl_in{
+            read_inputs.push(rd_file);
+        }
+    }
+
+    if args.list_reads.is_some() {
+        let file_reads = args.list_reads.unwrap();
+        let file = File::open(file_reads).unwrap();
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            read_inputs.push(line.unwrap());
+        }
+    }
+
+    if args.list_genomes.is_some() {
+        let file_genomes = args.list_genomes.unwrap();
+        let file = File::open(file_genomes).unwrap();
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            genome_inputs.push(line.unwrap());
         }
     }
 
@@ -292,12 +322,8 @@ pub fn sketch(args: SketchArgs) {
         check_vram_and_block(max_ram, read_file);
 
         let read_sketch_opt;
-        if args.sample_force {
-            read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k)
-        } else {
-            read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k)
-            //read_sketch_opt = sketch_query(args.c, args.k, args.threads, read_file);
-        }
+        read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k);
+
         if read_sketch_opt.is_some() {
             let read_sketch = read_sketch_opt.unwrap();
             let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();

@@ -23,7 +23,7 @@ fn main() {
     let cli = Cli::parse();
     match cli.mode {
         Mode::Sketch(sketch_args) => sketch::sketch(sketch_args),
-        Mode::Contain(contain_args) => contain::contain(contain_args, false),
+        Mode::Query(contain_args) => contain::contain(contain_args, false),
         Mode::Profile(contain_args) => contain::contain(contain_args, true),
     }
 }
