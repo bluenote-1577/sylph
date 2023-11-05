@@ -98,7 +98,7 @@ See [Pre-sketched databases](#pre-databases) below to download pre-indexed datab
 
 ### [Cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook)
 
-For common use-cases and fast explanations, see the above cookbook. 
+For common use-cases and fast explanations, see the above [cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook). 
 
 ### Tutorials
 
