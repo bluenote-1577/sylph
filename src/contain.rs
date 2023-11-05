@@ -733,7 +733,7 @@ fn get_stats<'a>(
     if let AdjustStatus::Lambda(lam) = use_lambda {
         final_est_cov = lam
     } else if median_cov < MAX_MEDIAN_FOR_MEAN_FINAL_EST{
-        final_est_cov = mean_cov;
+        final_est_cov = geq1_mean_cov;
     } else{
         final_est_cov = median_cov;
     }
