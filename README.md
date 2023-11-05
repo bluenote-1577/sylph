@@ -134,7 +134,7 @@ reads.fq   genome.fa   78.1242   81.8234   97.53   264.000   NA-NA   HIGH   NA-N
 - Mean_cov_geq1: mean k-mer multiplicity for k-mers with >= 1 multiplicity.
 - Containment_ind: `int/int` showing the containment index (number of k-mers contained divided by total k-mers), e.g. `959/1053`.
 - Naive_ANI: nearest neighbour ANI without coverage adjustment.
-- Contig_name: name of the first contig in the fasta or just the contig name for the -i option.
+- Contig_name: name of the first contig in the fast (or just the contig name for the -i option).
 
 <a name="pre-databases"></a>
 ## Pre-sketched databases
