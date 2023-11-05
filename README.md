@@ -96,7 +96,9 @@ See [Pre-sketched databases](#pre-databases) below to download pre-indexed datab
 
 ## Tutorials and manuals
 
-### Cookbook
+### [Cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook)
+
+For common use-cases and fast explanations, see the above cookbook. 
 
 ### Tutorials
 
@@ -104,7 +106,7 @@ See [Pre-sketched databases](#pre-databases) below to download pre-indexed datab
 
 ### Manuals
 
-Manuals forthcoming...
+1. #### [Incoporating taxonomy to get CAMI-like or MetaPhlAn-like outputs for GTDB (and custom taxonomy)](https://github.com/bluenote-1577/sylph/wiki/MetaPhlAn-or-CAMI%E2%80%90like-output-with-the-GTDB-database)
 
 ## Output format
 
