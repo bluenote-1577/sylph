@@ -1,18 +1,18 @@
-# sylph -  ANI genome querying and taxonomic profiling for shotgun metagenomes 
+# sylph -  ANI genome querying and metagenomic profiling for shotgun metagenomes 
 
 ## Introduction
 
-**sylph** is a program that can perform ultrafast (1) **ANI querying** or (2) **taxonomic profiling** for metagenomic shotgun samples. 
+**sylph** is a program that can perform ultrafast (1) **ANI querying** or (2) **metagenomic profiling** for metagenomic shotgun samples. 
 
 **ANI querying**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
 
-**Taxonomic profiling**: Just like e.g. Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _ANI to the database_.
+**Metagenomic profiling**: Just like e.g. Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _ANI to the database_.
 
 ### Why sylph?
 
 1. **Accurate ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can give accurate ANI estimates down to 0.1x coverage and often even lower.
 
-2. **Precise, flexible taxonomic profiling**: Our tests show that sylph is as precise and sensitive as MetaPhlAn4, but with better abundance estimates. Compared to MetaPhlAn4, database choice and read technology (e.g. nanopore) are flexible. Even viruses/eukaryotes can be profiled.  
+2. **Precise, flexible metagenomic profiling**: Our tests show that sylph is as precise and sensitive as MetaPhlAn4, but with better abundance estimates. Compared to MetaPhlAn4, database choice and read technology (e.g. nanopore) are flexible. Even viruses/eukaryotes can be profiled.  
 
 3. **Ultrafast, multithreaded, multi-sample**: sylph is > 100x faster than MetaPhlAn. sylph only takes 10GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
 
