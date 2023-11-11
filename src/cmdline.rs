@@ -63,7 +63,7 @@ pub struct ContainArgs {
     pub files: Vec<String>,
     #[clap(long,default_value_t = 3., help_heading = "ALGORITHM", help = "Minimum k-mer multiplicity needed for coverage correction. Higher values gives more precision but lower sensitivity")]
     pub min_count_correct: f64,
-    #[clap(long,default_value_t = 50., help_heading = "ALGORITHM", help = "Exclude genomes with less than this number of sampled k-mers")]
+    #[clap(short='M',long,default_value_t = 50., help_heading = "ALGORITHM", help = "Exclude genomes with less than this number of sampled k-mers")]
     pub min_number_kmers: f64,
     #[clap(short, long="minimum-ani", help_heading = "ALGORITHM", help = "Minimum adjusted ANI to consider (0-100). Default is 90 for contain and 95 for profile" )]
     pub minimum_ani: Option<f64>,
