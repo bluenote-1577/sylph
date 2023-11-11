@@ -1,24 +1,26 @@
-# sylph -  ANI genome searching and taxonomic profiling for shotgun metagenomes 
+# sylph -  ANI genome querying and metagenomic profiling for shotgun metagenomes 
 
 ## Introduction
 
-**sylph** is a program that can perform ultrafast (1) **nearest neighbour ANI search** or (2) **taxonomic profiling** for metagenomic shotgun samples. 
+**sylph** is a program that can perform ultrafast (1) **ANI querying** or (2) **metagenomic profiling** for metagenomic shotgun samples. 
 
-**Nearest neighbour ANI search**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
+**ANI querying**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
 
-**ANI-based taxonomic profiling**: sylph can determine what species are in your sample, their relative abundances (like Kraken or MetaPhlAn), and their ANI to the database.
+**Metagenomic profiling**: Like e.g. Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _ANI to the database_.
 
 ### Why sylph?
 
 1. **Accurate ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can give accurate ANI estimates down to 0.1x coverage and often even lower.
 
-2. **Precise, flexible taxonomic profiling**: Our tests show that sylph is as precise and sensitive as MetaPhlAn4, but with better abundance estimates. Compared to MetaPhlAn4, database choice and read technology (e.g. nanopore) are flexible. Even viruses/eukaryotes can be profiled.  
+2. **Precise profiling**: Our tests show that sylph is more precise than Kraken, about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs) but with possibly better abundance estimates. 
 
-3. **Ultrafast, multithreaded, multi-sample**: sylph is **50x faster than MetaPhlAn** and **10x faster than Kraken**. sylph only takes 10GB of RAM for classifying against the entire GTDB-R214 database (85k genomes). 
+3. **Ultrafast, multithreaded, multi-sample**: sylph is > 100x faster than MetaPhlAn for multi-sample processing. sylph only takes 10GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
+
+4. **Easily customized databases**: sylph does not require taxonomic information, so anything you can profile against metagenome-assembled genomes (MAGs), viruses, eukaryotes, even assembled contigs, etc. Taxonomic information can be incorporated downstream for traditional profiling reports. 
 
 ### How does sylph work?
 
-sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes or shallow depth samples.
+sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes.
 
 ## WARNING EARLY DEVELOPMENT
 
@@ -29,7 +31,7 @@ The following may change:
    - the command line options
    - Parameters will change 
 
-##  Install (current version v0.3.0)
+##  Install (current version v0.4.0)
 
 #### Option 1: conda install 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
@@ -55,7 +57,7 @@ cd sylph
 
 # If default rust install directory is ~/.cargo
 cargo install --path . --root ~/.cargo
-sylph contain test_files/*
+sylph query test_files/*
 ```
 #### Option 3: Pre-built x86-64 linux statically compiled executable
 
@@ -72,41 +74,31 @@ Note: the binary is compiled with a different set of libraries (musl instead of 
 ## Quick start
 
 ```sh
-# one fastq -> one *.sylsp; fastq are assumed to be samples (reads)
 # all fasta -> one *.syldb; fasta are assumed to be genomes
-sylph sketch reads1.fq reads2.fq.gz genome1.fa genome2.fa.gz -o database
-ls reads1.fq.sylsp reads2.fq.gz.sylsp database.syldb
+sylph sketch genome1.fa genome2.fa -o database
+#EQUIVALENT: sylph sketch -g genome1.fa genome2.fa -o database
 
-# nearest neighbour containment search 
-sylph contain database.syldb *.sylsp -t (threads) > containment.tsv
+# multi-sample sketching of paired reads
+sylph sketch -1 A_1.fq B_1.fq -2 A_2.fq B_2.fq -d output_read_sketch_folder
+
+# multi-sample sketching for single end reads, fastq are assumed to be reads
+sylph sketch reads.fq 
+#EQUIVALENT: sylph sketch -r reads.fq
+
+# ANI querying 
+sylph query database.syldb *.sylsp -t (threads) > ani_queries.tsv
 
 # taxonomic profiling 
 sylph profile database.syldb *.sylsp -t (threads) > profiling.tsv
 ```
 
-Below shows different ways of sketching/indexing samples (reads) or constructing databases
-
-```sh
-# lazy inputs without pre-sketching (convenient, not recommended for large files)
-sylph profile reads.fq genome1.fa genome2.fa
-
-# paired end reads mode, multi-sample allowed
-sylph sketch -1 pairA_1.fq pairB_1.fq -2 pairA_2.fq pairB_2.fq -d read_sketches
-
-# sketch file with fasta files line-by-line
-sylph sketch -l database_file_names.txt -o my_database
-
-# fasta reads need to be forced to be samples
-sylph sketch --sample-force fasta_reads.fa
-
-# database of contigs instead of genomes
-sylph sketch my_contigs.fa -i -o contig_queries
-
-```
-
 See [Pre-sketched databases](#pre-databases) below to download pre-indexed databases. 
 
 ## Tutorials and manuals
+
+### [Cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook)
+
+For common use-cases and fast explanations, see the above [cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook). 
 
 ### Tutorials
 
@@ -114,7 +106,7 @@ See [Pre-sketched databases](#pre-databases) below to download pre-indexed datab
 
 ### Manuals
 
-Manuals forthcoming...
+1. #### [Incoporating taxonomy to get CAMI-like or MetaPhlAn-like outputs for GTDB (and custom taxonomy)](https://github.com/bluenote-1577/sylph/wiki/MetaPhlAn-or-CAMI%E2%80%90like-output-with-the-GTDB-database)
 
 ## Output format
 
@@ -125,14 +117,12 @@ reads.fq   genome.fa   78.1242   81.8234   97.53   264.000   NA-NA   HIGH   NA-N
 
 - Sample_file: the filename of the sample.
 - Genome_file: the filename of the genome.
-- (*Not present for `contain`*) Taxonomic_abundance: normalized taxnomic abundance as a percentage (i.e. not scaled by sequence length; same as MetaPhlAn)
-- (*Not present for `contain`*) Sequence_abundance: normalized sequence abundance as a percentage (i.e. scaled by sequence length; same as Kraken)
+- (*Not present for `query`*) Taxonomic_abundance: normalized taxnomic abundance as a percentage (i.e. not scaled by sequence length; same as MetaPhlAn)
+- (*Not present for `query`*) Sequence_abundance: normalized sequence abundance as a percentage (i.e. scaled by sequence length; same as Kraken)
 - Adjusted_ANI: nearest neighbour ANI.
     * If coverage adjustment is possible (cov is < 3x cov): returns coverage-adjusted ANI
     * If coverage is too low/high: returns Naive_ANI (see below)
-- Eff_cov: estimate of the coverage. *This is an underestimate of the true coverage*. **Always a decimal number.** 
-    * If coverage adjustment is possible: this is Eff_lambda
-    * If coverage is too low/high: this is `Median_cov`
+- Eff_cov/True_cov: an estimate of the effective, or if `-u` specified, the true coverage. **Always a decimal number.** 
 - ANI_5-95_percentile: [5%,95%] confidence intervals. **Not always a decimal number**.
    * If coverage adjustment is possible: `float-float` e.g. `98.52-99.55`
    * If coverage is too low/high: `NA-NA` is given. 
@@ -144,14 +134,14 @@ reads.fq   genome.fa   78.1242   81.8234   97.53   264.000   NA-NA   HIGH   NA-N
 - Mean_cov_geq1: mean k-mer multiplicity for k-mers with >= 1 multiplicity.
 - Containment_ind: `int/int` showing the containment index (number of k-mers contained divided by total k-mers), e.g. `959/1053`.
 - Naive_ANI: nearest neighbour ANI without coverage adjustment.
-- Contig_name: name of the first contig in the fasta or just the contig name for the -i option.
+- Contig_name: name of the first contig in the fast (or just the contig name for the -i option).
 
 <a name="pre-databases"></a>
 ## Pre-sketched databases
 
 We have some pre-sketched databases available for download below. 
 
-### Pre-sketched GTDB r214 database (85,202 genomes)
+### Pre-sketched GTDB r214 database (85,202 genomes). Works with v0.3.0 - current
 
 1. `-c 200`, more sensitive database (10 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c200-gtdb-r214.syldb
 3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c1000-gtdb-r214.syldb

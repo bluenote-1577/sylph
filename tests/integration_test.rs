@@ -14,7 +14,7 @@ fn fresh(){
 
 #[serial]
 #[test]
-fn test_profile_vs_contain(){
+fn test_profile_vs_query(){
 
     let mut output = Command::cargo_bin("sylph").unwrap();
     let output = output
@@ -29,7 +29,7 @@ fn test_profile_vs_contain(){
 
     let mut output = Command::cargo_bin("sylph").unwrap();
     let output = output
-        .arg("contain")
+        .arg("query")
         .arg("./test_files/o157_reads.fastq")
         .arg("./test_files/e.coli-EC590.fasta")
         .arg("./test_files/e.coli-o157.fasta")
@@ -103,11 +103,29 @@ fn test_sketch_commands() {
     assert.success().code(0);
     assert!(Path::new("./tests/results/test_sketch_dir/t1.fq.paired.sylsp").exists(), "Output file was not created");
 
+
+    fresh();
+    let mut cmd= Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("-g")
+        .arg("./test_files/t1.fq")
+        .arg("-r")
+        .arg("./test_files/t2.fq")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .arg("-o")
+        .arg("./tests/results/test_sketch_dir/testdb")
+        .assert();
+    assert.success().code(0);
+    assert!(Path::new("./tests/results/test_sketch_dir/t2.fq.sylsp").exists(), "Output file was not created");
+    assert!(Path::new("./tests/results/test_sketch_dir/testdb.syldb").exists(), "Output file was not created");
+
     fresh();
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
-        .arg("--sample-force")
+        .arg("-r")
         .arg("./test_files/e.coli-EC590.fasta")
         .arg("./test_files/o157_reads.fastq")
         .arg("-o")
@@ -125,7 +143,7 @@ fn test_sketch_commands() {
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
-        .arg("--db-force")
+        .arg("-g")
         .arg("./test_files/e.coli-EC590.fasta")
         .arg("./test_files/o157_reads.fastq")
         .arg("-o")
@@ -138,6 +156,35 @@ fn test_sketch_commands() {
     assert!(!Path::new("./tests/results/test_sketch_dir/o157_reads.fastq.sylsp").exists(), "Output file was created");
     assert!(Path::new("./tests/results/test_sketch_dir/db.syldb").exists(), "Output file was not created");
     fresh();
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("--gl")
+        .arg("test_files/list.txt")
+        .arg("-o")
+        .arg("./tests/results/test_sketch_dir/db")
+        .assert();
+    assert.success().code(0);
+    assert!(Path::new("./tests/results/test_sketch_dir/db.syldb").exists(), "Output file was not created");
+    fresh();
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("--rl")
+        .arg("test_files/list.txt")
+        .arg("-o")
+        .arg("./tests/results/test_sketch_dir/db")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .assert();
+    assert.success().code(0);
+    assert!(!Path::new("./tests/results/test_sketch_dir/db.syldb").exists(), "Output file was not created");
+    assert!(Path::new("./tests/results/test_sketch_dir/e.coli-EC590.fasta.sylsp").exists(), "Output file was not created");
+    assert!(Path::new("./tests/results/test_sketch_dir/o157_reads.fastq.sylsp").exists(), "Output file was not created");
+    fresh();
+
 }
 
 #[serial]
@@ -148,7 +195,7 @@ fn test_profile_disabling(){
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
-        .arg("--db-force")
+        .arg("-g")
         .arg("./test_files/e.coli-EC590.fasta")
         .arg("-o")
         .arg("./tests/results/test_sketch_dir/db")
@@ -168,7 +215,7 @@ fn test_profile_disabling(){
 
     let mut output = Command::cargo_bin("sylph").unwrap();
     let assert = output
-        .arg("contain")
+        .arg("query")
         .arg("./test_files/o157_reads.fastq")
         .arg("./tests/results/test_sketch_dir/db.syldb")
         .assert();

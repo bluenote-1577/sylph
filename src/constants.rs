@@ -9,3 +9,4 @@ pub const QUERY_FILE_SUFFIX_VALID : [&str;2] = [QUERY_FILE_SUFFIX, ".sylqueries"
 pub const SAMPLE_FILE_SUFFIX_VALID : [&str;2] = [SAMPLE_FILE_SUFFIX, ".sylsample"];
 pub const MIN_ANI_DEF: f64 = 0.9;
 pub const MIN_ANI_P_DEF: f64 = 0.95;
+pub const MAX_MEDIAN_FOR_MEAN_FINAL_EST: f64 = 15.;

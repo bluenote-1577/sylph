@@ -1,3 +1,19 @@
+## sylph v0.4.0 release: major interface changes
+
+### BREAKING
+
+- renamed `sylph contain` to `sylph query`. 
+- methods for sketching are drastically different now. E.g. we use `-g genome1.fa genom2.fa` for specifying genomes and `-r read1.fa read2.fq` for specifying reads when sketching. 
+
+### Major
+
+- `-u` or `--estimate-unknown` options are now present for estimating unknown organisms in the sample. 
+- When using `-u`, associated options `--read-seq-id` and `--read-len` are available for calculating true coverages with sylph, i.e., coverages concordant with read mapping
+
+### Minor
+
+- Coverage calculation is slightly different now.
+
 ## sylph v0.3.0 release: first class support for pseudotax, now called "profile" - 2023-10-01
 
 Continuing development of sylph taxonomic profiling. 
