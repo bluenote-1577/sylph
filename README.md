@@ -10,7 +10,7 @@
 
 ### Why sylph?
 
-1. **Accurate ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can give accurate ANI estimates down to 0.1x coverage and often even lower.
+1. **Accurate ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage and often even lower.
 
 2. **Precise profiling**: Our tests show that sylph is more precise than Kraken, about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs) but with possibly better abundance estimates. 
 
