@@ -105,36 +105,8 @@ For common use-cases and fast explanations, see the above [cookbook](https://git
 1. #### [Introduction: 5-minute sylph tutorial outlining basic usage](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
 
 ### Manuals
-
+1. #### [Sylph's TSV output format](https://github.com/bluenote-1577/sylph/wiki/Output-format)
 1. #### [Incoporating taxonomy to get CAMI-like or MetaPhlAn-like outputs for GTDB (and custom taxonomy)](https://github.com/bluenote-1577/sylph/wiki/MetaPhlAn-or-CAMI%E2%80%90like-output-with-the-GTDB-database)
-
-## Output format
-
-```sh
-Sample_file   Genome_file   Taxonomic_abundance   Sequence_abundance   Adjusted_ANI   Eff_cov   ANI_5-95_percentile   Eff_lambda   Lambda_5-95_percentile   Median_cov   Mean_cov_geq1   Containment_ind   Naive_ANI   Contig_name
-reads.fq   genome.fa   78.1242   81.8234   97.53   264.000   NA-NA   HIGH   NA-NA   264   264.143   10281/22299   97.53   NC_016901.1 Shewanella baltica OS678, complete genome
-```
-
-- Sample_file: the filename of the sample.
-- Genome_file: the filename of the genome.
-- (*Not present for `query`*) Taxonomic_abundance: normalized taxnomic abundance as a percentage (i.e. not scaled by sequence length; same as MetaPhlAn)
-- (*Not present for `query`*) Sequence_abundance: normalized sequence abundance as a percentage (i.e. scaled by sequence length; same as Kraken)
-- Adjusted_ANI: nearest neighbour ANI.
-    * If coverage adjustment is possible (cov is < 3x cov): returns coverage-adjusted ANI
-    * If coverage is too low/high: returns Naive_ANI (see below)
-- Eff_cov/True_cov: an estimate of the effective, or if `-u` specified, the true coverage. **Always a decimal number.** 
-- ANI_5-95_percentile: [5%,95%] confidence intervals. **Not always a decimal number**.
-   * If coverage adjustment is possible: `float-float` e.g. `98.52-99.55`
-   * If coverage is too low/high: `NA-NA` is given. 
-- Eff_lambda: estimate of the effective coverage parameter. **Not always a decimal number**. 
-    * If coverage adjustment is possible: lambda estimate is given
-    * If coverage is too low/high: `LOW` or `HIGH` is output
-- Lambda_5-95_percentile: [5%, 95%] confidence intervals for lambda. Same format rules as ANI_5-95_percentile.
-- Median_cov: median k-mer multiplicity for k-mers with >= 1 multiplicity.
-- Mean_cov_geq1: mean k-mer multiplicity for k-mers with >= 1 multiplicity.
-- Containment_ind: `int/int` showing the containment index (number of k-mers contained divided by total k-mers), e.g. `959/1053`.
-- Naive_ANI: nearest neighbour ANI without coverage adjustment.
-- Contig_name: name of the first contig in the fast (or just the contig name for the -i option).
 
 <a name="pre-databases"></a>
 ## Pre-sketched databases
@@ -144,7 +116,10 @@ We have some pre-sketched databases available for download below.
 ### Pre-sketched GTDB r214 database (85,202 genomes). Works with v0.3.0 - current
 
 1. `-c 200`, more sensitive database (10 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c200-gtdb-r214.syldb
-3. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c1000-gtdb-r214.syldb
+2. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c1000-gtdb-r214.syldb
+
+### Pre-sketched IMG/VR4 database for high-confidence vOTU representatives (2,917,516 viral genomes). Works with v0.3.0 - current
+1. `-c 200` (2GB): https://storage.googleapis.com/sylph-stuff/imgvr_c200_v0.3.0.syldb
 
 Quick usage example
 
