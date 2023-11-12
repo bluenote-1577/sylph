@@ -103,10 +103,11 @@ For common use-cases and fast explanations, see the above [cookbook](https://git
 ### Tutorials
 
 1. #### [Introduction: 5-minute sylph tutorial outlining basic usage](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
+2. #### [Multi-sample paired-end read profiling against GTDB-R214 database](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
 
 ### Manuals
 1. #### [Sylph's TSV output format](https://github.com/bluenote-1577/sylph/wiki/Output-format)
-1. #### [Incoporating taxonomy to get CAMI-like or MetaPhlAn-like outputs for GTDB (and custom taxonomy)](https://github.com/bluenote-1577/sylph/wiki/MetaPhlAn-or-CAMI%E2%80%90like-output-with-the-GTDB-database)
+1. #### [Incoporating custom taxonomies to get CAMI-like or MetaPhlAn-like outputs](https://github.com/bluenote-1577/sylph/wiki/Integrating-taxonomic-information-with-sylph)
 
 <a name="pre-databases"></a>
 ## Pre-sketched databases
