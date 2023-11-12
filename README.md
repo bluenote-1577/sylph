@@ -1,4 +1,4 @@
-# sylph -  ANI genome querying and metagenomic profiling for shotgun metagenomes 
+# sylph -  metagenomic profiling with ANIs for shotgun metagenomes 
 
 ## Introduction
 
