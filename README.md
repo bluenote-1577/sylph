@@ -103,7 +103,7 @@ For common use-cases and fast explanations, see the above [cookbook](https://git
 ### Tutorials
 
 1. #### [Introduction: 5-minute sylph tutorial outlining basic usage](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
-2. #### [Multi-sample paired-end read profiling against GTDB-R214 database](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
+2. #### [Multi-sample paired-end taxonomic profiling against GTDB-R214 database](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
 
 ### Manuals
 1. #### [Sylph's TSV output format](https://github.com/bluenote-1577/sylph/wiki/Output-format)
