@@ -10,9 +10,9 @@
 
 ### Why sylph?
 
-1. **Accurate ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage and often even lower.
+1. **Accurate ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
 
-2. **Precise profiling**: Our tests show that sylph is more precise than Kraken, about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs) but with possibly better abundance estimates. 
+2. **Precise profiling**: Our tests show that sylph is more precise than Kraken, about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs), but with possibly better abundance estimates. 
 
 3. **Ultrafast, multithreaded, multi-sample**: sylph is > 100x faster than MetaPhlAn for multi-sample processing. sylph only takes 10GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
 
@@ -98,7 +98,7 @@ See [Pre-sketched databases](#pre-databases) below to download pre-indexed datab
 
 ### [Cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook)
 
-For common use-cases and fast explanations, see the above [cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook). 
+For common use cases and fast explanations, see the above [cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook). 
 
 ### Tutorials
 
