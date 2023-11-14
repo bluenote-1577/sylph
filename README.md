@@ -8,6 +8,13 @@
 
 **Metagenomic profiling**: Like e.g. Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _ANI to the database_.
 
+<p align="center"><img src="assets/sylph.gif?raw=true"/></p>
+<p align="center">
+   <i>
+   Profiling 5.3 gigabases of reads against 85,205 genomes in 2 seconds with 10 threads
+   </i>
+</p>
+
 ### Why sylph?
 
 1. **Accurate ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
