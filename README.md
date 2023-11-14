@@ -11,7 +11,7 @@
 <p align="center"><img src="assets/sylph.gif?raw=true"/></p>
 <p align="center">
    <i>
-   Profiling 5.3 gigabases of reads against 85,205 genomes in 2 seconds with 10 threads
+   Profiling 5.3 gb gut metagenome against 85,205 genomes in 2 seconds with 10 threads, finding C. diff present
    </i>
 </p>
 
