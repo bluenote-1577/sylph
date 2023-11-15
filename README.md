@@ -11,7 +11,7 @@
 <p align="center"><img src="assets/sylph.gif?raw=true"/></p>
 <p align="center">
    <i>
-   Profiling an indexed 1 Gbp mouse gut reads against 85,205 genomes in a few seconds 
+   Profiling 1 Gbp of mouse gut reads against 85,205 genomes in a few seconds 
    </i>
 </p>
 
