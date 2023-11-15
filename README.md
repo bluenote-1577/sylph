@@ -19,7 +19,7 @@
 
 1. **Accurate ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
 
-2. **Precise profiling**: Our tests show that sylph is more precise than Kraken, about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs), but with possibly better abundance estimates. 
+2. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken, about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs), but with possibly better abundance estimates. 
 
 3. **Ultrafast, multithreaded, multi-sample**: sylph is > 100x faster than MetaPhlAn for multi-sample processing. sylph only takes 10GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
 
