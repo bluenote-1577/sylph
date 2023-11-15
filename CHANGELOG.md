@@ -1,3 +1,9 @@
+## sylph v0.4.1 release: getting ready for preprinting
+
+### Minor
+
+- small changes for help text, options, and output texts. 
+
 ## sylph v0.4.0 release: major interface changes
 
 ### BREAKING

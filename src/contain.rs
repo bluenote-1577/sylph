@@ -236,7 +236,6 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
     let chunks = get_chunks(&sequence_index_vec, step);
 
     chunks.into_iter().for_each(|chunk| {
-    //sequence_index_vec.into_iter().for_each(|j| {
         chunk.into_par_iter().for_each(|j|{
             let is_sketch = j >= read_files.len() - read_sketch_files.len();
             let sequence_sketch = get_seq_sketch(&args, read_files[j], is_sketch, genome_sketches[0].c, genome_sketches[0].k);
@@ -291,7 +290,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                     let mut bases_explained = 1.;
                     if args.estimate_unknown{
                         bases_explained = estimate_covered_bases(&stats_vec_seq, &sequence_sketch, args.read_length, sequence_sketch.k);
-                        log::info!("{} has {:.2}% reads assigned by profile", &read_files[j], bases_explained * 100.);
+                        log::info!("{} has {:.2}% of reads detected in database by profile", &read_files[j], bases_explained * 100.);
                     }
 
                     let total_cov = stats_vec_seq.iter().map(|x| x.final_est_cov).sum::<f64>();
