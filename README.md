@@ -11,7 +11,7 @@
 <p align="center"><img src="assets/sylph.gif?raw=true"/></p>
 <p align="center">
    <i>
-   Profiling an indexed 5.3 Gbp gut metagenome against 85,205 genomes in 2 seconds with 10 threads and detecting C. diff
+   Profiling an indexed 1 Gbp mouse gut reads against 85,205 genomes in a few seconds 
    </i>
 </p>
 
