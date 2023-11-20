@@ -6,7 +6,7 @@
 
 **Containment ANI querying**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
 
-**Metagenomic profiling**: Like e.g. Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _ANI to the database_.
+**Metagenomic profiling**: Like e.g. Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _containment ANI to the database_.
 
 <p align="center"><img src="assets/sylph.gif?raw=true"/></p>
 <p align="center">
@@ -17,7 +17,7 @@
 
 ### Why sylph?
 
-1. **Accurate ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
+1. **Accurate (containment) ANIs down to 0.1x coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
 
 2. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken, about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs), but with possibly better abundance estimates. 
 
