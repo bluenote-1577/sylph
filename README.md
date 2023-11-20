@@ -4,7 +4,7 @@
 
 **sylph** is a program that can perform ultrafast (1) **ANI querying** or (2) **metagenomic profiling** for metagenomic shotgun samples. 
 
-**ANI querying**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
+**Containment ANI querying**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
 
 **Metagenomic profiling**: Like e.g. Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _ANI to the database_.
 
