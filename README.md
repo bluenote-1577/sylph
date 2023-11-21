@@ -130,5 +130,5 @@ sylph profile reads.fq v0.3-c200-gtdb-r214.syldb -t 30 > results.tsv
 
 ## Citing sylph
 
-Jim Shaw and Yun William Yu. Ultrafast, coverage-corrected genome similarity queries for metagenomic shotgun samples with sylph (Preprint to be released soon). 
+Jim Shaw and Yun William Yu. Metagenome profiling and containment estimation through abundance-corrected k-mer sketching with sylph (2023). bioRxiv.
 
