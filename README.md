@@ -1,4 +1,4 @@
-# sylph -  metagenomic profiling with ANIs for shotgun metagenomes 
+# sylph - fast and precise species-level metagenomic profiling with ANIs 
 
 ## Introduction
 
