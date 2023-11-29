@@ -90,7 +90,9 @@ sylph query database.syldb *.sylsp -t (threads) > ani_queries.tsv
 sylph profile database.syldb *.sylsp -t (threads) > profiling.tsv
 ```
 
-See [Pre-sketched databases](#pre-databases) below to download pre-indexed databases. 
+## [Pre-built databases](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases)
+
+The pre-built databases [available here](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases) can be downloaded and used with sylph for profiling and containment querying. 
 
 ## Tutorials and manuals
 
@@ -106,19 +108,6 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 ### Manuals
 1. #### [Sylph's TSV output and containment ANI explanation](https://github.com/bluenote-1577/sylph/wiki/Output-format)
 1. #### [Incoporating custom taxonomies to get CAMI-like or MetaPhlAn-like outputs](https://github.com/bluenote-1577/sylph/wiki/Integrating-taxonomic-information-with-sylph)
-
-<a name="pre-databases"></a>
-## Pre-sketched databases
-
-We have some pre-sketched databases available for download below. 
-
-### Pre-sketched GTDB r214 database (85,202 genomes). Works with v0.3.0 - current
-
-1. `-c 200`, more sensitive database (10 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c200-gtdb-r214.syldb
-2. `-c 1000` more efficient, less sensitive database (2 GB): https://storage.googleapis.com/sylph-stuff/v0.3-c1000-gtdb-r214.syldb
-
-### Pre-sketched IMG/VR4 database for high-confidence vOTU representatives (2,917,516 viral genomes). Works with v0.3.0 - current
-1. `-c 200` (2GB): https://storage.googleapis.com/sylph-stuff/imgvr_c200_v0.3.0.syldb
 
 Quick usage example
 
