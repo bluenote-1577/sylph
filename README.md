@@ -19,11 +19,11 @@
 
 1. **Accurate (containment) ANIs down to 0.1x effective coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
 
-2. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken, about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs), but with possibly better abundance estimates. 
+2. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken and about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
 
 3. **Ultrafast, multithreaded, multi-sample**: sylph is > 100x faster than MetaPhlAn for multi-sample processing. sylph only takes 13GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
 
-4. **Easily customized databases**: sylph does not require taxonomic information, so you can profile against metagenome-assembled genomes (MAGs), viruses, eukaryotes, even assembled contigs, etc. Taxonomic information can be incorporated downstream for traditional profiling reports. 
+4. **Easily customized databases**: sylph does not require taxonomic information, so you can profile against [metagenome-assembled genomes (MAGs), viruses, eukaryotes](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases), even assembled contigs, etc. Taxonomic information can be incorporated downstream for traditional profiling reports. 
 
 ### How does sylph work?
 
