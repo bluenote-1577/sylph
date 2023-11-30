@@ -107,15 +107,7 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 
 ### Manuals
 1. #### [Sylph's TSV output and containment ANI explanation](https://github.com/bluenote-1577/sylph/wiki/Output-format)
-1. #### [Incoporating custom taxonomies to get CAMI-like or MetaPhlAn-like outputs](https://github.com/bluenote-1577/sylph/wiki/Integrating-taxonomic-information-with-sylph)
-
-Quick usage example
-
-```sh
-# faster, less sensitive database
-wget https://storage.googleapis.com/sylph-stuff/v0.3-c1000-gtdb-r214.syldb
-sylph profile reads.fq v0.3-c200-gtdb-r214.syldb -t 30 > results.tsv
-```
+2. #### [Incoporating custom taxonomies to get CAMI-like or MetaPhlAn-like outputs](https://github.com/bluenote-1577/sylph/wiki/Integrating-taxonomic-information-with-sylph)
 
 ## Citing sylph
 
