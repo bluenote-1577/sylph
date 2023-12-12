@@ -6,7 +6,7 @@
 
 **Containment ANI querying**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
 
-**Metagenomic profiling**: Like e.g. Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _containment ANI to the database_.
+**Metagenomic profiling**: Like e.g. Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _containment ANI in your metagenome_.
 
 <p align="center"><img src="assets/sylph.gif?raw=true"/></p>
 <p align="center">
