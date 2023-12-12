@@ -21,7 +21,7 @@
 
 2. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken and about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
 
-3. **Ultrafast, multithreaded, multi-sample**: sylph is > 100x faster than MetaPhlAn for multi-sample processing. sylph only takes 13GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
+3. **Ultrafast, multithreaded, multi-sample**: sylph can be > 100x faster than MetaPhlAn for multi-sample processing. sylph only takes 13GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
 
 4. **Easily customized databases**: sylph does not require taxonomic information, so you can profile against [metagenome-assembled genomes (MAGs), viruses, eukaryotes](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases), even assembled contigs, etc. Taxonomic information can be incorporated downstream for traditional profiling reports. 
 
