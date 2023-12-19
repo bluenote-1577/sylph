@@ -1,3 +1,21 @@
+## sylph v0.5.0 release: **MASSIVE improvements on real illumina data** : Dec2023 / Jan 2024
+
+
+### Major
+
+**In previous versions, sylph was underperforming on real illumina data sets**. 
+
+This is because real illumina datasets have a non-trivial number of duplicate reads. Duplicate reads mess up sylph's statistical model.
+
+For the paired sketching options `sylph sketch -1 -2`, a new deduplication routine has been added.  This increases sketching time slightly but massively increases performance on real datasets. 
+
+For paired-end illumina reads, sylph can detect up to ~60% more species on certain datasets now for low-abundance species. 
+
+### BREAKING
+
+- sequence sketches (sylsp) have changed formats. Sequences will need to be re-sketched.
+- `--read-length` option removed and incorporated into the sketches by default. 
+
 ## sylph v0.4.1 release: getting ready for preprinting
 
 ### Minor
