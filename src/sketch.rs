@@ -19,6 +19,7 @@ use std::io::BufWriter;
 use std::io::{prelude::*, BufReader};
 use std::path::Path;
 use std::sync::Mutex;
+type Marker = u64;
 
 pub fn check_vram_and_block(max_ram: usize, file: &str){
     if let Some(usage) = memory_stats() {
@@ -27,11 +28,16 @@ pub fn check_vram_and_block(max_ram: usize, file: &str){
             log::debug!("Max memory reached. Blocking sketch for {}. Curr memory {}, max mem {}", file, gb_usage_curr, max_ram);
         }
         while (max_ram as f64) < gb_usage_curr{
-            let five_second = Duration::from_secs(3);
+            let five_second = Duration::from_secs(1);
             thread::sleep(five_second);
-            gb_usage_curr = usage.virtual_mem as f64 / 1_000_000_000 as f64;
-            if (max_ram as f64) >= gb_usage_curr{
-                log::debug!("Sketching for {} freed", file);
+            if let Some(usage) = memory_stats() {
+                gb_usage_curr = usage.virtual_mem as f64 / 1_000_000_000 as f64;
+                if (max_ram as f64) >= gb_usage_curr{
+                    log::debug!("Sketching for {} freed", file);
+                }
+            }
+            else{
+                break;
             }
         }
 
@@ -194,8 +200,8 @@ pub fn sketch(args: SketchArgs) {
     let mut max_ram = usize::MAX;
     if args.max_ram.is_some(){
         max_ram = args.max_ram.unwrap();
-        if max_ram < 10{
-            log::error!("Max ram must be >= 10. Exiting.");
+        if max_ram < 7{
+            log::error!("Max ram must be >= 7. Exiting.");
             std::process::exit(1);
         }
     }
@@ -487,24 +493,73 @@ pub fn sketch_genome(
 }
 
 #[inline]
-fn pair_kmer(s1: &[u8], s2: &[u8]) -> Option<[u64;2]>{
-    let k = 32;
-    if s1.len() < k || s2.len() < k{
+fn pair_kmer(s1: &[u8], s2: &[u8]) -> Option<([Marker;2], [Marker;2])>{
+    let k = std::mem::size_of::<Marker>() * 4 ;
+    if s1.len() < 2 * k + 1 || s2.len() < 2 * k + 1{
         return None
     }
     else{
         let mut kmer_f = 0;
+        let mut kmer_g = 0;
         let mut kmer_r = 0;
+        let mut kmer_t = 0;
         for i in 0..k{
-            let nuc_1 = BYTE_TO_SEQ[s1[i] as usize] as u64;
-            let nuc_2 = BYTE_TO_SEQ[s2[i] as usize] as u64;
+            let nuc_1 = BYTE_TO_SEQ[s1[2*i] as usize] as Marker;
+            let nuc_2 = BYTE_TO_SEQ[s2[2*i] as usize] as Marker;
+            let nuc_3 = BYTE_TO_SEQ[s1[1+2*i] as usize] as Marker;
+            let nuc_4 = BYTE_TO_SEQ[s2[1+2*i] as usize] as Marker;
+
             kmer_f <<= 2;
             kmer_f |= nuc_1;
 
             kmer_r <<= 2;
             kmer_r |= nuc_2;
+
+            kmer_g <<= 2;
+            kmer_g |= nuc_3;
+
+            kmer_t <<= 2;
+            kmer_t |= nuc_4;
+
         }
-        return Some([kmer_f, kmer_r]);
+        return Some(([kmer_f, kmer_r], [kmer_g, kmer_t]));
+    }
+}
+
+fn dup_removal_lsh(read_sketch: &mut SequencesSketch,
+                   kmer_to_pair_table: &mut FxHashMap<u64, (SmallVec<[[Marker;2];1]>, SmallVec<[[Marker;2];1]>)>,
+                   km: &u64,
+                   kmer_pair: Option<([Marker;2],[Marker;2])>){
+    let c = read_sketch.kmer_counts.entry(*km).or_insert(0);
+    if *c < MAX_DEDUP_COUNT{ 
+        if let Some(doublepairs) = kmer_pair{
+            if kmer_to_pair_table.contains_key(km){ 
+                let mut ret = false;
+                let tables = kmer_to_pair_table.get_mut(km).unwrap();
+                if tables.0.contains(&doublepairs.0){
+                    ret = true;
+                }
+                else{
+                    tables.0.push(doublepairs.0);
+                }
+                if tables.1.contains(&doublepairs.1){
+                    ret = true;
+                }
+                else{
+                    tables.1.push(doublepairs.1);
+                }
+                if ret{
+                    return
+                }
+            }
+            else{
+                kmer_to_pair_table.insert(*km, (smallvec![doublepairs.0], smallvec![doublepairs.1]));
+            }
+        }
+    }
+    *c += 1;
+    if *c == MAX_DEDUP_COUNT{
+        kmer_to_pair_table.remove(km);
     }
 }
 
@@ -523,7 +578,10 @@ pub fn sketch_pair_sequences(
     let mut reader1 = r1o.unwrap();
     let mut reader2 = r2o.unwrap();
 
-    let mut kmer_to_firstpair_table : FxHashMap<u64,SmallVec<[[u64;2];1]>> = FxHashMap::default();
+    let mut kmer_to_pair_table : FxHashMap<u64,
+    (SmallVec<[[Marker;2];1]>,
+     SmallVec<[[Marker;2];1]>)> = FxHashMap::default();
+
     let mut mean_read_length:f64 = 0.;
     let mut counter:f64 = 0.;
 
@@ -547,47 +605,14 @@ pub fn sketch_pair_sequences(
                             ((rec1.seq().len() as f64) - mean_read_length) / counter;
 
                         for km in temp_vec1.iter() {
-                            if kmer_pair.is_some() &&
-                                kmer_to_firstpair_table.contains_key(km) && 
-                               kmer_to_firstpair_table[km].contains(&kmer_pair.unwrap()){
-                                    continue;
-                            }
-                            else{
-                                let c = read_sketch.kmer_counts.entry(*km).or_insert(0);
-                                *c += 1;
-                                if *c == 4{
-                                    kmer_to_firstpair_table.remove(km);
-                                }
-                                else if *c < 4{
-                                    if let Some(kmers) = kmer_pair{
-                                        let pairs = kmer_to_firstpair_table.entry(*km).or_insert(smallvec![]);
-                                        pairs.push(kmers);
-                                    }
-                                }
-                            }
+                            dup_removal_lsh(&mut read_sketch, &mut kmer_to_pair_table, km, kmer_pair); 
+                            
                         }
                         for km in temp_vec2.iter() {
                             if temp_vec1.contains(km) {
                                 continue;
                             }
-                            else if kmer_pair.is_some() &&
-                                kmer_to_firstpair_table.contains_key(km) && 
-                               kmer_to_firstpair_table[km].contains(&kmer_pair.unwrap()){
-                                    continue;
-                            }
-                            else{
-                                let c = read_sketch.kmer_counts.entry(*km).or_insert(0);
-                                *c += 1;
-                                if *c == 4{
-                                    kmer_to_firstpair_table.remove(km);
-                                }
-                                else if *c < 4{
-                                    if let Some(kmers) = kmer_pair{
-                                        let pairs = kmer_to_firstpair_table.entry(*km).or_insert(smallvec![]);
-                                        pairs.push(kmers);
-                                    }
-                                }
-                            }
+                            dup_removal_lsh(&mut read_sketch, &mut kmer_to_pair_table, km, kmer_pair); 
                         }
                     }
                 } else {

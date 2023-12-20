@@ -48,7 +48,7 @@ pub struct SketchArgs {
     pub c: usize,
     #[clap(short, default_value_t = 3, help = "Number of threads")]
     pub threads: usize,
-    #[clap(long="ram-barrier", help = "Stop multi-threaded read sketching when (virtual) RAM is past this value (in GB). Does NOT guarantee max RAM limit", hidden=true)]
+    #[clap(long="ram-barrier", help = "Stop multi-threaded read sketching when (virtual) RAM is past this value (in GB). Does NOT guarantee max RAM limit")]
     pub max_ram: Option<usize>,
     #[clap(long="trace", help = "Trace output (caution: very verbose)")]
     pub trace: bool,
