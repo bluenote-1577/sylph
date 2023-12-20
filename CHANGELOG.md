@@ -1,20 +1,26 @@
-## sylph v0.5.0 release: **MASSIVE improvements on real illumina data** : Dec2023 / Jan 2024
-
+## sylph v0.5.0 release: **Big improvements on real illumina data** : Dec2023 / Jan 2024
 
 ### Major
 
-**In previous versions, sylph was underperforming on real illumina data sets**. 
+**In previous versions, sylph was underperforming on real illumina data sets**. See https://github.com/bluenote-1577/sylph/issues/5 
 
-This is because real illumina datasets have a non-trivial number of duplicate reads. Duplicate reads mess up sylph's statistical model.
+This is because many real illumina datasets have a non-trivial number of duplicate reads. Duplicate reads mess up sylph's statistical model.
 
-For the paired sketching options `sylph sketch -1 -2`, a new deduplication routine has been added.  This increases sketching time slightly but massively increases performance on real datasets. 
+For the paired sketching options `sylph sketch -1 -2`, a new deduplication routine has been added. **This increases sketching memory by 3-4x but greatly increases performance on real datasets with > 1-2% of duplication for low-abundance genomes**. 
 
-For paired-end illumina reads, sylph can detect up to ~60% more species on certain datasets now for low-abundance species. 
+For paired-end illumina reads, sylph can detect up to ~10-50% more species low-abundance species below 0.1x coverage for certain illumina datasets. 
 
 ### BREAKING
 
 - sequence sketches (sylsp) have changed formats. Sequences will need to be re-sketched.
-- `--read-length` option removed and incorporated into the sketches by default. 
+- `--read-length` option removed and incorporated into the sketches by default. (suggested by @fplaza)
+
+### Other changes
+
+- New warning when `-o` specified and only reads are sketched (https://github.com/bluenote-1577/sylph/issues/7)
+- You can now rename sylph samples by specifing a sample naming file with `--sample-names` (suggested by @jolespin)
+- Newline delimited files are available in `profile` and `query` now (suggested by @jolespin)
+
 
 ## sylph v0.4.1 release: getting ready for preprinting
 

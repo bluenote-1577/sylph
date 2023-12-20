@@ -152,7 +152,18 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
     let mut read_sketch_files = vec![];
     let mut read_files = vec![];
 
-    for file in args.files.iter() {
+    let mut all_files = args.files.clone();
+
+    if let Some(ref newline_file) = args.file_list{
+        let file = File::open(newline_file).unwrap();
+        let reader = BufReader::new(file);
+        for line in reader.lines() {
+            all_files.push(line.unwrap());
+        }
+
+    }
+
+    for file in all_files.iter(){
 
         let mut genome_sketch_good_suffix = false;
         for suff in QUERY_FILE_SUFFIX_VALID{
@@ -186,11 +197,20 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
         }
     }
 
+    if genome_sketch_files.is_empty() && genome_files.is_empty(){
+        log::error!("No genome files found; see sylph query/profile -h for help. Exiting");
+        std::process::exit(1);
+    }
+
+    if read_sketch_files.is_empty() && read_files.is_empty(){
+        log::error!("No read files found; see sylph query/profile -h for help. Exiting");
+        std::process::exit(1);
+    }
+
     let genome_sketches = get_genome_sketches(&args, &genome_sketch_files, &genome_files);
     let genome_index_vec = (0..genome_sketches.len()).collect::<Vec<usize>>();
     log::info!("Finished obtaining genome sketches.");
 
-    
     if genome_sketches.is_empty() {
         log::error!("No genome sketches found; see sylph query/profile -h for help. Exiting");
         std::process::exit(1);
@@ -280,7 +300,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                             stats_vec_seq_2.lock().unwrap().push(res.unwrap());
                         }
                     });
-                    stats_vec_seq = derep_if_reassign_threshold(&stats_vec_seq, stats_vec_seq_2.into_inner().unwrap(), args.redundant_ANI, sequence_sketch.k);
+                    stats_vec_seq = derep_if_reassign_threshold(&stats_vec_seq, stats_vec_seq_2.into_inner().unwrap(), args.redundant_ani, sequence_sketch.k);
                     //stats_vec_seq = stats_vec_seq_2.into_inner().unwrap();
                     estimate_true_cov(&mut stats_vec_seq, kmer_id_opt, args.estimate_unknown, sequence_sketch.mean_read_length, sequence_sketch.k);
                     log::info!("{} has {} genomes passing profiling threshold. ", &read_files[j], stats_vec_seq.len());
@@ -527,7 +547,7 @@ fn get_seq_sketch(
             );
             return None;
         } else {
-            let read_sketch_opt = sketch_sequences_needle(&read_file, args.c, args.k);
+            let read_sketch_opt = sketch_sequences_needle(&read_file, args.c, args.k, None);
             return read_sketch_opt;
         }
     }
@@ -634,7 +654,7 @@ fn _get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genom
             error!("-k {} is not equal to -k {} found in sketches. Continuing without sketching.", args.k, current_k.unwrap());
         }
         else {
-            let read_sketch_opt = sketch_sequences_needle(&read_file,args.c, args.k,);
+            let read_sketch_opt = sketch_sequences_needle(&read_file,args.c, args.k, None);
             if read_sketch_opt.is_some() {
                 read_sketches.lock().unwrap().push(read_sketch_opt.unwrap());
             }
@@ -801,12 +821,19 @@ fn get_stats<'a>(
     }
 
     
+    let seq_name;
+    if let Some(sample) = &sequence_sketch.sample_name{
+        seq_name = sample.clone();
+    }
+    else{
+        seq_name = sequence_sketch.file_name.clone();
+    }
 
     let ani_result = AniResult {
         naive_ani,
         final_est_ani,
         final_est_cov,
-        seq_name: sequence_sketch.file_name.clone(),
+        seq_name: seq_name,
         gn_name: genome_sketch.file_name.as_str(),
         contig_name: genome_sketch.first_contig_name.as_str(),
         mean_cov: geq1_mean_cov,

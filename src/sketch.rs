@@ -108,7 +108,7 @@ pub fn is_fasta(file: &str) -> bool {
     }
 }
 
-pub fn sketch(args: SketchArgs) {
+fn check_args_valid(args: &SketchArgs){
     let level;
     if args.trace {
         level = log::LevelFilter::Trace;
@@ -137,26 +137,25 @@ pub fn sketch(args: SketchArgs) {
         && args.reads.is_none()
         && args.list_genomes.is_none()
         && args.list_reads.is_none()
+        && args.list_first_pair.is_none()
+        && args.list_second_pair.is_none()
     {
         error!("No input sequences found; see sylph sketch -h for help. Exiting.");
         std::process::exit(1);
     }
 
-    let mut all_files = vec![];
+    
 
+}
+
+fn parse_ambiguous_files(args: &SketchArgs, read_inputs: &mut Vec<String>, genome_inputs: &mut Vec<String>){
+    let mut all_files = vec![];
     if args.list_sequence.is_some() {
-        let file_list = args.list_sequence.unwrap();
-        let file = File::open(file_list).unwrap();
-        let reader = BufReader::new(file);
-        for line in reader.lines() {
-            all_files.push(line.unwrap());
-        }
+        let file_list = args.list_sequence.as_ref().unwrap();
+        parse_line_file(file_list, &mut all_files);
     }
 
-    all_files.extend(args.files);
-
-    let mut read_inputs = vec![];
-    let mut genome_inputs = vec![];
+    all_files.extend(args.files.clone());
 
     for file in all_files {
         if is_fastq(&file) {
@@ -167,33 +166,102 @@ pub fn sketch(args: SketchArgs) {
             warn!("{} does not have a fasta/fastq/gzip type extension; skipping", file);
         }
     }
+}
 
-    if let Some(genomes_syl_in) = args.genomes{
+fn parse_reads_and_genomes(args: &SketchArgs, 
+    read_inputs: &mut Vec<String>, 
+    genome_inputs: &mut Vec<String>){
+
+    if let Some(genomes_syl_in) = args.genomes.clone(){
         for gn_file in genomes_syl_in{
             genome_inputs.push(gn_file);
         }
     }
-    if let Some(reads_syl_in) = args.reads{
+    if let Some(reads_syl_in) = args.reads.clone(){
         for rd_file in reads_syl_in{
             read_inputs.push(rd_file);
         }
     }
 
     if args.list_reads.is_some() {
-        let file_reads = args.list_reads.unwrap();
-        let file = File::open(file_reads).unwrap();
-        let reader = BufReader::new(file);
-        for line in reader.lines() {
-            read_inputs.push(line.unwrap());
-        }
+        let file_reads = args.list_reads.as_ref().unwrap();
+        parse_line_file(file_reads, read_inputs);
     }
 
     if args.list_genomes.is_some() {
-        let file_genomes = args.list_genomes.unwrap();
-        let file = File::open(file_genomes).unwrap();
-        let reader = BufReader::new(file);
-        for line in reader.lines() {
-            genome_inputs.push(line.unwrap());
+        let file_genomes = args.list_genomes.as_ref().unwrap();
+        parse_line_file(file_genomes, genome_inputs);
+    }
+
+}
+
+fn parse_paired_end_reads(args: &SketchArgs, first_pairs: &mut Vec<String>, second_pairs: &mut Vec<String>){
+
+    if args.first_pair.len() != args.second_pair.len(){
+        error!("Different number of paired sequences. Exiting.");
+        std::process::exit(1);
+    }
+
+    for f in args.first_pair.iter(){
+        first_pairs.push(f.clone());
+    }
+
+    for f in args.second_pair.iter(){
+        second_pairs.push(f.clone());
+    }
+
+    if args.list_first_pair.is_some() {
+        let file_first_pair = args.list_first_pair.as_ref().unwrap();
+        parse_line_file(file_first_pair, first_pairs);
+    }
+
+    if args.list_second_pair.is_some() {
+        let file_second_pair = args.list_second_pair.as_ref().unwrap();
+        parse_line_file(file_second_pair, second_pairs)
+    }
+
+    if first_pairs.len() != second_pairs.len(){
+        error!("Different number of paired sequences. Exiting.");
+        std::process::exit(1);
+    }
+}
+
+fn parse_line_file(file_name: &str, vec: &mut Vec<String>){
+    let file = File::open(file_name).unwrap();
+    let reader = BufReader::new(file);
+    for line in reader.lines() {
+        vec.push(line.unwrap());
+    }
+}
+
+fn parse_sample_names(args: &SketchArgs) -> Option<Vec<String>>{
+    if args.list_sample_names.is_none(){
+        return None
+    }
+    else{
+        let mut sample_names = vec![];
+        parse_line_file(&args.list_sample_names.as_ref().unwrap(), &mut sample_names);
+        return Some(sample_names);
+    }
+}
+
+pub fn sketch(args: SketchArgs) {
+    
+    let mut read_inputs = vec![];
+    let mut genome_inputs = vec![];
+    let mut first_pairs = vec![];
+    let mut second_pairs = vec![];
+
+    check_args_valid(&args);
+    parse_ambiguous_files(&args, &mut read_inputs, &mut genome_inputs);
+    parse_reads_and_genomes(&args, &mut read_inputs, &mut genome_inputs);
+    parse_paired_end_reads(&args, &mut first_pairs, &mut second_pairs);
+
+    let sample_names = parse_sample_names(&args);
+    if let Some(names) = &sample_names{
+        if names.len() != first_pairs.len() + read_inputs.len(){
+            log::error!("Sample name length is not equal to the number of reads. Exiting");
+            std::process::exit(1);
         }
     }
 
@@ -206,29 +274,19 @@ pub fn sketch(args: SketchArgs) {
         }
     }
 
-    if args.first_pair.is_empty() && !args.second_pair.is_empty(){
-        error!("Different number of paired sequences. Exiting.");
-        std::process::exit(1);
-
-    }
-    if !args.first_pair.is_empty() && args.second_pair.is_empty(){
-        error!("Different number of paired sequences. Exiting.");
-        std::process::exit(1);
-    }
-
-    if !args.first_pair.is_empty() && !args.second_pair.is_empty() {
+    if !first_pairs.is_empty() && !second_pairs.is_empty() {
         info!("Sketching paired sequences...");
-        if args.first_pair.len() != args.second_pair.len() {
-            error!("Different number of paired sequences. Exiting.");
-            std::process::exit(1);
-        }
-        let iter_vec: Vec<usize> = (0..args.first_pair.len()).into_iter().collect();
+        let iter_vec: Vec<usize> = (0..first_pairs.len()).into_iter().collect();
         iter_vec.into_par_iter().for_each(|i| {
-            let read_file1 = &args.first_pair[i];
-            let read_file2 = &args.second_pair[i];
+            let read_file1 = &first_pairs[i];
+            let read_file2 = &second_pairs[i];
             check_vram_and_block(max_ram, read_file1);
 
-            let read_sketch_opt = sketch_pair_sequences(read_file1, read_file2, args.c, args.k);
+            let mut sample_name = None;
+            if let Some(name) = &sample_names{
+                sample_name = Some(name[i].clone());
+            }
+            let read_sketch_opt = sketch_pair_sequences(read_file1, read_file2, args.c, args.k, sample_name.clone());
             if read_sketch_opt.is_some() {
                 let res = fs::create_dir_all(&args.sample_output_dir);
                 if res.is_err(){
@@ -237,7 +295,16 @@ pub fn sketch(args: SketchArgs) {
                 }
                 let pref = Path::new(&args.sample_output_dir);
                 let read_sketch = read_sketch_opt.unwrap();
-                let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
+
+                let sketch_name;
+                if sample_name.is_some(){
+                    sketch_name = read_sketch.sample_name.as_ref().unwrap();
+                }
+                else{
+                    sketch_name = &read_sketch.file_name;
+                }
+
+                let read_file_path = Path::new(&sketch_name).file_name().unwrap();
                 let file_path = pref.join(&read_file_path);
 
                 let file_path_str = format!(
@@ -270,13 +337,24 @@ pub fn sketch(args: SketchArgs) {
         let read_file = &read_inputs[i];
 
         check_vram_and_block(max_ram, read_file);
+        let mut sample_name = None;
+        if let Some(name) = &sample_names{
+            sample_name = Some(name[i + first_pairs.len()].clone());
+        }
 
         let read_sketch_opt;
-        read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k);
+        read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k, sample_name.clone());
 
         if read_sketch_opt.is_some() {
             let read_sketch = read_sketch_opt.unwrap();
-            let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
+            let sketch_name;
+            if sample_name.is_some(){
+                sketch_name = read_sketch.sample_name.as_ref().unwrap();
+            }
+            else{
+                sketch_name = &read_sketch.file_name;
+            }
+            let read_file_path = Path::new(&sketch_name).file_name().unwrap();
             let file_path = pref.join(&read_file_path);
 
             let file_path_str = format!("{}{}", file_path.to_str().unwrap(), SAMPLE_FILE_SUFFIX);
@@ -568,10 +646,11 @@ pub fn sketch_pair_sequences(
     read_file2: &str,
     c: usize,
     k: usize,
+    sample_name: Option<String>
 ) -> Option<SequencesSketch> {
     let r1o = parse_fastx_file(&read_file1);
     let r2o = parse_fastx_file(&read_file2);
-    let mut read_sketch = SequencesSketch::new(read_file1.to_string(), c, k, true, String::new(), 0.);
+    let mut read_sketch = SequencesSketch::new(read_file1.to_string(), c, k, true, sample_name, 0.);
     if r1o.is_err() || r2o.is_err() {
         panic!("Paired end reading failed");
     }
@@ -627,74 +706,7 @@ pub fn sketch_pair_sequences(
     return Some(read_sketch);
 }
 
-//This did not work
-//pub fn sketch_pair_sequences(read_file1: &str, read_file2: &str) {
-//    let mut queue: WorkQueue<(, _)> = WorkQueue::new();
-//
-//    let (results_tx, results_rx) = channel();
-//
-//    // Create a SyncFlag to share whether or not the worker threads should
-//    // keep waiting on jobs.
-//    let (mut more_jobs_tx, more_jobs_rx) = new_syncflag(true);
-//
-//    // This Vec is just for the controller to keep track of the worker threads.
-//    let mut thread_handles = Vec::new();
-//    for _ in 0..15 {
-//        let mut t_queue = queue.clone();
-//        let t_results_tx = results_tx.clone();
-//        let t_more_jobs = more_jobs_rx.clone();
-//        thread_handles.push(std::thread::spawn(move || {
-//            while let Some(work_input) = t_queue.wait(&t_more_jobs) {
-//                // Do some work. Totally contrived in this case.
-//                let result = work_input;
-//                // Send the results of the work to the main thread.
-//                //
-//                unsafe {
-//                    extract_markers_avx2(&result.0, &mut vec![], 100, 21);
-//                    extract_markers_avx2(&result.1, &mut vec![], 100, 21);
-//                }
-//                t_results_tx.send(("x", result)).unwrap();
-//            }
-//        }));
-//    }
-//
-//    let mut reader1 = ReaderQ::new(BufReader::new(File::open(&read_file1).unwrap()));
-//    let mut reader2 = ReaderQ::new(BufReader::new(File::open(&read_file2).unwrap()));
-//    let mut rset1 = seq_io::fastq::RecordSet::default();
-//    let mut rset2 = seq_io::fastq::RecordSet::default();
-//
-//    loop{
-//        let ok1 = reader1.read_record_set(&mut rset1);
-//        let ok2 = reader2.read_record_set(&mut rset2);
-//
-//        queue.push_work(rset1,rset2);
-////        for (rec1,rec2) in rset1.into_iter().zip(rset2.into_iter()){
-////            queue.push_work((rec1, rec2));
-////        }
-//    }
-//
-////    for (record1 , record2) in records1.into_iter().zip(records2.into_iter()){
-////        if record1.is_ok() && record2.is_ok() {
-////            let rec1 = record1.unwrap();
-////            let rec2 = record2.unwrap();
-////            let seq1 = rec1.seq;
-////            let seq2 = rec2.seq;
-////            queue.push_work((seq1, seq2));
-////            //tx.send("x").unwrap();
-////        } else {
-////            println!("err");
-////        }
-////    }
-//
-//    more_jobs_tx.set(false);
-//
-//    // Join all the threads.
-//    for thread_handle in thread_handles {
-//        thread_handle.join().unwrap();
-//    }
-//}
-
-pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize) -> Option<SequencesSketch> {
+pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize, sample_name: Option<String>) -> Option<SequencesSketch> {
     let mut kmer_map = HashMap::default();
     let ref_file = &read_file;
     let reader = parse_fastx_file(&ref_file);
@@ -731,7 +743,7 @@ pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize) -> Option<Se
         c,
         k,
         paired: false,
-        sample_name: String::new(),
+        sample_name: sample_name,
         mean_read_length
     });
 }

@@ -104,7 +104,7 @@ pub struct SequencesSketch{
     pub c: usize,
     pub k: usize,
     pub file_name: String,
-    pub sample_name: String,
+    pub sample_name: Option<String>,
     pub paired: bool,
     pub mean_read_length: f64,
 }
@@ -117,7 +117,7 @@ pub struct SequencesSketchEncode{
     pub c: usize,
     pub k: usize,
     pub file_name: String,
-    pub sample_name: String,
+    pub sample_name: Option<String>,
     pub paired: bool,
     pub mean_read_length: f64,
 }
@@ -133,7 +133,7 @@ impl SequencesSketchEncode{
 }
 
 impl SequencesSketch{
-    pub fn new(file_name: String, c: usize, k: usize, paired: bool, sample_name: String, mean_read_length: f64) -> SequencesSketch{
+    pub fn new(file_name: String, c: usize, k: usize, paired: bool, sample_name: Option<String>, mean_read_length: f64) -> SequencesSketch{
         return SequencesSketch{kmer_counts : HashMap::default(), file_name, c, k, paired, sample_name, mean_read_length}
     }
     pub fn from_enc(sketch: SequencesSketchEncode) -> SequencesSketch{
