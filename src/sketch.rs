@@ -617,7 +617,9 @@ fn pair_kmer(s1: &[u8], s2: &[u8]) -> Option<([Marker;2], [Marker;2])>{
 fn dup_removal_lsh(read_sketch: &mut SequencesSketch,
                    kmer_to_pair_table: &mut FxHashMap<u64, (SmallVec<[[Marker;2];1]>, SmallVec<[[Marker;2];1]>)>,
                    km: &u64,
-                   kmer_pair: Option<([Marker;2],[Marker;2])>){
+                   kmer_pair: Option<([Marker;2],[Marker;2])>,
+                   num_dup_removed: &mut usize
+                ){
     let c = read_sketch.kmer_counts.entry(*km).or_insert(0);
     if *c < MAX_DEDUP_COUNT{ 
         if let Some(doublepairs) = kmer_pair{
@@ -637,6 +639,7 @@ fn dup_removal_lsh(read_sketch: &mut SequencesSketch,
                     tables.1.push(doublepairs.1);
                 }
                 if ret{
+                    *num_dup_removed += 1;
                     return
                 }
             }
@@ -664,6 +667,9 @@ pub fn sketch_pair_sequences(
     if r1o.is_err() || r2o.is_err() {
         panic!("Paired end reading failed");
     }
+
+    let mut num_dup_removed = 0;
+
     let mut reader1 = r1o.unwrap();
     let mut reader2 = r2o.unwrap();
 
@@ -694,14 +700,14 @@ pub fn sketch_pair_sequences(
                             ((rec1.seq().len() as f64) - mean_read_length) / counter;
 
                         for km in temp_vec1.iter() {
-                            dup_removal_lsh(&mut read_sketch, &mut kmer_to_pair_table, km, kmer_pair); 
+                            dup_removal_lsh(&mut read_sketch, &mut kmer_to_pair_table, km, kmer_pair, &mut num_dup_removed); 
                             
                         }
                         for km in temp_vec2.iter() {
                             if temp_vec1.contains(km) {
                                 continue;
                             }
-                            dup_removal_lsh(&mut read_sketch, &mut kmer_to_pair_table, km, kmer_pair); 
+                            dup_removal_lsh(&mut read_sketch, &mut kmer_to_pair_table, km, kmer_pair, &mut num_dup_removed); 
                         }
                     }
                 } else {
@@ -712,6 +718,7 @@ pub fn sketch_pair_sequences(
             break;
         }
     }
+    log::debug!("Number of sketched k-mers removed due to read duplication for {}: {}", read_sketch.file_name, num_dup_removed);
     read_sketch.mean_read_length = mean_read_length;
     return Some(read_sketch);
 }
