@@ -311,7 +311,7 @@ fn test_sample_names(){
         .arg("test_files/t2.fq")
         .arg("-d")
         .arg("./tests/results/test_sketch_dir")
-        .arg("--sample-names")
+        .arg("--lS")
         .arg("./test_files/single_sample.txt")
         .assert();
     assert.success().code(0);
@@ -325,7 +325,7 @@ fn test_sample_names(){
         .arg("test_files/o157_reads.fastq")
         .arg("-d")
         .arg("./tests/results/test_sketch_dir")
-        .arg("--sample-names")
+        .arg("--lS")
         .arg("./test_files/sample_list.txt")
         .assert();
     assert.success().code(0);
@@ -342,5 +342,23 @@ fn test_sample_names(){
     dbg!(&stdout);
     assert!(stdout.contains("S2"));
     assert!(!stdout.contains("o157_reads"));
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("-1")
+        .arg("test_files/t1.fq")
+        .arg("-2")
+        .arg("test_files/t2.fq")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .arg("-S")
+        .arg("SAMPLE_TEST_S")
+        .assert();
+    assert.success().code(0);
+    assert!(Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST_S.paired.sylsp").exists(), "Output file was not created, -S");
+    fresh();
+
+
 }
 

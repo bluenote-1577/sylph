@@ -19,7 +19,7 @@ use std::io::BufWriter;
 use std::io::{prelude::*, BufReader};
 use std::path::Path;
 use std::sync::Mutex;
-type Marker = u64;
+type Marker = u32;
 
 pub fn check_vram_and_block(max_ram: usize, file: &str){
     if let Some(usage) = memory_stats() {
@@ -235,12 +235,18 @@ fn parse_line_file(file_name: &str, vec: &mut Vec<String>){
 }
 
 fn parse_sample_names(args: &SketchArgs) -> Option<Vec<String>>{
-    if args.list_sample_names.is_none(){
+    if args.list_sample_names.is_none() && args.sample_names.is_none(){
         return None
     }
     else{
         let mut sample_names = vec![];
-        parse_line_file(&args.list_sample_names.as_ref().unwrap(), &mut sample_names);
+        if let Some(file) = &args.list_sample_names{
+            parse_line_file(file, &mut sample_names);
+            return Some(sample_names);
+        }
+        if let Some(vec) = &args.sample_names{
+            sample_names.extend(vec.clone());
+        }
         return Some(sample_names);
     }
 }
@@ -272,6 +278,10 @@ pub fn sketch(args: SketchArgs) {
             log::error!("Max ram must be >= 7. Exiting.");
             std::process::exit(1);
         }
+    }
+
+    if genome_inputs.is_empty() && args.db_out_name != "database"{
+        log::warn!("-o is set but no genomes are present. -o only applies to genomes; see -d for reads");
     }
 
     if !first_pairs.is_empty() && !second_pairs.is_empty() {
