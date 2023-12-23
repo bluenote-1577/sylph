@@ -29,6 +29,18 @@
 
 sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes.
 
+## Changelog
+
+### Version v0.5.0 - Dec 23, 2023. Major breaking update.
+
+#### IMPORTANT
+
+* Big sensitivity boost for real illumina profiling in v0.5 versus v0.4.
+* Breaking change: *.sylsp files are now a new format. Old sketches will no longer work.
+
+See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
+
+
 ##  Install (current version v0.5.0)
 
 #### Option 1: conda install 
