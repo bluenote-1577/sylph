@@ -29,7 +29,7 @@
 
 sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes.
 
-##  Install (current version v0.4.1)
+##  Install (current version v0.5.0)
 
 #### Option 1: conda install 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
