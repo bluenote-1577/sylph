@@ -547,7 +547,7 @@ fn get_seq_sketch(
             );
             return None;
         } else {
-            let read_sketch_opt = sketch_sequences_needle(&read_file, args.c, args.k, None);
+            let read_sketch_opt = sketch_sequences_needle(&read_file, args.c, args.k, None, false);
             return read_sketch_opt;
         }
     }
@@ -654,7 +654,7 @@ fn _get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genom
             error!("-k {} is not equal to -k {} found in sketches. Continuing without sketching.", args.k, current_k.unwrap());
         }
         else {
-            let read_sketch_opt = sketch_sequences_needle(&read_file,args.c, args.k, None);
+            let read_sketch_opt = sketch_sequences_needle(&read_file,args.c, args.k, None, false);
             if read_sketch_opt.is_some() {
                 read_sketches.lock().unwrap().push(read_sketch_opt.unwrap());
             }

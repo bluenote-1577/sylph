@@ -60,6 +60,9 @@ pub struct SketchArgs {
     #[clap(long="debug", help = "Debug output")]
     pub debug: bool,
 
+
+    #[clap(long="no-dedup", help_heading = "ALGORITHM", help = "Disable read deduplication procedure. Reduces memory; not recommended for illumina data")]
+    pub no_dedup: bool,
     #[clap(long="disable-profiling", help_heading = "ALGORITHM", help = "Disable sylph profile usage for databases; may decrease size and make sylph query slightly faster")]
     pub no_pseudotax: bool,
     #[clap(long="min-spacing", default_value_t = 30, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the genomes")]

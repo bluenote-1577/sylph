@@ -8,7 +8,10 @@ This is because many real illumina datasets have a non-trivial number of duplica
 
 For the paired sketching options `sylph sketch -1 -2`, a new deduplication routine has been added. **This increases sketching memory by 3-4x but greatly increases performance on real datasets with > 1-2% of duplication for low-abundance genomes**. 
 
-For paired-end illumina reads, sylph can detect up to ~10-50% more species low-abundance species below 0.1x coverage for certain illumina datasets. 
+For paired-end illumina reads with non-trivial (> 1% duplication), sylph can now 
+
+1. detect up to many more species low-abundance species below 0.3x coverage
+2. give better coverage/abundance estimates for low-abundance species 
 
 ### BREAKING
 
@@ -18,7 +21,7 @@ For paired-end illumina reads, sylph can detect up to ~10-50% more species low-a
 ### Other changes
 
 - New warning when `-o` specified and only reads are sketched (https://github.com/bluenote-1577/sylph/issues/7)
-- You can now rename sylph samples by specifing a sample naming file with `--sample-names` (suggested by @jolespin)
+- You can now rename sylph samples by specifing a sample naming file with `--sample-names` or `--lS` (suggested by @jolespin)
 - Newline delimited files are available in `profile` and `query` now (suggested by @jolespin)
 
 
