@@ -32,7 +32,7 @@ else:
 for row in f:
     spl = row.rstrip().split();
     accession = spl[0]
-    taxonomy = spl[1].rstrip() + ';t__' + accession
+    taxonomy = ' '.join(spl[1:]).rstrip() + ';t__' + accession
     genome_to_taxonomy[accession] = taxonomy
 
 ### Group by sample file. Output one file fo reach sample file. 
@@ -55,10 +55,12 @@ for sample_file, group_df in grouped:
         genome_file = genome_file_to_gtdb_acc(row['Genome_file'])
         ani = float(row['Adjusted_ANI'])
 
-        if genome_file not in genome_to_taxonomy:
-            tax_str = 'NO_TAXONOMY;t__' + genome_file
-        else:
+        if genome_file in genome_to_taxonomy:
             tax_str = genome_to_taxonomy[genome_file]
+        elif genome_file +'.gz' in genome_to_taxonomy:
+            tax_str = genome_to_taxonomy[genome_file + '.gz']
+        else:
+            tax_str = 'NO_TAXONOMY;t__' + genome_file
 
         abundance = float(row['Sequence_abundance'])
         rel_abundance = float(row['Taxonomic_abundance'])
@@ -79,10 +81,21 @@ for sample_file, group_df in grouped:
     of.write(f"#SampleID\t{sample_file}\n")
     of.write("#clade_name\trelative_abundance\tsequence_abundance\tANI (if strain-level)\n")
 
-    sorted_keys = sorted(tax_abundance.keys())
-    for tax in sorted_keys:
-        if tax in ani_dict:
-            of.write(f"{tax}\t{tax_abundance[tax]}\t{seq_abundance[tax]}\t{ani_dict[tax]}\n")
+    level_to_key = dict()
+    for key in tax_abundance.keys():
+        level = len(key.split('|'))
+        if level not in level_to_key:
+            level_to_key[level] = [key]
         else:
-            of.write(f"{tax}\t{tax_abundance[tax]}\t{seq_abundance[tax]}\tNA\n")
+            level_to_key[level].append(key)
+
+    sorted_keys = sorted(level_to_key.keys())
+
+    for level in sorted_keys:
+        keys_for_level = sorted(level_to_key[level], key = lambda x: tax_abundance[x], reverse=True)
+        for tax in keys_for_level:
+            if tax in ani_dict:
+                of.write(f"{tax}\t{tax_abundance[tax]}\t{seq_abundance[tax]}\t{ani_dict[tax]}\n")
+            else:
+                of.write(f"{tax}\t{tax_abundance[tax]}\t{seq_abundance[tax]}\tNA\n")
 

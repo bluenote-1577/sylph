@@ -74,6 +74,15 @@ fn test_sketch_commands() {
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("profile")
+        .arg("-l")
+        .arg("./test_files/list.txt")
+        .assert();
+    assert.success().code(0);
+
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("profile")
         .arg("./tests/results/test_sketch_dir/o157_reads.fastq.sylsp")
         .arg("./test_files/e.coli-EC590.fasta")
         .assert();
@@ -102,6 +111,21 @@ fn test_sketch_commands() {
         .assert();
     assert.success().code(0);
     assert!(Path::new("./tests/results/test_sketch_dir/t1.fq.paired.sylsp").exists(), "Output file was not created");
+    fresh();
+
+    let mut cmd= Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("--l1")
+        .arg("./test_files/pair_list1.txt")
+        .arg("--l2")
+        .arg("./test_files/pair_list2.txt")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .assert();
+    assert.success().code(0);
+    assert!(Path::new("./tests/results/test_sketch_dir/t1.fq.paired.sylsp").exists(), "Output file was not created");
+
 
 
     fresh();
@@ -274,3 +298,67 @@ fn test_sketch_fasta_fastq_concord(){
 
     fresh();
 }
+
+#[serial]
+#[test]
+fn test_sample_names(){
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("-1")
+        .arg("test_files/t1.fq")
+        .arg("-2")
+        .arg("test_files/t2.fq")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .arg("--lS")
+        .arg("./test_files/single_sample.txt")
+        .assert();
+    assert.success().code(0);
+    assert!(Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST.paired.sylsp").exists(), "Output file was not created");
+    fresh();
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("test_files/t1.fq")
+        .arg("test_files/o157_reads.fastq")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .arg("--lS")
+        .arg("./test_files/sample_list.txt")
+        .assert();
+    assert.success().code(0);
+    assert!(Path::new("./tests/results/test_sketch_dir/S1.sylsp").exists(), "Output file was not created");
+    assert!(Path::new("./tests/results/test_sketch_dir/S2.sylsp").exists(), "Output file was not created");
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let output = cmd
+        .arg("profile")
+        .arg("./tests/results/test_sketch_dir/S2.sylsp")
+        .arg("./test_files/e.coli-EC590.fasta")
+        .output().unwrap();
+    let stdout = str::from_utf8(&output.stdout).expect("Output was not valid UTF-8");
+    dbg!(&stdout);
+    assert!(stdout.contains("S2"));
+    assert!(!stdout.contains("o157_reads"));
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("-1")
+        .arg("test_files/t1.fq")
+        .arg("-2")
+        .arg("test_files/t2.fq")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .arg("-S")
+        .arg("SAMPLE_TEST_S")
+        .assert();
+    assert.success().code(0);
+    assert!(Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST_S.paired.sylsp").exists(), "Output file was not created, -S");
+    fresh();
+
+
+}
+
