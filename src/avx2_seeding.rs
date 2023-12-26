@@ -39,7 +39,7 @@ pub unsafe fn extract_markers_avx2(string: &[u8], kmer_vec: &mut Vec<u64>, c: us
     let string2 = &string[len..2 * len + k - 1];
     let string3 = &string[2 * len..3 * len + k - 1];
     let string4 = &string[3 * len..4 * len + k - 1];
-    if string.len() < 2 * k {
+    if string.len() < k+1{
         return;
     }
 

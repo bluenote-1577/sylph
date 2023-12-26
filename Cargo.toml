@@ -1,6 +1,6 @@
 [package]
 name = "sylph"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
@@ -24,7 +24,7 @@ rand = "0"
 regex = "1"
 fastrand = "2"
 memory-stats = "1"
-growable-bloom-filter = "*"
+scalable_cuckoo_filter = "*"
 
 [target.'cfg(target_env = "musl")'.dependencies]
 tikv-jemallocator = "0"

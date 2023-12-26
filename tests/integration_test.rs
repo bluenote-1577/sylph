@@ -362,3 +362,50 @@ fn test_sample_names(){
 
 }
 
+#[serial]
+#[test]
+fn test_fpr(){
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("-1")
+        .arg("test_files/t1.fq")
+        .arg("-2")
+        .arg("test_files/t2.fq")
+        .arg("-d ")
+        .arg("./tests/results/test_sketch_dir")
+        .arg("0")
+        .assert();
+    assert.success().code(0);
+    fresh();
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("-1")
+        .arg("test_files/t1.fq")
+        .arg("-2")
+        .arg("test_files/t2.fq")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .arg("--fpr")
+        .arg("0.001")
+        .assert();
+    assert.success().code(0);
+    fresh();
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("-1")
+        .arg("test_files/t1.fq")
+        .arg("-2")
+        .arg("test_files/t2.fq")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .arg("--fpr")
+        .arg("2")
+        .assert();
+    assert.failure().code(1);
+    fresh();
+
+}

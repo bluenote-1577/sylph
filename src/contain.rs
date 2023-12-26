@@ -461,11 +461,11 @@ fn get_genome_sketches(
     let genome_sketches = Mutex::new(vec![]);
 
     for genome_sketch_file in genome_sketch_files {
-        let file = File::open(genome_sketch_file).expect(&format!("The sketch `{}` not a valid file ", genome_sketch_file));
+        let file = File::open(genome_sketch_file).expect(&format!("The sketch `{}` could not be opened. Exiting", genome_sketch_file));
         let genome_reader = BufReader::with_capacity(10_000_000, file);
         let genome_sketches_vec: Vec<GenomeSketch> = bincode::deserialize_from(genome_reader)
             .expect(&format!(
-                "The sketch `{}` is not a valid sketch ",
+                "The sketch `{}` is not a valid sketch. Perhaps it is an older, incompatible version ",
                 &genome_sketch_file
             ));
         if genome_sketches_vec.is_empty() {
@@ -521,13 +521,13 @@ fn get_seq_sketch(
 ) -> Option<SequencesSketch> {
     if is_sketch_file {
         let read_sketch_file = read_file;
-        let file = File::open(read_sketch_file.clone()).expect(&format!(
-            "The sketch `{}` not a valid file ",
+        let file = File::open(read_sketch_file).expect(&format!(
+            "The sketch `{}` could not be opened",
             &read_sketch_file
         ));
         let read_reader = BufReader::with_capacity(10_000_000, file);
         let read_sketch_enc: SequencesSketchEncode = bincode::deserialize_from(read_reader).expect(
-            &format!("The sketch `{}` is not a valid sketch ", read_sketch_file),
+            &format!("The sketch `{}` is not a valid sketch. Perhaps it is an older incompatible version ", read_sketch_file),
         );
         let read_sketch = SequencesSketch::from_enc(read_sketch_enc);
         if read_sketch.c > genome_c {
@@ -547,7 +547,7 @@ fn get_seq_sketch(
             );
             return None;
         } else {
-            let read_sketch_opt = sketch_sequences_needle(&read_file, args.c, args.k, None, false);
+            let read_sketch_opt = sketch_sequences_needle(&read_file, args.c, args.k, None, false, );
             return read_sketch_opt;
         }
     }
@@ -582,10 +582,10 @@ fn _get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genom
     let mut current_k = None;
 
     read_sketch_files.into_par_iter().for_each(|read_sketch_file|{
-        let file = File::open(read_sketch_file.clone()).expect(&format!("The sketch `{}` not a valid file ", &read_sketch_file));
+        let file = File::open(read_sketch_file.clone()).expect(&format!("The sketch `{}` could not be opened. Exiting ", &read_sketch_file));
         let read_reader = BufReader::with_capacity(10_000_000, file);
         let read_sketch_enc: SequencesSketchEncode = bincode::deserialize_from(read_reader).expect(&format!(
-            "The sketch `{}` is not a valid sketch ",
+            "The sketch `{}` is not a valid sketch. It is either corrupted or an older incompatible version ",
             read_sketch_file
         ));
         let read_sketch = SequencesSketch::from_enc(read_sketch_enc);
@@ -598,11 +598,11 @@ fn _get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<Genom
 
     for genome_sketch_file in genome_sketch_files {
         let file =
-            File::open(genome_sketch_file.clone()).expect(&format!("The sketch `{}` not a valid file ", genome_sketch_file));
+            File::open(genome_sketch_file.clone()).expect(&format!("The sketch `{}` could not be opened. Exiting ", genome_sketch_file));
         let genome_reader = BufReader::with_capacity(10_000_000, file);
         let genome_sketches_vec: Vec<GenomeSketch> = bincode::deserialize_from(genome_reader)
             .expect(&format!(
-                "The sketch `{}` is not a valid sketch ",
+                "The sketch `{}` is not a valid sketch. It is either corrupted or an older incompatible version ",
                 &genome_sketch_file
             ));
         if genome_sketches_vec.is_empty() {
