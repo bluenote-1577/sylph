@@ -12,3 +12,4 @@ pub const MIN_ANI_P_DEF: f64 = 0.95;
 pub const MAX_MEDIAN_FOR_MEAN_FINAL_EST: f64 = 15.;
 pub const DEREP_PROFILE_ANI: f64 = 0.975;
 pub const MAX_DEDUP_COUNT: u32 = 4;
+pub const MAX_DEDUP_LEN: usize = 10000000;

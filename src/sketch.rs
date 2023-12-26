@@ -1,4 +1,7 @@
 use crate::cmdline::*;
+use growable_bloom_filter::GrowableBloom;
+
+
 use smallvec::SmallVec;
 use smallvec::smallvec;
 use std::fs;
@@ -6,6 +9,8 @@ use std::thread;
 use std::time::Duration;
 use memory_stats::memory_stats;
 use fxhash::FxHashMap;
+use fxhash::FxHasher;
+use fxhash::FxHashSet;
 
 use crate::constants::*;
 use crate::seeding::*;
@@ -650,6 +655,45 @@ fn pair_kmer(s1: &[u8], s2: &[u8]) -> Option<([Marker;2], [Marker;2])>{
     }
 }
 
+fn dup_removal_lsh_full(kmer_counts: &mut FxHashMap<Kmer,u32>,
+                   //kmer_to_pair_set: &mut FxHashSet<(u64,[Marker;2])>,
+                   //kmer_to_pair_set: &mut GrowableBloom<(u64,[Marker;2])>,
+                   kmer_to_pair_set: &mut GrowableBloom,
+                   km: &u64,
+                   kmer_pair: Option<([Marker;2],[Marker;2])>,
+                   num_dup_removed: &mut usize,
+                   no_dedup: bool
+                ){
+    let c = kmer_counts.entry(*km).or_insert(0);
+    if !no_dedup{  
+        if let Some(doublepairs) = kmer_pair{
+            let mut ret = false;
+            if kmer_to_pair_set.contains(&(*km, doublepairs.0)){
+                //Need this when using approximate data structures 
+                if *c > 0{
+                    ret = true;
+                }
+            }
+            else{
+                kmer_to_pair_set.insert((*km, doublepairs.0));
+            }
+            if kmer_to_pair_set.contains(&(*km, doublepairs.1)){
+                if *c > 0{
+                    ret = true;
+                }
+            }
+            else{
+                kmer_to_pair_set.insert((*km, doublepairs.1));
+            }
+            if ret{
+                *num_dup_removed += 1;
+                return
+            }
+        }
+    }
+    *c += 1;
+}
+
 fn dup_removal_lsh(kmer_counts: &mut FxHashMap<Kmer,u32>,
                    kmer_to_pair_table: &mut FxHashMap<u64, (SmallVec<[[Marker;2];1]>, SmallVec<[[Marker;2];1]>)>,
                    km: &u64,
@@ -667,13 +711,17 @@ fn dup_removal_lsh(kmer_counts: &mut FxHashMap<Kmer,u32>,
                     ret = true;
                 }
                 else{
-                    tables.0.push(doublepairs.0);
+                    if tables.0.len() < MAX_DEDUP_LEN{
+                        tables.0.push(doublepairs.0);
+                    }
                 }
                 if tables.1.contains(&doublepairs.1){
                     ret = true;
                 }
                 else{
-                    tables.1.push(doublepairs.1);
+                    if tables.0.len() < MAX_DEDUP_LEN{
+                        tables.1.push(doublepairs.1);
+                    }
                 }
                 if ret{
                     *num_dup_removed += 1;
@@ -711,9 +759,13 @@ pub fn sketch_pair_sequences(
     let mut reader1 = r1o.unwrap();
     let mut reader2 = r2o.unwrap();
 
-    let mut kmer_to_pair_table : FxHashMap<u64,
-    (SmallVec<[[Marker;2];1]>,
-     SmallVec<[[Marker;2];1]>)> = FxHashMap::default();
+    //let mut kmer_pair_set = FxHashMap::default();
+    //let mut kmer_pair_set = FxHashSet::default();
+    let mut kmer_pair_set = GrowableBloom::new(0.001, 1_000_000_0);
+    //let mut kmer_pair_set_ = GrowableBloom::new(0.001, 1_000_000);
+    //.hasher(FxHasher::default())
+    //.finish();
+
 
     let mut mean_read_length:f64 = 0.;
     let mut counter:f64 = 0.;
@@ -738,14 +790,16 @@ pub fn sketch_pair_sequences(
                             ((rec1.seq().len() as f64) - mean_read_length) / counter;
 
                         for km in temp_vec1.iter() {
-                            dup_removal_lsh(&mut read_sketch.kmer_counts, &mut kmer_to_pair_table, km, kmer_pair, &mut num_dup_removed, no_dedup); 
+                            dup_removal_lsh_full(&mut read_sketch.kmer_counts, &mut kmer_pair_set, km, kmer_pair, &mut num_dup_removed, no_dedup); 
+                            //dup_removal_lsh(&mut read_sketch.kmer_counts, &mut kmer_pair_set, km, kmer_pair, &mut num_dup_removed, no_dedup); 
                             
                         }
                         for km in temp_vec2.iter() {
                             if temp_vec1.contains(km) {
                                 continue;
                             }
-                            dup_removal_lsh(&mut read_sketch.kmer_counts, &mut kmer_to_pair_table, km, kmer_pair, &mut num_dup_removed, no_dedup); 
+                            dup_removal_lsh_full(&mut read_sketch.kmer_counts, &mut kmer_pair_set, km, kmer_pair, &mut num_dup_removed, no_dedup); 
+                            //dup_removal_lsh(&mut read_sketch.kmer_counts, &mut kmer_pair_set, km, kmer_pair, &mut num_dup_removed, no_dedup); 
                         }
                     }
                 } else {

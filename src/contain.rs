@@ -699,6 +699,9 @@ fn get_stats<'a>(
     //let start_t_initial = Instant::now();
     for kmer in gn_kmers.iter() {
         if sequence_sketch.kmer_counts.contains_key(kmer) {
+            if sequence_sketch.kmer_counts[kmer] == 0{
+                continue
+            }
             if winner_map.is_some(){
                 let map = &winner_map.unwrap();
                 //TODO... algorithm testing
