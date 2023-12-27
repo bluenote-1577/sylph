@@ -1,29 +1,31 @@
 use crate::cmdline::*;
+use scalable_cuckoo_filter::ScalableCuckooFilterBuilder;
+use scalable_cuckoo_filter::ScalableCuckooFilter;
+
+
+use smallvec::SmallVec;
+use smallvec::smallvec;
 use std::fs;
 use std::thread;
 use std::time::Duration;
-
 use memory_stats::memory_stats;
+use fxhash::FxHashMap;
+use fxhash::FxHasher;
+use fxhash::FxHashSet;
 
 use crate::constants::*;
 use crate::seeding::*;
 use crate::types::*;
-use flate2::read::GzDecoder;
 use log::*;
 use needletail::parse_fastx_file;
 use rayon::prelude::*;
-use regex::Regex;
-use seq_io;
-use seq_io::fasta::{Reader as ReaderA, Record as ReccordA};
-use seq_io::fastq::{Reader as ReaderQ, Record as RecordQ};
-use seq_io::parallel::read_parallel;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
-use std::io::Read;
 use std::io::{prelude::*, BufReader};
 use std::path::Path;
 use std::sync::Mutex;
+type Marker = u32;
 
 pub fn check_vram_and_block(max_ram: usize, file: &str){
     if let Some(usage) = memory_stats() {
@@ -32,11 +34,16 @@ pub fn check_vram_and_block(max_ram: usize, file: &str){
             log::debug!("Max memory reached. Blocking sketch for {}. Curr memory {}, max mem {}", file, gb_usage_curr, max_ram);
         }
         while (max_ram as f64) < gb_usage_curr{
-            let five_second = Duration::from_secs(3);
+            let five_second = Duration::from_secs(1);
             thread::sleep(five_second);
-            gb_usage_curr = usage.virtual_mem as f64 / 1_000_000_000 as f64;
-            if (max_ram as f64) >= gb_usage_curr{
-                log::debug!("Sketching for {} freed", file);
+            if let Some(usage) = memory_stats() {
+                gb_usage_curr = usage.virtual_mem as f64 / 1_000_000_000 as f64;
+                if (max_ram as f64) >= gb_usage_curr{
+                    log::debug!("Sketching for {} freed", file);
+                }
+            }
+            else{
+                break;
             }
         }
 
@@ -107,58 +114,7 @@ pub fn is_fasta(file: &str) -> bool {
     }
 }
 
-//Can combine two paired sketches into one. Deprecated since paired end filenames have
-//no standard format...
-pub fn combine_sketches(mut sketches: Vec<SequencesSketch>) -> SequencesSketch {
-    assert!(!sketches.is_empty());
-    let re = Regex::new(PAIR_REGEX).unwrap();
-    let num_sketches = sketches.len();
-    let mut first_sketch = std::mem::take(&mut sketches[0]);
-    for i in 1..num_sketches {
-        let x = std::mem::take(&mut sketches[i]);
-        for (key, val) in x.kmer_counts.into_iter() {
-            let count = first_sketch.kmer_counts.entry(key).or_insert(0);
-            *count += val;
-        }
-    }
-    for cap in re.captures_iter(&first_sketch.file_name.clone()) {
-        let new_file_name = format!("{}{}", &cap[1], &cap[3]);
-        first_sketch.file_name = new_file_name;
-    }
-    return first_sketch;
-}
-
-//Collect paired-end reads names together.
-pub fn collect_pairs_file_names<'a>(sequence_names: &Option<Vec<String>>) -> Vec<Vec<&str>> {
-    let mut list_pair1: HashMap<_, _> = HashMap::default();
-    let mut ret_pairs = vec![];
-    let re = Regex::new(PAIR_REGEX).unwrap();
-    if sequence_names.is_some() {
-        for read_file in sequence_names.as_ref().unwrap().iter() {
-            if re.is_match(read_file) {
-                let front = re.captures(read_file).unwrap().get(1).unwrap().as_str();
-                let pair = list_pair1.entry(front).or_insert(vec![]);
-                pair.push(read_file.as_str());
-            } else {
-                ret_pairs.push(vec![read_file.as_str()]);
-            }
-        }
-    }
-    for (_, files) in list_pair1 {
-        if files.len() == 1 || files.len() == 2 {
-            ret_pairs.push(files);
-        } else if files.len() > 2 {
-            log::warn!("Something went wrong with paired-end read processing. Treating pairs in {:?} as separate.", &files);
-            for file in files {
-                ret_pairs.push(vec![file]);
-            }
-        }
-    }
-
-    return ret_pairs;
-}
-
-pub fn sketch(args: SketchArgs) {
+fn check_args_valid(args: &SketchArgs){
     let level;
     if args.trace {
         level = log::LevelFilter::Trace;
@@ -187,26 +143,29 @@ pub fn sketch(args: SketchArgs) {
         && args.reads.is_none()
         && args.list_genomes.is_none()
         && args.list_reads.is_none()
+        && args.list_first_pair.is_none()
+        && args.list_second_pair.is_none()
     {
         error!("No input sequences found; see sylph sketch -h for help. Exiting.");
         std::process::exit(1);
     }
 
-    let mut all_files = vec![];
+    if args.fpr < 0. || args.fpr >= 1.{
+        error!("Invalid FPR for sketching. Must be in [0,1).");
+        std::process::exit(1);
+    }
+    
 
+}
+
+fn parse_ambiguous_files(args: &SketchArgs, read_inputs: &mut Vec<String>, genome_inputs: &mut Vec<String>){
+    let mut all_files = vec![];
     if args.list_sequence.is_some() {
-        let file_list = args.list_sequence.unwrap();
-        let file = File::open(file_list).unwrap();
-        let reader = BufReader::new(file);
-        for line in reader.lines() {
-            all_files.push(line.unwrap());
-        }
+        let file_list = args.list_sequence.as_ref().unwrap();
+        parse_line_file(file_list, &mut all_files);
     }
 
-    all_files.extend(args.files);
-
-    let mut read_inputs = vec![];
-    let mut genome_inputs = vec![];
+    all_files.extend(args.files.clone());
 
     for file in all_files {
         if is_fastq(&file) {
@@ -217,68 +176,137 @@ pub fn sketch(args: SketchArgs) {
             warn!("{} does not have a fasta/fastq/gzip type extension; skipping", file);
         }
     }
+}
 
-    if let Some(genomes_syl_in) = args.genomes{
+fn parse_reads_and_genomes(args: &SketchArgs, 
+    read_inputs: &mut Vec<String>, 
+    genome_inputs: &mut Vec<String>){
+
+    if let Some(genomes_syl_in) = args.genomes.clone(){
         for gn_file in genomes_syl_in{
             genome_inputs.push(gn_file);
         }
     }
-    if let Some(reads_syl_in) = args.reads{
+    if let Some(reads_syl_in) = args.reads.clone(){
         for rd_file in reads_syl_in{
             read_inputs.push(rd_file);
         }
     }
 
     if args.list_reads.is_some() {
-        let file_reads = args.list_reads.unwrap();
-        let file = File::open(file_reads).unwrap();
-        let reader = BufReader::new(file);
-        for line in reader.lines() {
-            read_inputs.push(line.unwrap());
-        }
+        let file_reads = args.list_reads.as_ref().unwrap();
+        parse_line_file(file_reads, read_inputs);
     }
 
     if args.list_genomes.is_some() {
-        let file_genomes = args.list_genomes.unwrap();
-        let file = File::open(file_genomes).unwrap();
-        let reader = BufReader::new(file);
-        for line in reader.lines() {
-            genome_inputs.push(line.unwrap());
+        let file_genomes = args.list_genomes.as_ref().unwrap();
+        parse_line_file(file_genomes, genome_inputs);
+    }
+
+}
+
+fn parse_paired_end_reads(args: &SketchArgs, first_pairs: &mut Vec<String>, second_pairs: &mut Vec<String>){
+
+    if args.first_pair.len() != args.second_pair.len(){
+        error!("Different number of paired sequences. Exiting.");
+        std::process::exit(1);
+    }
+
+    for f in args.first_pair.iter(){
+        first_pairs.push(f.clone());
+    }
+
+    for f in args.second_pair.iter(){
+        second_pairs.push(f.clone());
+    }
+
+    if args.list_first_pair.is_some() {
+        let file_first_pair = args.list_first_pair.as_ref().unwrap();
+        parse_line_file(file_first_pair, first_pairs);
+    }
+
+    if args.list_second_pair.is_some() {
+        let file_second_pair = args.list_second_pair.as_ref().unwrap();
+        parse_line_file(file_second_pair, second_pairs)
+    }
+
+    if first_pairs.len() != second_pairs.len(){
+        error!("Different number of paired sequences. Exiting.");
+        std::process::exit(1);
+    }
+}
+
+fn parse_line_file(file_name: &str, vec: &mut Vec<String>){
+    let file = File::open(file_name).unwrap();
+    let reader = BufReader::new(file);
+    for line in reader.lines() {
+        vec.push(line.unwrap());
+    }
+}
+
+fn parse_sample_names(args: &SketchArgs) -> Option<Vec<String>>{
+    if args.list_sample_names.is_none() && args.sample_names.is_none(){
+        return None
+    }
+    else{
+        let mut sample_names = vec![];
+        if let Some(file) = &args.list_sample_names{
+            parse_line_file(file, &mut sample_names);
+            return Some(sample_names);
+        }
+        if let Some(vec) = &args.sample_names{
+            sample_names.extend(vec.clone());
+        }
+        return Some(sample_names);
+    }
+}
+
+pub fn sketch(args: SketchArgs) {
+    
+    let mut read_inputs = vec![];
+    let mut genome_inputs = vec![];
+    let mut first_pairs = vec![];
+    let mut second_pairs = vec![];
+
+    check_args_valid(&args);
+    parse_ambiguous_files(&args, &mut read_inputs, &mut genome_inputs);
+    parse_reads_and_genomes(&args, &mut read_inputs, &mut genome_inputs);
+    parse_paired_end_reads(&args, &mut first_pairs, &mut second_pairs);
+
+    let sample_names = parse_sample_names(&args);
+    if let Some(names) = &sample_names{
+        if names.len() != first_pairs.len() + read_inputs.len(){
+            log::error!("Sample name length is not equal to the number of reads. Exiting");
+            std::process::exit(1);
         }
     }
 
     let mut max_ram = usize::MAX;
     if args.max_ram.is_some(){
         max_ram = args.max_ram.unwrap();
-        if max_ram < 10{
-            log::error!("Max ram must be >= 10. Exiting.");
+        if max_ram < 7{
+            log::error!("Max ram must be >= 7. Exiting.");
             std::process::exit(1);
         }
     }
 
-    if args.first_pair.is_empty() && !args.second_pair.is_empty(){
-        error!("Different number of paired sequences. Exiting.");
-        std::process::exit(1);
-
-    }
-    if !args.first_pair.is_empty() && args.second_pair.is_empty(){
-        error!("Different number of paired sequences. Exiting.");
-        std::process::exit(1);
+    if genome_inputs.is_empty() && args.db_out_name != "database"{
+        log::warn!("-o is set but no genomes are present. -o only applies to genomes; see -d for reads");
     }
 
-    if !args.first_pair.is_empty() && !args.second_pair.is_empty() {
+    if !first_pairs.is_empty() && !second_pairs.is_empty() {
         info!("Sketching paired sequences...");
-        if args.first_pair.len() != args.second_pair.len() {
-            error!("Different number of paired sequences. Exiting.");
-            std::process::exit(1);
-        }
-        let iter_vec: Vec<usize> = (0..args.first_pair.len()).into_iter().collect();
+        let iter_vec: Vec<usize> = (0..first_pairs.len()).into_iter().collect();
         iter_vec.into_par_iter().for_each(|i| {
-            let read_file1 = &args.first_pair[i];
-            let read_file2 = &args.second_pair[i];
+            let read_file1 = &first_pairs[i];
+            let read_file2 = &second_pairs[i];
             check_vram_and_block(max_ram, read_file1);
 
-            let read_sketch_opt = sketch_pair_sequences(read_file1, read_file2, args.c, args.k);
+            let mut sample_name = None;
+            if let Some(name) = &sample_names{
+                sample_name = Some(name[i].clone());
+            }
+            let read_sketch_opt = sketch_pair_sequences(read_file1, read_file2, args.c, args.k, sample_name.clone(), args.no_dedup, args.fpr);
             if read_sketch_opt.is_some() {
                 let res = fs::create_dir_all(&args.sample_output_dir);
                 if res.is_err(){
@@ -287,7 +315,16 @@ pub fn sketch(args: SketchArgs) {
                 }
                 let pref = Path::new(&args.sample_output_dir);
                 let read_sketch = read_sketch_opt.unwrap();
-                let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
+
+                let sketch_name;
+                if sample_name.is_some(){
+                    sketch_name = read_sketch.sample_name.as_ref().unwrap();
+                }
+                else{
+                    sketch_name = &read_sketch.file_name;
+                }
+
+                let read_file_path = Path::new(&sketch_name).file_name().unwrap();
                 let file_path = pref.join(&read_file_path);
 
                 let file_path_str = format!(
@@ -320,13 +357,24 @@ pub fn sketch(args: SketchArgs) {
         let read_file = &read_inputs[i];
 
         check_vram_and_block(max_ram, read_file);
+        let mut sample_name = None;
+        if let Some(name) = &sample_names{
+            sample_name = Some(name[i + first_pairs.len()].clone());
+        }
 
         let read_sketch_opt;
-        read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k);
+        read_sketch_opt = sketch_sequences_needle(read_file, args.c, args.k, sample_name.clone(), args.no_dedup);
 
         if read_sketch_opt.is_some() {
             let read_sketch = read_sketch_opt.unwrap();
-            let read_file_path = Path::new(&read_sketch.file_name).file_name().unwrap();
+            let sketch_name;
+            if sample_name.is_some(){
+                sketch_name = read_sketch.sample_name.as_ref().unwrap();
+            }
+            else{
+                sketch_name = &read_sketch.file_name;
+            }
+            let read_file_path = Path::new(&sketch_name).file_name().unwrap();
             let file_path = pref.join(&read_file_path);
 
             let file_path_str = format!("{}{}", file_path.to_str().unwrap(), SAMPLE_FILE_SUFFIX);
@@ -542,20 +590,241 @@ pub fn sketch_genome(
     }
 }
 
+#[inline]
+fn pair_kmer_single(s1: &[u8]) -> Option<([Marker;2], [Marker;2])>{
+    let k = std::mem::size_of::<Marker>() * 4 ;
+    if s1.len() < 4 * k + 2{
+        return None
+    }
+    else{
+        let mut kmer_f = 0;
+        let mut kmer_g = 0;
+        let mut kmer_r = 0;
+        let mut kmer_t = 0;
+        let halfway = s1.len()/2;
+        // len(s1)/2 + (k-1)* 2 + 2 < len(s1)
+        for i in 0..k{
+            let nuc_1 = BYTE_TO_SEQ[s1[2*i] as usize] as Marker;
+            let nuc_2 = BYTE_TO_SEQ[s1[2*i + halfway] as usize] as Marker;
+            let nuc_3 = BYTE_TO_SEQ[s1[1+2*i] as usize] as Marker;
+            let nuc_4 = BYTE_TO_SEQ[s1[1+2*i + halfway] as usize] as Marker;
+
+            kmer_f <<= 2;
+            kmer_f |= nuc_1;
+
+            kmer_r <<= 2;
+            kmer_r |= nuc_2;
+
+            kmer_g <<= 2;
+            kmer_g |= nuc_3;
+
+            kmer_t <<= 2;
+            kmer_t |= nuc_4;
+
+        }
+        return Some(([kmer_f, kmer_r], [kmer_g, kmer_t]));
+    }
+}
+
+#[inline]
+fn pair_kmer(s1: &[u8], s2: &[u8]) -> Option<([Marker;2], [Marker;2])>{
+    let k = std::mem::size_of::<Marker>() * 4 ;
+    if s1.len() < 2 * k + 1 || s2.len() < 2 * k + 1{
+        return None
+    }
+    else{
+        let mut kmer_f = 0;
+        let mut kmer_g = 0;
+        let mut kmer_r = 0;
+        let mut kmer_t = 0;
+        for i in 0..k{
+            let nuc_1 = BYTE_TO_SEQ[s1[2*i] as usize] as Marker;
+            let nuc_2 = BYTE_TO_SEQ[s2[2*i] as usize] as Marker;
+            let nuc_3 = BYTE_TO_SEQ[s1[1+2*i] as usize] as Marker;
+            let nuc_4 = BYTE_TO_SEQ[s2[1+2*i] as usize] as Marker;
+
+            kmer_f <<= 2;
+            kmer_f |= nuc_1;
+
+            kmer_r <<= 2;
+            kmer_r |= nuc_2;
+
+            kmer_g <<= 2;
+            kmer_g |= nuc_3;
+
+            kmer_t <<= 2;
+            kmer_t |= nuc_4;
+
+        }
+        return Some(([kmer_f, kmer_r], [kmer_g, kmer_t]));
+    }
+}
+
+fn dup_removal_lsh_full_exact(kmer_counts: &mut FxHashMap<Kmer,u32>,
+                   kmer_to_pair_set: &mut FxHashSet<(u64,[Marker;2])>,
+                   //kmer_to_pair_set: &mut ScalableCuckooFilter<(u64,[Marker;2]), FxHasher>,
+                   //kmer_to_pair_set: &mut GrowableBloom,
+                   km: &u64,
+                   kmer_pair: Option<([Marker;2],[Marker;2])>,
+                   num_dup_removed: &mut usize,
+                   no_dedup: bool,
+                   threshold: Option<u32>,
+                ){
+    let c = kmer_counts.entry(*km).or_insert(0);
+    let mut c_threshold = u32::MAX;
+    if let Some(t) = threshold{
+        c_threshold = t;
+    }
+    if !no_dedup && *c < c_threshold{  
+        if let Some(doublepairs) = kmer_pair{
+            let mut ret = false;
+            if kmer_to_pair_set.contains(&(*km, doublepairs.0)){
+                //Need this when using approximate data structures 
+                if *c > 0{
+                    ret = true;
+                }
+            }
+            else{
+                kmer_to_pair_set.insert((*km, doublepairs.0));
+            }
+            if kmer_to_pair_set.contains(&(*km, doublepairs.1)){
+                if *c > 0{
+                    ret = true;
+                }
+            }
+            else{
+                kmer_to_pair_set.insert((*km, doublepairs.1));
+            }
+            if ret{
+                *num_dup_removed += 1;
+                return
+            }
+        }
+    }
+    *c += 1;
+}
+
+fn dup_removal_lsh_full(kmer_counts: &mut FxHashMap<Kmer,u32>,
+                   //kmer_to_pair_set: &mut FxHashSet<(u64,[Marker;2])>,
+                   kmer_to_pair_set: &mut ScalableCuckooFilter<(u64,[Marker;2]), FxHasher>,
+                   //kmer_to_pair_set: &mut GrowableBloom,
+                   km: &u64,
+                   kmer_pair: Option<([Marker;2],[Marker;2])>,
+                   num_dup_removed: &mut usize,
+                   no_dedup: bool
+                ){
+    let c = kmer_counts.entry(*km).or_insert(0);
+    if !no_dedup{  
+        if let Some(doublepairs) = kmer_pair{
+            let mut ret = false;
+            if kmer_to_pair_set.contains(&(*km, doublepairs.0)){
+                //Need this when using approximate data structures 
+                if *c > 0{
+                    ret = true;
+                }
+            }
+            else{
+                kmer_to_pair_set.insert(&(*km, doublepairs.0));
+            }
+            if kmer_to_pair_set.contains(&(*km, doublepairs.1)){
+                if *c > 0{
+                    ret = true;
+                }
+            }
+            else{
+                kmer_to_pair_set.insert(&(*km, doublepairs.1));
+            }
+            if ret{
+                *num_dup_removed += 1;
+                return
+            }
+        }
+    }
+    *c += 1;
+}
+
+fn dup_removal_lsh(kmer_counts: &mut FxHashMap<Kmer,u32>,
+                   kmer_to_pair_table: &mut FxHashMap<u64, (SmallVec<[[Marker;2];1]>, SmallVec<[[Marker;2];1]>)>,
+                   km: &u64,
+                   kmer_pair: Option<([Marker;2],[Marker;2])>,
+                   num_dup_removed: &mut usize,
+                   no_dedup: bool
+                ){
+    let c = kmer_counts.entry(*km).or_insert(0);
+    if *c < MAX_DEDUP_COUNT && !no_dedup{ 
+        if let Some(doublepairs) = kmer_pair{
+            if kmer_to_pair_table.contains_key(km){ 
+                let mut ret = false;
+                let tables = kmer_to_pair_table.get_mut(km).unwrap();
+                if tables.0.contains(&doublepairs.0){
+                    ret = true;
+                }
+                else{
+                    if tables.0.len() < MAX_DEDUP_LEN{
+                        tables.0.push(doublepairs.0);
+                    }
+                }
+                if tables.1.contains(&doublepairs.1){
+                    ret = true;
+                }
+                else{
+                    if tables.0.len() < MAX_DEDUP_LEN{
+                        tables.1.push(doublepairs.1);
+                    }
+                }
+                if ret{
+                    *num_dup_removed += 1;
+                    return
+                }
+            }
+            else{
+                kmer_to_pair_table.insert(*km, (smallvec![doublepairs.0], smallvec![doublepairs.1]));
+            }
+        }
+    }
+    *c += 1;
+    if *c == MAX_DEDUP_COUNT{
+        kmer_to_pair_table.remove(km);
+    }
+}
+
 pub fn sketch_pair_sequences(
     read_file1: &str,
     read_file2: &str,
     c: usize,
     k: usize,
+    sample_name: Option<String>,
+    no_dedup: bool,
+    dedup_fpr: f64
 ) -> Option<SequencesSketch> {
     let r1o = parse_fastx_file(&read_file1);
     let r2o = parse_fastx_file(&read_file2);
-    let mut read_sketch = SequencesSketch::new(read_file1.to_string(), c, k, true);
+    let mut read_sketch = SequencesSketch::new(read_file1.to_string(), c, k, true, sample_name, 0.);
     if r1o.is_err() || r2o.is_err() {
-        panic!("Paired end reading failed");
+        log::error!("Paired end reading failed for '{}' and '{}'. Make sure the files are present or the sequences are valid.", read_file1, read_file2);
+        std::process::exit(1);
     }
+
+    let mut num_dup_removed = 0;
+
     let mut reader1 = r1o.unwrap();
     let mut reader2 = r2o.unwrap();
+
+    //let mut kmer_pair_set = FxHashMap::default();
+    let mut kmer_pair_set = FxHashSet::default();
+    //let mut kmer_pair_set = GrowableBloom::new(0.001, 1_000_000_0);
+    let mut fpr = 0.001;
+    if dedup_fpr != 0.{
+        fpr = dedup_fpr;
+    }
+    let mut kmer_pair_set_approx = ScalableCuckooFilterBuilder::new()
+    .initial_capacity(1_000_000_0)
+    .false_positive_probability(fpr)
+    .hasher(FxHasher::default())
+    .finish();
+
+    let mut mean_read_length:f64 = 0.;
+    let mut counter:f64 = 0.;
 
     loop {
         let n1 = reader1.next();
@@ -566,18 +835,37 @@ pub fn sketch_pair_sequences(
                     if let Ok(rec2) = rec2_o {
                         let mut temp_vec1 = vec![];
                         let mut temp_vec2 = vec![];
+
                         extract_markers(&rec1.seq(), &mut temp_vec1, c, k);
                         extract_markers(&rec2.seq(), &mut temp_vec2, c, k);
+                        let kmer_pair = pair_kmer(&rec1.seq(), &rec2.seq());
+
+                        //moving average
+                        counter += 1.;
+                        mean_read_length = mean_read_length + 
+                            ((rec1.seq().len() as f64) - mean_read_length) / counter;
+
                         for km in temp_vec1.iter() {
-                            let c = read_sketch.kmer_counts.entry(*km).or_insert(0);
-                            *c += 1;
+                            if dedup_fpr == 0.{
+                                dup_removal_lsh_full_exact(&mut read_sketch.kmer_counts, &mut kmer_pair_set, km, kmer_pair, &mut num_dup_removed, no_dedup, None); 
+                            }
+                            else{
+                                dup_removal_lsh_full(&mut read_sketch.kmer_counts, &mut kmer_pair_set_approx, km, kmer_pair, &mut num_dup_removed, no_dedup); 
+                            }
+                            //dup_removal_lsh(&mut read_sketch.kmer_counts, &mut kmer_pair_set, km, kmer_pair, &mut num_dup_removed, no_dedup); 
+                            
                         }
-                        for km in temp_vec2 {
-                            if temp_vec1.contains(&km) {
+                        for km in temp_vec2.iter() {
+                            if temp_vec1.contains(km) {
                                 continue;
                             }
-                            let c = read_sketch.kmer_counts.entry(km).or_insert(0);
-                            *c += 1;
+                            if dedup_fpr == 0.{
+                                dup_removal_lsh_full_exact(&mut read_sketch.kmer_counts, &mut kmer_pair_set, km, kmer_pair, &mut num_dup_removed, no_dedup, None); 
+                            }
+                            else{
+                                dup_removal_lsh_full(&mut read_sketch.kmer_counts, &mut kmer_pair_set_approx, km, kmer_pair, &mut num_dup_removed, no_dedup); 
+                            }
+                            //dup_removal_lsh(&mut read_sketch.kmer_counts, &mut kmer_pair_set, km, kmer_pair, &mut num_dup_removed, no_dedup); 
                         }
                     }
                 } else {
@@ -588,194 +876,48 @@ pub fn sketch_pair_sequences(
             break;
         }
     }
+    log::debug!("Number of sketched k-mers removed due to read duplication for {}: {}", read_sketch.file_name, num_dup_removed);
+    read_sketch.mean_read_length = mean_read_length;
     return Some(read_sketch);
 }
 
-//This did not work
-//pub fn sketch_pair_sequences(read_file1: &str, read_file2: &str) {
-//    let mut queue: WorkQueue<(, _)> = WorkQueue::new();
-//
-//    let (results_tx, results_rx) = channel();
-//
-//    // Create a SyncFlag to share whether or not the worker threads should
-//    // keep waiting on jobs.
-//    let (mut more_jobs_tx, more_jobs_rx) = new_syncflag(true);
-//
-//    // This Vec is just for the controller to keep track of the worker threads.
-//    let mut thread_handles = Vec::new();
-//    for _ in 0..15 {
-//        let mut t_queue = queue.clone();
-//        let t_results_tx = results_tx.clone();
-//        let t_more_jobs = more_jobs_rx.clone();
-//        thread_handles.push(std::thread::spawn(move || {
-//            while let Some(work_input) = t_queue.wait(&t_more_jobs) {
-//                // Do some work. Totally contrived in this case.
-//                let result = work_input;
-//                // Send the results of the work to the main thread.
-//                //
-//                unsafe {
-//                    extract_markers_avx2(&result.0, &mut vec![], 100, 21);
-//                    extract_markers_avx2(&result.1, &mut vec![], 100, 21);
-//                }
-//                t_results_tx.send(("x", result)).unwrap();
-//            }
-//        }));
-//    }
-//
-//    let mut reader1 = ReaderQ::new(BufReader::new(File::open(&read_file1).unwrap()));
-//    let mut reader2 = ReaderQ::new(BufReader::new(File::open(&read_file2).unwrap()));
-//    let mut rset1 = seq_io::fastq::RecordSet::default();
-//    let mut rset2 = seq_io::fastq::RecordSet::default();
-//
-//    loop{
-//        let ok1 = reader1.read_record_set(&mut rset1);
-//        let ok2 = reader2.read_record_set(&mut rset2);
-//
-//        queue.push_work(rset1,rset2);
-////        for (rec1,rec2) in rset1.into_iter().zip(rset2.into_iter()){
-////            queue.push_work((rec1, rec2));
-////        }
-//    }
-//
-////    for (record1 , record2) in records1.into_iter().zip(records2.into_iter()){
-////        if record1.is_ok() && record2.is_ok() {
-////            let rec1 = record1.unwrap();
-////            let rec2 = record2.unwrap();
-////            let seq1 = rec1.seq;
-////            let seq2 = rec2.seq;
-////            queue.push_work((seq1, seq2));
-////            //tx.send("x").unwrap();
-////        } else {
-////            println!("err");
-////        }
-////    }
-//
-//    more_jobs_tx.set(false);
-//
-//    // Join all the threads.
-//    for thread_handle in thread_handles {
-//        thread_handle.join().unwrap();
-//    }
-//}
-
-pub fn sketch_query(
-    c: usize,
-    k: usize,
-    _threads: usize,
-    query_file: &str,
-) -> Option<SequencesSketch> {
-    let read_file = query_file;
-    let mut read_sketch = SequencesSketch::new(read_file.to_string(), c, k, false);
-    let mut error_free = true;
-    if is_fastq(read_file) {
-        let reader;
-        if read_file.contains(".gz") || read_file.contains(".gzip") {
-            let file = File::open(read_file).unwrap();
-            let gz_decoder: Box<dyn Read + Send> = Box::new(BufReader::new(GzDecoder::new(file)));
-            reader = ReaderQ::new(gz_decoder);
-        } else {
-            let file = File::open(read_file).unwrap();
-            let decoder: Box<dyn Read + Send> = Box::new(BufReader::new(file));
-            reader = ReaderQ::new(decoder);
-        }
-        read_parallel(
-            reader,
-            10,
-            100,
-            |record_set| {
-                let mut vec = vec![];
-                for record in record_set.into_iter() {
-                    //                        dbg!(String::from_utf8(record.seq().to_vec()));
-                    extract_markers(record.seq(), &mut vec, c, k);
-                }
-
-                return vec;
-            },
-            |record_sets| {
-                while let Some(result) = record_sets.next() {
-                    if result.is_ok() {
-                        let (_rec_set, vec) = result.unwrap();
-                        for km in vec {
-                            let c = read_sketch.kmer_counts.entry(km).or_insert(0);
-                            *c += 1;
-                        }
-                    } else {
-                        log::warn!("{} was not a valid sequence file.", query_file);
-                        error_free = false;
-                        break;
-                    }
-                }
-            },
-        );
-    } else {
-        let reader;
-        if read_file.contains(".gz") || read_file.contains(".gzip") {
-            let file = File::open(read_file).unwrap();
-            let gz_decoder: Box<dyn Read + Send> = Box::new(BufReader::new(GzDecoder::new(file)));
-            reader = ReaderA::new(gz_decoder);
-        } else {
-            let file = File::open(read_file).unwrap();
-            let decoder: Box<dyn Read + Send> = Box::new(BufReader::new(file));
-            reader = ReaderA::new(decoder);
-        }
-        read_parallel(
-            reader,
-            10 as u32,
-            2 * 100,
-            |record_set| {
-                // this function does the heavy work
-                let mut vec = vec![];
-                for record in record_set.into_iter() {
-                    extract_markers(record.seq(), &mut vec, c, k);
-                }
-
-                return vec;
-            },
-            |record_sets| {
-                while let Some(result) = record_sets.next() {
-                    if result.is_ok() {
-                        let (_rec_set, vec) = result.as_ref().unwrap();
-                        for km in vec {
-                            let c = read_sketch.kmer_counts.entry(*km).or_insert(0);
-                            *c += 1;
-                        }
-                    } else {
-                        error_free = false;
-                        log::warn!("{} was not a valid sequence file.", query_file);
-                    }
-                }
-            },
-        );
-    }
-
-    if error_free {
-        return Some(read_sketch);
-    } else {
-        return None;
-    }
-}
-
-pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize) -> Option<SequencesSketch> {
+pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize, sample_name: Option<String>, no_dedup: bool) -> Option<SequencesSketch> {
     let mut kmer_map = HashMap::default();
     let ref_file = &read_file;
     let reader = parse_fastx_file(&ref_file);
-    let mut vec = vec![];
+    let mut mean_read_length = 0.;
+    let mut counter = 0.;
+    let mut kmer_to_pair_table = FxHashSet::default();
+    let mut num_dup_removed = 0;
+
     if !reader.is_ok() {
         warn!("{} is not a valid fasta/fastq file; skipping.", ref_file);
     } else {
         let mut reader = reader.unwrap();
         while let Some(record) = reader.next() {
             if record.is_ok() {
+                let mut vec = vec![];
                 let record = record.expect(&format!("Invalid record for file {} ", ref_file));
                 let seq = record.seq();
+                let kmer_pair;
+                if seq.len() > 400{
+                    kmer_pair = None;
+                }
+                else{
+                    kmer_pair = pair_kmer_single(&seq);
+                }
                 extract_markers(&seq, &mut vec, c, k);
+                for km in vec {
+                    dup_removal_lsh_full_exact(&mut kmer_map, &mut kmer_to_pair_table, &km, kmer_pair, &mut num_dup_removed, no_dedup, Some(MAX_DEDUP_COUNT)); 
+                }
+                //moving average
+                counter += 1.;
+                mean_read_length = mean_read_length + 
+                    ((seq.len() as f64) - mean_read_length) / counter;
+
             } else {
                 warn!("File {} is not a valid fasta/fastq file", ref_file);
             }
-        }
-        for km in vec {
-            let c = kmer_map.entry(km).or_insert(0);
-            *c += 1;
         }
     }
 
@@ -785,5 +927,7 @@ pub fn sketch_sequences_needle(read_file: &str, c: usize, k: usize) -> Option<Se
         c,
         k,
         paired: false,
+        sample_name: sample_name,
+        mean_read_length
     });
 }

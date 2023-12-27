@@ -20,27 +20,32 @@ pub enum Mode {
 
 #[derive(Args, Default)]
 pub struct SketchArgs {
-    #[clap(multiple=true, help = "fasta/fastq files; gzip optional. Default: fastq file produces a sample sketch (*.sylsp) while fasta files are combined into a database (*.syldb).")]
+    #[clap(multiple=true, help_heading = "INPUT", help = "fasta/fastq files; gzip optional. Default: fastq file produces a sample sketch (*.sylsp) while fasta files are combined into a database (*.syldb).")]
     pub files: Vec<String>,
     #[clap(short='o',long="out-name-db", default_value = "database", help_heading = "OUTPUT", help = "Output name for database sketch (with .syldb appended)")]
     pub db_out_name: String,
     #[clap(short='d',long="sample-output-directory", default_value = "./", help_heading = "OUTPUT", help = "Output directory for sample sketches")]
     pub sample_output_dir: String,
-    #[clap(short,long="individual-records", help_heading = "INPUT", help = "Use individual records (contigs) for database construction")]
+    #[clap(short,long="individual-records", help_heading = "GENOME INPUT", help = "Use individual records (contigs) for database construction")]
     pub individual: bool,
-    #[clap(multiple=true,short,long="reads", help_heading = "INPUT", help = "Single-end fasta/fastq reads")]
+    #[clap(multiple=true,short,long="reads", help_heading = "SINGLE-END INPUT", help = "Single-end fasta/fastq reads")]
     pub reads: Option<Vec<String>>,
-    #[clap(multiple=true,short='g', long="genomes", help_heading = "INPUT", help = "Genomes in fasta format")]
+    #[clap(multiple=true,short='g', long="genomes", help_heading = "GENOME INPUT", help = "Genomes in fasta format")]
     pub genomes: Option<Vec<String>>,
     #[clap(short,long="list", help_heading = "INPUT", help = "Newline delimited file with inputs; fastas -> database, fastq -> sample")]
     pub list_sequence: Option<String>,
-
-    #[clap(long="rl", hidden=true, help_heading = "INPUT", help = "Newline delimited file; inputs assumed reads")]
+    #[clap(long="rl", hidden=true, help_heading = "SINGLE-END INPUT", help = "Newline delimited file; inputs assumed reads")]
     pub list_reads: Option<String>,
-
-    #[clap(long="gl", help_heading = "INPUT", help = "Newline delimited file; inputs assumed genomes")]
+    #[clap(long="gl", help_heading = "GENOME INPUT", help = "Newline delimited file; inputs assumed genomes")]
     pub list_genomes: Option<String>,
-
+    #[clap(long="l1", help_heading = "PAIRED-END INPUT", help = "Newline delimited file; inputs are first pair of PE reads")]
+    pub list_first_pair: Option<String>,
+    #[clap(long="l2", help_heading = "PAIRED-END INPUT", help = "Newline delimited file; inputs are second pair of PE reads")]
+    pub list_second_pair: Option<String>,
+    #[clap(long="lS", help_heading = "INPUT", help = "Newline delimited file; read sketches are renamed to given sample names")]
+    pub list_sample_names: Option<String>,
+    #[clap(short='S', long="sample-names", help_heading = "INPUT", help = "Read sketches are renamed to given sample names")]
+    pub sample_names: Option<Vec<String>>,
 
     #[clap(short, default_value_t = 31,help_heading = "ALGORITHM", help ="Value of k. Only k = 21, 31 are currently supported")]
     pub k: usize,
@@ -55,13 +60,18 @@ pub struct SketchArgs {
     #[clap(long="debug", help = "Debug output")]
     pub debug: bool,
 
-    #[clap(long="disable-profiling", help_heading = "ALGORITHM", help = "Disable sylph profile usage for databases; may decrease size and make sylph query slightly faster")]
+
+    #[clap(long="no-dedup", help_heading = "ALGORITHM", help = "Disable read deduplication procedure. Reduces memory; not recommended for illumina data")]
+    pub no_dedup: bool,
+    #[clap(long="disable-profiling", help_heading = "ALGORITHM", help = "Disable sylph profile usage for databases; may decrease size and make sylph query slightly faster", hidden=true)]
     pub no_pseudotax: bool,
     #[clap(long="min-spacing", default_value_t = 30, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the genomes")]
     pub min_spacing_kmer: usize,
-    #[clap(short='1',long="first-pairs", multiple=true, help_heading = "INPUT", help = "First pairs for paired end reads")]
+    #[clap(long="fpr", default_value_t = 0.0001, help_heading = "ALGORITHM", help = "False positive rate for read deduplicate hashing; valid values in [0,1).")]
+    pub fpr: f64,
+    #[clap(short='1',long="first-pairs", multiple=true, help_heading = "PAIRED-END INPUT", help = "First pairs for paired end reads")]
     pub first_pair: Vec<String>,
-    #[clap(short='2',long="second-pairs", multiple=true, help_heading = "INPUT", help = "Second pairs for paired end reads")]
+    #[clap(short='2',long="second-pairs", multiple=true, help_heading = "PAIRED-END INPUT", help = "Second pairs for paired end reads")]
     pub second_pair: Vec<String>,
 }
 
@@ -69,6 +79,10 @@ pub struct SketchArgs {
 pub struct ContainArgs {
     #[clap(multiple=true, help = "Pre-sketched *.syldb/*.sylsp files. Raw fastq/fasta are allowed and will be automatically sketched to .sylsp/.syldb")]
     pub files: Vec<String>,
+
+    #[clap(short='l',long="list", help = "Newline delimited file of file inputs")]
+    pub file_list: Option<String>,
+
     #[clap(long,default_value_t = 3., help_heading = "ALGORITHM", help = "Minimum k-mer multiplicity needed for coverage correction. Higher values gives more precision but lower sensitivity")]
     pub min_count_correct: f64,
     #[clap(short='M',long,default_value_t = 50., help_heading = "ALGORITHM", help = "Exclude genomes with less than this number of sampled k-mers")]
@@ -90,8 +104,11 @@ pub struct ContainArgs {
     #[clap(short='I',long="read-seq-id", help_heading = "ALGORITHM", help = "Mean sequence identity of reads (0-100). Only used if --estimate-unknown is toggled. Consider this if automatic identity estimate fails" )]
     pub seq_id: Option<f64>,
 
-    #[clap(short='l', long="read-length", help_heading = "ALGORITHM", help = "Read length (single-end length for pairs). Only necessary for short-read coverages when using --estimate-unknown. Not needed for long-reads" )]
-    pub read_length: Option<usize>,
+    //#[clap(short='l', long="read-length", help_heading = "ALGORITHM", help = "Read length (single-end length for pairs). Only necessary for short-read coverages when using --estimate-unknown. Not needed for long-reads" )]
+    //pub read_length: Option<usize>,
+
+    #[clap(short='R', long="redundancy-threshold", help_heading = "ALGORITHM", help = "Removes redundant genomes up to a rough ANI percentile when profiling", default_value_t = 99.0, hidden=true)]
+    pub redundant_ani: f64,
 
     #[clap(short, default_value_t = 200, help_heading = "SKETCHING", help = "Subsampling rate. Does nothing for pre-sketched files")]
     pub c: usize,

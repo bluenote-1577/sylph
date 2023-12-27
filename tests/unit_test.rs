@@ -1,7 +1,6 @@
 use assert_cmd::prelude::*; // Add methods on commands
 use sylph::seeding;
 
-#[test]
 fn test_hash(){
 
     let key = 19238239812933123;

@@ -1,3 +1,38 @@
+## sylph v0.5.1 release: **Memory improvement and bug fixes** : Dec 27 2023
+
+### Major
+
+* Scalable cuckoo filters are now used for read deduplication for memory savings. 
+* Deduplication algorithm improved. v0.5.0 worked poorly on highly (>15%) duplicated read sets. 
+* Shorter reads can be sketched now. Down to 32bp instead of 63 bp before.
+
+## sylph v0.5.0 release: **Big improvements on real illumina data** : Dec 23 2023
+
+### Major
+
+**In previous versions, sylph was underperforming on real illumina data sets**. See https://github.com/bluenote-1577/sylph/issues/5 
+
+This is because many real illumina datasets have a non-trivial number of duplicate reads. Duplicate reads mess up sylph's statistical model.
+
+For the paired sketching options `sylph sketch -1 -2`, a new deduplication routine has been added. **This increases sketching memory by 3-4x but greatly increases performance on real datasets with > 1-2% of duplication for low-abundance genomes**. 
+
+For paired-end illumina reads with non-trivial (> 1% duplication), sylph can now 
+
+1. detect up to many more species low-abundance species below 0.3x coverage
+2. give better coverage/abundance estimates for low-abundance species 
+
+### BREAKING
+
+- sequence sketches (sylsp) have changed formats. Sequences will need to be re-sketched.
+- `--read-length` option removed and incorporated into the sketches by default. (suggested by @fplaza)
+
+### Other changes
+
+- New warning when `-o` specified and only reads are sketched (https://github.com/bluenote-1577/sylph/issues/7)
+- You can now rename sylph samples by specifing a sample naming file with `--sample-names` or `--lS` (suggested by @jolespin)
+- Newline delimited files are available in `profile` and `query` now (suggested by @jolespin)
+
+
 ## sylph v0.4.1 release: getting ready for preprinting
 
 ### Minor
