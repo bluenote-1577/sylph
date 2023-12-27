@@ -14,7 +14,9 @@
 
 This is because many real illumina datasets have a non-trivial number of duplicate reads. Duplicate reads mess up sylph's statistical model.
 
-For the paired sketching options `sylph sketch -1 -2`, a new deduplication routine has been added. **This increases sketching memory by 3-4x but greatly increases performance on real datasets with > 1-2% of duplication for low-abundance genomes**. 
+For the single and paired sketching options, a new deduplication routine has been added. This will be described in version 2 of our preprint. 
+
+**This increases sketching memory by 3-4x but greatly increases performance on real datasets with > 1-2% of duplication, especially for low-abundance genomes**. 
 
 For paired-end illumina reads with non-trivial (> 1% duplication), sylph can now 
 
