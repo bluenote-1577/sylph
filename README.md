@@ -115,9 +115,9 @@ The pre-built databases [available here](https://github.com/bluenote-1577/sylph/
 For common use cases and fast explanations, see the above [cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook). 
 
 ### Tutorials
-
-1. #### [Introduction: 5-minute sylph tutorial outlining basic usage](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
-2. #### [Taxonomic profiling against GTDB-R214 database with MetaPhlAn output format](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
+1. #### [Introduction: what can sylph do and how does it work?](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F)
+2. #### [Introduction: 5-minute sylph tutorial outlining basic usage](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
+3. #### [Taxonomic profiling against GTDB-R214 database with MetaPhlAn output format](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
 
 ### Manuals
 1. #### [Sylph's TSV output and containment ANI explanation](https://github.com/bluenote-1577/sylph/wiki/Output-format)
