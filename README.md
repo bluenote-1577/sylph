@@ -31,12 +31,14 @@ sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's nove
 
 ## Changelog
 
-### Version v0.5.1 - Dec 27, 2023. Major breaking updates.
+### Version v0.5.0 and v0.5.1 - Dec 27, 2023. Major breaking updates.
 
 #### IMPORTANT
 
-* Big sensitivity boost for real illumina profiling in v0.5 versus v0.4.
-* Breaking change: *.sylsp files are now a new format. Old sketches will no longer work.
+* Big sensitivity boost for real Illumina profiling in v0.5 versus v0.4.
+* Breaking change: *.sylsp files are now in a new format. Old sketches will no longer work.
+* Shorter reads (>= 32bp) now usable
+* New probabilistic data structures for read deduplication -- lower memory usage 
 
 See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
