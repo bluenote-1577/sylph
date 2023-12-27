@@ -31,7 +31,7 @@ sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's nove
 
 ## Changelog
 
-### Version v0.5.0 - Dec 23, 2023. Major breaking update.
+### Version v0.5.1 - Dec 27, 2023. Major breaking updates.
 
 #### IMPORTANT
 
