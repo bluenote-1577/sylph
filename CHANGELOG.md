@@ -1,4 +1,4 @@
-## sylph v0.5.1 release: **Memory improvement and bug fixes** : Dec2023 / Jan 2024
+## sylph v0.5.1 release: **Memory improvement and bug fixes** : Dec 27 2023
 
 ### Major
 
@@ -6,7 +6,7 @@
 * Deduplication algorithm improved. v0.5.0 worked poorly on highly (>15%) duplicated read sets. 
 * Shorter reads can be sketched now. Down to 32bp instead of 63 bp before.
 
-## sylph v0.5.0 release: **Big improvements on real illumina data** : Dec2023 / Jan 2024
+## sylph v0.5.0 release: **Big improvements on real illumina data** : Dec 23 2023
 
 ### Major
 
