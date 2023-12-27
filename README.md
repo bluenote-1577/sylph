@@ -41,7 +41,7 @@ sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's nove
 See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
 
-##  Install (current version v0.5.0)
+##  Install (current version v0.5.1)
 
 #### Option 1: conda install 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
