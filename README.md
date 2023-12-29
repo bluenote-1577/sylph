@@ -31,17 +31,19 @@ sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's nove
 
 ## Changelog
 
-### Version v0.5.0 - Dec 23, 2023. Major breaking update.
+### Version v0.5.0 and v0.5.1 - Dec 27, 2023. Major breaking updates.
 
 #### IMPORTANT
 
-* Big sensitivity boost for real illumina profiling in v0.5 versus v0.4.
-* Breaking change: *.sylsp files are now a new format. Old sketches will no longer work.
+* Big sensitivity boost for real Illumina profiling in v0.5 versus v0.4.
+* Breaking change: *.sylsp files are now in a new format. Old sketches will no longer work.
+* Shorter reads (>= 32bp) now usable
+* New probabilistic data structures for read deduplication -- lower memory usage 
 
 See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
 
-##  Install (current version v0.5.0)
+##  Install (current version v0.5.1)
 
 #### Option 1: conda install 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
@@ -89,17 +91,17 @@ sylph sketch genome1.fa genome2.fa -o database
 #EQUIVALENT: sylph sketch -g genome1.fa genome2.fa -o database
 
 # multi-sample sketching of paired reads
-sylph sketch -1 A_1.fq B_1.fq -2 A_2.fq B_2.fq -d output_read_sketch_folder
+sylph sketch -1 A_1.fq B_1.fq -2 A_2.fq B_2.fq -d read_sketch_folder
 
 # multi-sample sketching for single end reads, fastq are assumed to be reads
 sylph sketch reads.fq 
 #EQUIVALENT: sylph sketch -r reads.fq
 
 # ANI querying 
-sylph query database.syldb *.sylsp -t (threads) > ani_queries.tsv
+sylph query database.syldb read_sketch_folder/*.sylsp -t (threads) > ani_queries.tsv
 
 # taxonomic profiling 
-sylph profile database.syldb *.sylsp -t (threads) > profiling.tsv
+sylph profile database.syldb read_sketch_folder/*.sylsp -t (threads) > profiling.tsv
 ```
 
 ## [Pre-built databases](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases)
@@ -113,9 +115,9 @@ The pre-built databases [available here](https://github.com/bluenote-1577/sylph/
 For common use cases and fast explanations, see the above [cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook). 
 
 ### Tutorials
-
-1. #### [Introduction: 5-minute sylph tutorial outlining basic usage](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
-2. #### [Taxonomic profiling against GTDB-R214 database with MetaPhlAn output format](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
+1. #### [Introduction: what can sylph do and how does it work?](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F)
+2. #### [Introduction: 5-minute sylph tutorial outlining basic usage](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
+3. #### [Taxonomic profiling against GTDB-R214 database with MetaPhlAn output format](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
 
 ### Manuals
 1. #### [Sylph's TSV output and containment ANI explanation](https://github.com/bluenote-1577/sylph/wiki/Output-format)
