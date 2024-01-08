@@ -915,6 +915,7 @@ pub fn sketch_sequences_needle(
 
     if !reader.is_ok() {
         warn!("{} is not a valid fasta/fastq file; skipping.", ref_file);
+        return None
     } else {
         let mut reader = reader.unwrap();
         while let Some(record) = reader.next() {
