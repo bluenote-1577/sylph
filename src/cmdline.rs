@@ -44,7 +44,7 @@ pub struct SketchArgs {
     pub list_second_pair: Option<String>,
     #[clap(long="lS", help_heading = "INPUT", help = "Newline delimited file; read sketches are renamed to given sample names")]
     pub list_sample_names: Option<String>,
-    #[clap(short='S', long="sample-names", help_heading = "INPUT", help = "Read sketches are renamed to given sample names")]
+    #[clap(multiple=true, short='S', long="sample-names", help_heading = "INPUT", help = "Read sketches are renamed to given sample names")]
     pub sample_names: Option<Vec<String>>,
 
     #[clap(short, default_value_t = 31,help_heading = "ALGORITHM", help ="Value of k. Only k = 21, 31 are currently supported")]

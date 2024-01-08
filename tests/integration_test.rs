@@ -357,6 +357,25 @@ fn test_sample_names(){
         .assert();
     assert.success().code(0);
     assert!(Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST_S.paired.sylsp").exists(), "Output file was not created, -S");
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("-1")
+        .arg("test_files/t1.fq")
+        .arg("test_files/t1.fq")
+        .arg("-2")
+        .arg("test_files/t2.fq")
+        .arg("test_files/t2.fq")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .arg("-S")
+        .arg("SAMPLE_TEST_S")
+        .arg("SAMPLE_TEST_S1")
+        .assert();
+    assert.success().code(0);
+    assert!(Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST_S1.paired.sylsp").exists(), "Output file was not created, -S");
+
     fresh();
 
 
