@@ -53,6 +53,8 @@ See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.m
 conda install -c bioconda sylph
 ```
 
+**WARNING**: conda install may break if you don't have AVX2 instructions (i.e. you're on an old machine). See the [issue here](https://github.com/bluenote-1577/sylph/issues/2). The binary and source install still work. 
+
 #### Option 2: Build from source
 
 Requirements:
