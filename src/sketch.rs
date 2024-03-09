@@ -886,7 +886,6 @@ pub fn sketch_pair_sequences(
             break;
         }
     }
-    let num_kmers = read_sketch.kmer_counts.values().sum::<u32>() as f64;
     let percent = (num_dup_removed as f64)/((read_sketch.kmer_counts.values().sum::<u32>() as f64) + num_dup_removed as f64) * 100.;
     log::debug!(
         "Number of sketched k-mers removed due to read duplication for {}: {}. Percentage: {:.2}%",
