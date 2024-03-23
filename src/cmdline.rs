@@ -1,7 +1,7 @@
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser)]
-#[clap(author, version, about = "Ultrafast genome ANI queries and taxonomic profiling for metagenomic shotgun samples.\n\n--- Preparing inputs by sketching (indexing)\n## fastq (reads) and fasta (genomes all at once\n## *.sylsp found in -d; *.syldb given by -o\nsylph sketch -t 5 sample1.fq sample2.fq genome1.fa genome2.fa -o genome1+genome2 -d sample_dir\n\n## paired-end reads\nsylph sketch -1 a_1.fq b_1.fq -2 b_2.fq b_2.fq -d paired_sketches\n\n--- Nearest neighbour containment ANI\nsylph query *.syldb *.sylsp > all-to-all-query.tsv\n\n--- Taxonomic profiling with relative abundances and ANI\nsylph profile *.syldb *.sylsp > all-to-all-profile.tsv", arg_required_else_help = true, disable_help_subcommand = true)]
+#[clap(author, version, about = "Ultrafast genome ANI queries and taxonomic profiling for metagenomic shotgun samples.\n\n--- Preparing inputs by sketching (indexing)\n## fastq (reads) and fasta (genomes all at once)\n## *.sylsp found in -d; *.syldb given by -o\nsylph sketch -t 5 sample1.fq sample2.fq genome1.fa genome2.fa -o genome1+genome2 -d sample_dir\n\n## paired-end reads\nsylph sketch -1 a_1.fq b_1.fq -2 b_2.fq b_2.fq -d paired_sketches\n\n--- Nearest neighbour containment ANI\nsylph query *.syldb *.sylsp > all-to-all-query.tsv\n\n--- Taxonomic profiling with relative abundances and ANI\nsylph profile *.syldb *.sylsp > all-to-all-profile.tsv", arg_required_else_help = true, disable_help_subcommand = true)]
 pub struct Cli {
     #[clap(subcommand,)]
     pub mode: Mode,
@@ -98,8 +98,11 @@ pub struct ContainArgs {
     #[clap(long="debug", help = "Debug output")]
     pub debug: bool,
 
-    #[clap(short='u', long="estimate-unknown", help_heading = "ALGORITHM", help = "Estimates true coverage and scales sequence abundance in `profile` by estimated unknown sequence percentage" )]
+    #[clap(short='u', long="estimate-unknown", help_heading = "ALGORITHM", help = "Estimate true coverage and scale sequence abundance in `profile` by estimated unknown sequence percentage" )]
     pub estimate_unknown: bool,
+
+    #[clap(long="mean-coverage", help_heading = "ALGORITHM", help = "Use the robust mean coverage estimator instead of median estimator" )]
+    pub mean_coverage: bool,
 
     #[clap(short='I',long="read-seq-id", help_heading = "ALGORITHM", help = "Mean sequence identity of reads (0-100). Only used if --estimate-unknown is toggled. Consider this if automatic identity estimate fails" )]
     pub seq_id: Option<f64>,
@@ -137,6 +140,10 @@ pub struct ContainArgs {
 
     #[clap(short='o',long="output-file", help = "Output to this file instead of stdout")]
     pub out_file_name: Option<String>,
+
+    #[clap(long="log-reassignments", help = "Output information for how k-mers for genomes are reassigned during `profile`. Caution: can be verbose and slows down computation.")]
+    pub log_reassignments: bool,
+
 
 
 }

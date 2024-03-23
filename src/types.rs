@@ -184,6 +184,7 @@ pub struct AniResult<'a>{
     pub lambda_ci: (Option<f64>,Option<f64>),
     pub genome_sketch: &'a GenomeSketch,
     pub rel_abund: Option<f64>,
-    pub seq_abund: Option<f64>
+    pub seq_abund: Option<f64>,
+    pub kmers_lost: Option<usize>,
 
 }

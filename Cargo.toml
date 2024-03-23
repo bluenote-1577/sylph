@@ -1,6 +1,6 @@
 [package]
 name = "sylph"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
@@ -17,14 +17,13 @@ bincode = "1"
 fxhash = "0"
 clap = { version = "3", features = ["derive"] }
 flate2 = { version = "1.0.17", features = ["zlib-ng"], default-features = false }
-#nlopt="*"
 statrs="0.16"
 nalgebra="0"
 rand = "0"
 regex = "1"
 fastrand = "2"
 memory-stats = "1"
-scalable_cuckoo_filter = "*"
+scalable_cuckoo_filter = "0.2"
 
 [target.'cfg(target_env = "musl")'.dependencies]
 tikv-jemallocator = "0"
