@@ -302,6 +302,7 @@ fn test_sketch_fasta_fastq_concord(){
 #[serial]
 #[test]
 fn test_sample_names(){
+    fresh();
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")

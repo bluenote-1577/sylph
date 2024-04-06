@@ -164,6 +164,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
 
     }
 
+
     for file in all_files.iter(){
 
         let mut genome_sketch_good_suffix = false;
@@ -232,6 +233,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
         std::process::exit(1);
     }
 
+    let num_raw_read_files = read_files.len();
     let step;
     if let Some(sample_threads) = args.sample_threads{
         if sample_threads > 0{
@@ -243,7 +245,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
     }
     else{
         if args.pseudotax{
-            step = args.threads/3 + 1;
+            step = usize::max(args.threads/3 + 1, usize::min(num_raw_read_files, args.threads))
         }
         else{
             step = 1
