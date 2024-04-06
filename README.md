@@ -42,6 +42,7 @@ conda install -c bioconda sylph
 
 # download GTDB-R214 pre-built database (~10 GB)
 wget https://storage.googleapis.com/sylph-stuff/v0.3-c200-gtdb-r214.syldb
+
 # multi-sample paired-end profiling (sylph version >= 0.6)
 sylph profile v0.3-200-gtdb-r214.syldb -1 *_1.fastq.gz -2 *_2.fastq.gz -t (threads) > profiling.tsv
 
