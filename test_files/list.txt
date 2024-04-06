@@ -1,4 +1,4 @@
-test_files/e.coli-EC590.fasta
-test_files/e.coli-K12.fasta
-test_files/e.coli-o157.fasta
-test_files/o157_reads.fastq
+test_files/e.coli-EC590.fasta.gz
+test_files/e.coli-K12.fasta.gz
+test_files/e.coli-o157.fasta.gz
+test_files/o157_reads.fastq.gz
