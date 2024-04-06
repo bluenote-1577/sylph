@@ -17,33 +17,29 @@
 
 ### Why sylph?
 
-1. **Accurate (containment) ANIs down to 0.1x effective coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
 
-2. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken and about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
+1. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken and about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
 
-3. **Ultrafast, multithreaded, multi-sample**: sylph can be > 100x faster than MetaPhlAn for multi-sample processing. sylph only takes 13GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
+2. **Ultrafast, multithreaded, multi-sample**: sylph can be > 50x faster than MetaPhlAn for multi-sample processing. sylph only takes 13GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
 
-4. **Easily customized databases**: sylph does not require taxonomic information, so you can profile against [metagenome-assembled genomes (MAGs), viruses, eukaryotes](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases), even assembled contigs, etc. Taxonomic information can be incorporated downstream for traditional profiling reports. 
+3. **Accurate (containment) ANIs down to 0.1x effective coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
+
+4. **Easily customized databases**: sylph can profile against [metagenome-assembled genomes (MAGs), viruses, eukaryotes](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases), and more. Taxonomic information can be incorporated downstream for traditional profiling reports. 
 
 ### How does sylph work?
 
-sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
+sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI for low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
 
 ## Changelog
 
-### Version v0.5.0 and v0.5.1 - Dec 27, 2023. Major breaking updates.
+### Version v0.6.0 - 2024-04-06. New input/output options.
 
-#### IMPORTANT
-
-* Big sensitivity boost for real Illumina profiling in v0.5 versus v0.4.
-* Breaking change: *.sylsp files are now in a new format. Old sketches will no longer work.
-* Shorter reads (>= 32bp) now usable
-* New probabilistic data structures for read deduplication -- lower memory usage 
+* `-1` and `-2` options are available for raw fastq profiling for `sylph profile` now. 
+* Output slightly changed. See documentation below. 
 
 See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
-
-##  Install (current version v0.5.1)
+##  Install (current version v0.6.0)
 
 #### Option 1: conda install 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
@@ -104,6 +100,9 @@ sylph query database.syldb read_sketch_folder/*.sylsp -t (threads) > ani_queries
 
 # taxonomic profiling 
 sylph profile database.syldb read_sketch_folder/*.sylsp -t (threads) > profiling.tsv
+
+# direct profiling w/o sketching
+sylph profile database.syldb -1 *_1.fastq -2 *_2.fastq > profiling.tsv
 ```
 
 ## [Pre-built databases](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases)
