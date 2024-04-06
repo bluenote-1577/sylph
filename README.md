@@ -30,25 +30,25 @@
 
 sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI for low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
 
+See below for more comprehensive usage information/tutorials/manuals. 
+
 ## Very quick start
 
-#### Profile metagenome sample against GTDB-R214 (85,205 bacterial/archaeal genomes) 
+#### Profile metagenome sample against [GTDB-R214](https://gtdb.ecogenomic.org/) (85,205 bacterial/archaeal genomes) 
 
 ```sh
 # see below for install options
 conda install -c bioconda sylph
 
-# download GTDB-R214 database
+# download GTDB-R214 pre-built database (~10 GB)
 wget https://storage.googleapis.com/sylph-stuff/v0.3-200-gtdb-r214.syldb
 
-# multi-sample paired-end profiling
+# multi-sample paired-end profiling (sylph version >= 0.6)
 sylph profile v0.3-200-gtdb-r214.syldb -1 *_1.fastq.gz -2 *_2.fastq.gz -t (threads) > profiling.tsv
 
 # multi-sample single-end profiling
 sylph profile v0.3-200-gtdb-r214.syldb *.fastq -t (threads) > profiling.tsv
 ```
-
-See below for more comprehensive usage information/tutorials/manuals. 
 
 ##  Install (current version v0.6.0)
 
@@ -118,11 +118,11 @@ sylph query database.syldb read_sketch_folder/*.sylsp -t (threads) > ani_queries
 sylph profile database.syldb read_sketch_folder/*.sylsp -t (threads) > profiling.tsv
 ```
 
-## [Pre-built databases](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases)
+## Tutorials, manuals, and pre-built databases
+
+### [Pre-built databases](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases)
 
 The pre-built databases [available here](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases) can be downloaded and used with sylph for profiling and containment querying. 
-
-## Tutorials and manuals
 
 ### [Cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook)
 
