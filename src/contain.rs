@@ -72,7 +72,7 @@ fn print_ani_result(ani_result: &AniResult, pseudotax: bool, writer: &mut Box<dy
     }
     else{
         writeln!(writer,
-            "{}\t{}\t{:.4}\t{:.4}\t{}\t{:.3}\t{}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{:.2}\t{}",
+            "{}\t{}\t{:.4}\t{:.4}\t{}\t{:.3}\t{}\t{}\t{}\t{:.0}\t{:.3}\t{}/{}\t{:.2}\t{}\t{}",
             ani_result.seq_name,
             ani_result.gn_name,
             ani_result.rel_abund.unwrap(),
@@ -87,6 +87,7 @@ fn print_ani_result(ani_result: &AniResult, pseudotax: bool, writer: &mut Box<dy
             ani_result.containment_index.0,
             ani_result.containment_index.1,
             ani_result.naive_ani * 100.,
+            ani_result.kmers_lost.unwrap(),
             ani_result.contig_name,
         ).expect("Error writing to file");
 
@@ -163,6 +164,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
 
     }
 
+
     for file in all_files.iter(){
 
         let mut genome_sketch_good_suffix = false;
@@ -188,13 +190,23 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
         } else if is_fasta(&file) {
             genome_files.push(file);
         } else if is_fastq(&file) {
-            read_files.push(file);
+            read_files.push(vec![file]);
         } else {
             warn!(
                 "{} file extension is not a sketch or a fasta/fastq file.",
                 &file
             );
         }
+    }
+
+    if args.first_pair.len() != args.second_pair.len() {
+        error!("Different number of paired sequences (-1, -2) for sketching. Exiting.");
+        std::process::exit(1);
+    }
+
+    // zip together the first and second pair files, push them to read_files
+    for (first, second) in args.first_pair.iter().zip(args.second_pair.iter()) {
+        read_files.push(vec![first,second]);
     }
 
     if genome_sketch_files.is_empty() && genome_files.is_empty(){
@@ -221,6 +233,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
         std::process::exit(1);
     }
 
+    let num_raw_read_files = read_files.len();
     let step;
     if let Some(sample_threads) = args.sample_threads{
         if sample_threads > 0{
@@ -232,10 +245,10 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
     }
     else{
         if args.pseudotax{
-            step = args.threads/3 + 1;
+            step = usize::max(args.threads/3 + 1, usize::min(num_raw_read_files, args.threads))
         }
         else{
-            step = 1
+            step = usize::max(1, usize::min(num_raw_read_files, args.threads))
         }
     }
 
@@ -245,7 +258,8 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
         }
     }
 
-    read_files.extend(read_sketch_files.clone());
+    let read_sketch_files_as_vec = read_sketch_files.clone().into_iter().map(|x| vec![x]).collect::<Vec<Vec<&String>>>();
+    read_files.extend(read_sketch_files_as_vec);
     let first_write = Mutex::new(true);
     let sequence_index_vec = (0..read_files.len()).collect::<Vec<usize>>();
     let out_writer:Mutex<Box<dyn Write + Send>> = Mutex::new(out_writer);
@@ -255,8 +269,9 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
     chunks.into_iter().for_each(|chunk| {
         chunk.into_par_iter().for_each(|j|{
             let is_sketch = j >= read_files.len() - read_sketch_files.len();
-            let sequence_sketch = get_seq_sketch(&args, read_files[j], is_sketch, genome_sketches[0].c, genome_sketches[0].k);
+            let sequence_sketch = get_seq_sketch(&args, &read_files[j], is_sketch, genome_sketches[0].c, genome_sketches[0].k);
             if sequence_sketch.is_some(){
+                let first_read_file = read_files[j][0];
                 let sequence_sketch = sequence_sketch.unwrap();
                 
                 let kmer_id_opt;
@@ -267,18 +282,18 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                     kmer_id_opt = get_kmer_identity(&sequence_sketch, args.estimate_unknown);
                 }
                 if args.estimate_unknown{
-                    log::debug!("{} has estimated kmer identity {:.3}.", &read_files[j], kmer_id_opt.unwrap());
+                    log::debug!("{} has estimated kmer identity {:.3}.", &first_read_file, kmer_id_opt.unwrap());
                     if kmer_id_opt.is_some() && kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) > 0.98{
                     }
                     else if args.seq_id.is_none(){
-                        log::warn!("{} has estimated identity {:.3} < 98%, indicating low-depth of coverage, highly diverse samples, or noisy reads. If using accurate reads (> 98% id), --estimate-unknown option is unreliable. Strongly consider using --read-seq-id.",  &read_files[j], kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) * 100.);
+                        log::warn!("{} has estimated identity {:.3} < 98%, indicating low-depth of coverage, highly diverse samples, or noisy reads. If using accurate reads (> 98% id), --estimate-unknown option is unreliable. Strongly consider using --read-seq-id.",  &first_read_file, kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) * 100.);
                     }
                 }
                 
                 let stats_vec_seq: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
                 genome_index_vec.par_iter().for_each(|i| {
                     let genome_sketch = &genome_sketches[*i];
-                    let res = get_stats(&args, &genome_sketch, &sequence_sketch, None);
+                    let res = get_stats(&args, &genome_sketch, &sequence_sketch, None, args.log_reassignments);
                     if res.is_some() {
                         //res.as_mut().unwrap().genome_sketch_index = *i;
                         stats_vec_seq.lock().unwrap().push(res.unwrap());
@@ -290,12 +305,12 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                 estimate_true_cov(&mut stats_vec_seq, kmer_id_opt, args.estimate_unknown, sequence_sketch.mean_read_length, sequence_sketch.k);
 
                 if args.pseudotax{
-                    log::info!("{} taxonomic profiling; reassigning k-mers for {} genomes...", &read_files[j], stats_vec_seq.len());
-                    let winner_map = winner_table(&stats_vec_seq);
+                    log::info!("{} taxonomic profiling; reassigning k-mers for {} genomes...", &first_read_file, stats_vec_seq.len());
+                    let winner_map = winner_table(&stats_vec_seq, args.log_reassignments);
                     let remaining_genomes = stats_vec_seq.iter().map(|x| x.genome_sketch).collect::<Vec<&GenomeSketch>>();
                     let stats_vec_seq_2 = Mutex::new(vec![]);
                     remaining_genomes.into_par_iter().for_each(|genome_sketch|{
-                        let res = get_stats(&args, &genome_sketch, &sequence_sketch, Some(&winner_map));
+                        let res = get_stats(&args, &genome_sketch, &sequence_sketch, Some(&winner_map), args.log_reassignments);
                         if res.is_some() {
                             stats_vec_seq_2.lock().unwrap().push(res.unwrap());
                         }
@@ -303,12 +318,12 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                     stats_vec_seq = derep_if_reassign_threshold(&stats_vec_seq, stats_vec_seq_2.into_inner().unwrap(), args.redundant_ani, sequence_sketch.k);
                     //stats_vec_seq = stats_vec_seq_2.into_inner().unwrap();
                     estimate_true_cov(&mut stats_vec_seq, kmer_id_opt, args.estimate_unknown, sequence_sketch.mean_read_length, sequence_sketch.k);
-                    log::info!("{} has {} genomes passing profiling threshold. ", &read_files[j], stats_vec_seq.len());
+                    log::info!("{} has {} genomes passing profiling threshold. ", &first_read_file, stats_vec_seq.len());
 
                     let mut bases_explained = 1.;
                     if args.estimate_unknown{
                         bases_explained = estimate_covered_bases(&stats_vec_seq, &sequence_sketch, sequence_sketch.mean_read_length, sequence_sketch.k);
-                        log::info!("{} has {:.2}% of reads detected in database by profile", &read_files[j], bases_explained * 100.);
+                        log::info!("{} has {:.2}% of reads detected in database by profile", &first_read_file, bases_explained * 100.);
                     }
 
                     let total_cov = stats_vec_seq.iter().map(|x| x.final_est_cov).sum::<f64>();
@@ -340,7 +355,12 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                     print_ani_result(&res, args.pseudotax, &mut *out_writer);
                 }
             }
-            log::info!("Finished sample {}.", &read_files[j]);
+            if read_files[j].len() > 1{
+                log::info!("Finished paired sample {}.", &read_files[j][0]);
+            }
+            else{
+                log::info!("Finished sample {}.", &read_files[j][0]);
+            }
         });
     });
 
@@ -404,7 +424,7 @@ fn estimate_covered_bases(results: &Vec<AniResult>, sequence_sketch: &SequencesS
     return f64::min(num_covered_bases as f64 / num_tentative_bases, 1.);
 }
 
-fn winner_table<'a>(results : &'a Vec<AniResult>) -> FxHashMap<Kmer, (f64,&'a GenomeSketch, bool)> {
+fn winner_table<'a>(results : &'a Vec<AniResult>, log_reassign: bool) -> FxHashMap<Kmer, (f64,&'a GenomeSketch, bool)> {
     let mut kmer_to_genome_map : FxHashMap<_,_> = FxHashMap::default();
     for res in results.iter(){
         //let gn_sketch = &genome_sketches[res.genome_sketch_index];
@@ -426,6 +446,32 @@ fn winner_table<'a>(results : &'a Vec<AniResult>) -> FxHashMap<Kmer, (f64,&'a Ge
         }
     }
 
+    //log reassigned kmers
+    if log_reassign{
+        log::info!("------------- Logging k-mer reassignments -----------------");
+        let mut sketch_to_index = FxHashMap::default();
+        for (i,res) in results.iter().enumerate(){
+            log::info!("Index\t{}\t{}\t{}", i, res.genome_sketch.file_name, res.genome_sketch.first_contig_name);
+            sketch_to_index.insert(res.genome_sketch, i);
+        }
+        (0..results.len()).into_par_iter().for_each(|i|{
+            let res = &results[i];
+            let mut reassign_edge_map = FxHashMap::default();
+            for kmer in res.genome_sketch.genome_kmers.iter(){
+                let value = kmer_to_genome_map[kmer].1;
+                if value != res.genome_sketch{
+                    let edge_count = reassign_edge_map.entry((sketch_to_index[value],i)).or_insert(0);
+                    *edge_count += 1;
+                }
+            }
+            for (key,val) in reassign_edge_map{
+                if val > 10{
+                    log::info!("{}->{}\t{}\tkmers reassigned", key.0, key.1, val);
+                }
+            }
+        });
+    }
+
     return kmer_to_genome_map;
 }
 
@@ -445,7 +491,7 @@ fn print_header(pseudotax: bool, writer: &mut Box<dyn Write + Send>, estimate_un
             cov_head = "Eff_cov";
         }
         writeln!(writer,
-            "Sample_file\tGenome_file\tTaxonomic_abundance\tSequence_abundance\tAdjusted_ANI\t{}\tANI_5-95_percentile\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tNaive_ANI\tContig_name", cov_head
+            "Sample_file\tGenome_file\tTaxonomic_abundance\tSequence_abundance\tAdjusted_ANI\t{}\tANI_5-95_percentile\tEff_lambda\tLambda_5-95_percentile\tMedian_cov\tMean_cov_geq1\tContainment_ind\tNaive_ANI\tkmers_reassigned\tContig_name", cov_head
             ).expect("Error writing to file.");
     }
 }
@@ -514,12 +560,13 @@ fn get_genome_sketches(
 
 fn get_seq_sketch(
     args: &ContainArgs,
-    read_file: &str,
+    read_file: &Vec<&String>,
     is_sketch_file: bool,
     genome_c: usize,
     genome_k: usize,
 ) -> Option<SequencesSketch> {
     if is_sketch_file {
+        let read_file = read_file[0];
         let read_sketch_file = read_file;
         let file = File::open(read_sketch_file).expect(&format!(
             "The sketch `{}` could not be opened",
@@ -531,24 +578,40 @@ fn get_seq_sketch(
         );
         let read_sketch = SequencesSketch::from_enc(read_sketch_enc);
         if read_sketch.c > genome_c {
-            error!("{} value of -c for {} is {} -- greater than the smallest value of -c for a genome sketch {}. Exiting.", read_file, read_sketch.c, read_sketch_file, genome_c);
+            error!("{} value of -c is {}; this is greater than the smallest value of -c = {} for a genome sketch. Exiting.", read_file, read_sketch.c, genome_c);
             return None;
+        }
+        else if read_sketch.c < genome_c{
+            info!("{} value of -c for reads is {}; this is smaller than the -c for a genome sketch. Using the larger -c {} instead.", read_file, read_sketch.c,  genome_c);
         }
 
         return Some(read_sketch);
     } else {
+        if args.c > genome_c{
+            info!("{} value of -c for reads is {}; this is smaller than the -c for a genome sketch. Using the larger -c {} instead.", read_file[0], args.c,  genome_c);
+        }
         if genome_c < args.c {
-            error!("{} error: value of -c for contain = {} -- greater than the smallest value of -c for a genome sketch = {}. Continuing without sketching.", read_file, args.c, genome_c);
+            error!("{} error: value of -c for contain = {} -- greater than the smallest value of -c for a genome sketch = {}. Continuing without sketching.", read_file[0], args.c, genome_c);
             return None;
-        } else if genome_k != args.k {
+        } 
+        else if genome_k != args.k {
             error!(
                 "{} -k {} is not equal to -k {} found in sketches. Continuing without sketching.",
-                read_file, args.k, genome_k
+                read_file[0], args.k, genome_k
             );
             return None;
         } else {
-            let read_sketch_opt = sketch_sequences_needle(&read_file, args.c, args.k, None, false, );
-            return read_sketch_opt;
+            if read_file.len() == 1{
+                let read_sketch_opt = sketch_sequences_needle(&read_file[0], args.c, args.k, None, false);
+                return read_sketch_opt;
+            }
+            else if read_file.len() == 2{
+                let read_sketch_opt = sketch_pair_sequences(&read_file[0], &read_file[1], args.c, args.k, None, false, DEFAULT_FPR);
+                return read_sketch_opt;
+            }
+            else{
+                panic!("Internal Error: read_file has length {}. Something went wrong...", read_file.len());
+            }
         }
     }
 }
@@ -671,7 +734,8 @@ fn get_stats<'a>(
     args: &ContainArgs,
     genome_sketch: &'a GenomeSketch,
     sequence_sketch: &SequencesSketch,
-    winner_map: Option<&FxHashMap<Kmer, (f64,& GenomeSketch, bool)>>
+    winner_map: Option<&FxHashMap<Kmer, (f64,& GenomeSketch, bool)>>,
+    log_reassign: bool
 ) -> Option<AniResult<'a>> {
     if genome_sketch.k != sequence_sketch.k {
         log::error!(
@@ -696,7 +760,7 @@ fn get_stats<'a>(
         return None
     }
 
-    //let start_t_initial = Instant::now();
+    let mut kmers_lost_count = 0;
     for kmer in gn_kmers.iter() {
         if sequence_sketch.kmer_counts.contains_key(kmer) {
             if sequence_sketch.kmer_counts[kmer] == 0{
@@ -704,8 +768,8 @@ fn get_stats<'a>(
             }
             if winner_map.is_some(){
                 let map = &winner_map.unwrap();
-                //TODO... algorithm testing
-                if map[kmer].1 != genome_sketch{// || map[kmer].2 {
+                if map[kmer].1 != genome_sketch{
+                    kmers_lost_count += 1;
                     continue
                 }
                 contain_count += 1;
@@ -718,8 +782,7 @@ fn get_stats<'a>(
             }
         }
     }
-    //log::trace!("Hashing time {:?}", Instant::now() - start_t_initial);
-    //let start_t_initial = Instant::now();
+
     if covs.is_empty() {
         return None;
     }
@@ -788,7 +851,12 @@ fn get_stats<'a>(
     } else if median_cov < MAX_MEDIAN_FOR_MEAN_FINAL_EST{
         final_est_cov = geq1_mean_cov;
     } else{
-        final_est_cov = median_cov;
+        if args.mean_coverage{
+            final_est_cov = geq1_mean_cov;
+        }
+        else{
+            final_est_cov = median_cov;
+        }
     }
 
     let opt_lambda;
@@ -811,6 +879,19 @@ fn get_stats<'a>(
         else if args.pseudotax { MIN_ANI_P_DEF } 
         else { MIN_ANI_DEF };
     if final_est_ani < min_ani {
+        if winner_map.is_some(){
+            //Used to be > min ani, now it is not after reassignment
+            if log_reassign{
+                log::info!("Genome/contig {}/{} has ANI = {} < {} after reassigning {} k-mers ({} contained k-mers after reassign)", 
+                    genome_sketch.file_name,
+                    genome_sketch.first_contig_name,
+                    final_est_ani * 100.,
+                    min_ani * 100.,
+                    kmers_lost_count,
+                    contain_count)
+            }
+
+        }
         return None;
     }
 
@@ -832,6 +913,14 @@ fn get_stats<'a>(
         seq_name = sequence_sketch.file_name.clone();
     }
 
+    let kmers_lost;
+    if winner_map.is_some(){
+        kmers_lost = Some(kmers_lost_count)
+    }
+    else{
+        kmers_lost = None;
+    }
+
     let ani_result = AniResult {
         naive_ani,
         final_est_ani,
@@ -848,6 +937,7 @@ fn get_stats<'a>(
         genome_sketch: genome_sketch,
         rel_abund: None,
         seq_abund: None,
+        kmers_lost: kmers_lost,
 
     };
     //log::trace!("Other time {:?}", Instant::now() - start_t_initial);

@@ -1,3 +1,10 @@
+## sylph v0.6.0 release: New output column, lazy raw paired fastq profiling: 2024-04-06 
+
+### Major
+
+* A new column called `kmers_reassigned` is now in the profile output. This states how many k-mers are lost due to reassignment for that particular genome. 
+* `-1, -2` options are now available for `sylph profile`. You can now do `sylph profile database.syldb -1 1.fq -2 2.fq ...`
+
 ## sylph v0.5.1 release: **Memory improvement and bug fixes** : Dec 27 2023
 
 ### Major

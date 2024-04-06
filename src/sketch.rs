@@ -313,7 +313,6 @@ pub fn sketch(args: SketchArgs) {
         iter_vec.into_par_iter().for_each(|i| {
             let read_file1 = &first_pairs[i];
             let read_file2 = &second_pairs[i];
-            check_vram_and_block(max_ram, read_file1);
 
             let mut sample_name = None;
             if let Some(name) = &sample_names {
@@ -407,7 +406,7 @@ pub fn sketch(args: SketchArgs) {
 
             let mut read_sk_file = BufWriter::new(
                 File::create(&file_path_str)
-                    .expect(&format!("{} path not valid; exiting ", file_path_str)),
+                    .expect(&format!("{} path not valid; exiting.", file_path_str)),
             );
 
             let enc = SequencesSketchEncode::new(read_sketch);

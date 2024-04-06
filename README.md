@@ -15,35 +15,42 @@
    </i>
 </p>
 
+
 ### Why sylph?
 
-1. **Accurate (containment) ANIs down to 0.1x effective coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
+1. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken and about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
 
-2. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken and about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
+2. **Ultrafast, multithreaded, multi-sample**: sylph can be > 50x faster than MetaPhlAn for multi-sample processing. sylph only takes 13GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
 
-3. **Ultrafast, multithreaded, multi-sample**: sylph can be > 100x faster than MetaPhlAn for multi-sample processing. sylph only takes 13GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
+3. **Accurate (containment) ANIs down to 0.1x effective coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
 
-4. **Easily customized databases**: sylph does not require taxonomic information, so you can profile against [metagenome-assembled genomes (MAGs), viruses, eukaryotes](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases), even assembled contigs, etc. Taxonomic information can be incorporated downstream for traditional profiling reports. 
+4. **Easily customized databases**: sylph can profile against [metagenome-assembled genomes (MAGs), viruses, eukaryotes](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases), and more. Taxonomic information can be incorporated downstream for traditional profiling reports. 
 
 ### How does sylph work?
 
-sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI queries for even low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
+sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI for low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
 
-## Changelog
+See below for more comprehensive usage information/tutorials/manuals. 
 
-### Version v0.5.0 and v0.5.1 - Dec 27, 2023. Major breaking updates.
+## Very quick start
 
-#### IMPORTANT
+#### Profile metagenome sample against [GTDB-R214](https://gtdb.ecogenomic.org/) (85,205 bacterial/archaeal genomes) 
 
-* Big sensitivity boost for real Illumina profiling in v0.5 versus v0.4.
-* Breaking change: *.sylsp files are now in a new format. Old sketches will no longer work.
-* Shorter reads (>= 32bp) now usable
-* New probabilistic data structures for read deduplication -- lower memory usage 
+```sh
+# see below for install options
+conda install -c bioconda sylph
 
-See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
+# download GTDB-R214 pre-built database (~10 GB)
+wget https://storage.googleapis.com/sylph-stuff/v0.3-c200-gtdb-r214.syldb
 
+# multi-sample paired-end profiling (sylph version >= 0.6)
+sylph profile v0.3-200-gtdb-r214.syldb -1 *_1.fastq.gz -2 *_2.fastq.gz -t (threads) > profiling.tsv
 
-##  Install (current version v0.5.1)
+# multi-sample single-end profiling
+sylph profile v0.3-200-gtdb-r214.syldb *.fastq -t (threads) > profiling.tsv
+```
+
+##  Install (current version v0.6.0)
 
 #### Option 1: conda install 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
@@ -85,7 +92,9 @@ chmod +x sylph
 
 Note: the binary is compiled with a different set of libraries (musl instead of glibc), probably impacting performance. 
 
-## Quick start
+## Standard usage
+
+#### Sketching reads/genomes (indexing)
 
 ```sh
 # all fasta -> one *.syldb; fasta are assumed to be genomes
@@ -98,7 +107,10 @@ sylph sketch -1 A_1.fq B_1.fq -2 A_2.fq B_2.fq -d read_sketch_folder
 # multi-sample sketching for single end reads, fastq are assumed to be reads
 sylph sketch reads.fq 
 #EQUIVALENT: sylph sketch -r reads.fq
+```
 
+#### Profiling or querying
+```sh
 # ANI querying 
 sylph query database.syldb read_sketch_folder/*.sylsp -t (threads) > ani_queries.tsv
 
@@ -106,11 +118,11 @@ sylph query database.syldb read_sketch_folder/*.sylsp -t (threads) > ani_queries
 sylph profile database.syldb read_sketch_folder/*.sylsp -t (threads) > profiling.tsv
 ```
 
-## [Pre-built databases](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases)
+## Tutorials, manuals, and pre-built databases
+
+### [Pre-built databases](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases)
 
 The pre-built databases [available here](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases) can be downloaded and used with sylph for profiling and containment querying. 
-
-## Tutorials and manuals
 
 ### [Cookbook](https://github.com/bluenote-1577/sylph/wiki/sylph-cookbook)
 
@@ -126,7 +138,16 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 
 ### [sylph-utils](https://github.com/bluenote-1577/sylph-utils) 
 
-For incoporating taxonomy and manipulating output formats, see the [sylph-utils repository](https://github.com/bluenote-1577/sylph-utils).
+For incorporating taxonomy and manipulating output formats, see the [sylph-utils repository](https://github.com/bluenote-1577/sylph-utils).
+
+### Changelog
+
+#### Version v0.6.0 - 2024-04-06. New input/output options.
+
+* `-1` and `-2` options are available for raw fastq profiling for `sylph profile` now. 
+* Output slightly changed. See the documentation below. 
+
+See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
 ## Citing sylph
 

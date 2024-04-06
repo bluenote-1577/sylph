@@ -1,7 +1,8 @@
 use clap::{Args, Parser, Subcommand};
+use crate::constants::*;
 
 #[derive(Parser)]
-#[clap(author, version, about = "Ultrafast genome ANI queries and taxonomic profiling for metagenomic shotgun samples.\n\n--- Preparing inputs by sketching (indexing)\n## fastq (reads) and fasta (genomes all at once\n## *.sylsp found in -d; *.syldb given by -o\nsylph sketch -t 5 sample1.fq sample2.fq genome1.fa genome2.fa -o genome1+genome2 -d sample_dir\n\n## paired-end reads\nsylph sketch -1 a_1.fq b_1.fq -2 b_2.fq b_2.fq -d paired_sketches\n\n--- Nearest neighbour containment ANI\nsylph query *.syldb *.sylsp > all-to-all-query.tsv\n\n--- Taxonomic profiling with relative abundances and ANI\nsylph profile *.syldb *.sylsp > all-to-all-profile.tsv", arg_required_else_help = true, disable_help_subcommand = true)]
+#[clap(author, version, about = "Ultrafast genome ANI queries and taxonomic profiling for metagenomic shotgun samples.\n\n--- Preparing inputs by sketching (indexing)\n## fastq (reads) and fasta (genomes all at once)\n## *.sylsp found in -d; *.syldb given by -o\nsylph sketch -t 5 sample1.fq sample2.fq genome1.fa genome2.fa -o genome1+genome2 -d sample_dir\n\n## paired-end reads\nsylph sketch -1 a_1.fq b_1.fq -2 b_2.fq b_2.fq -d paired_sketches\n\n--- Nearest neighbour containment ANI\nsylph query *.syldb *.sylsp > all-to-all-query.tsv\n\n--- Taxonomic profiling with relative abundances and ANI\nsylph profile *.syldb *.sylsp > all-to-all-profile.tsv", arg_required_else_help = true, disable_help_subcommand = true)]
 pub struct Cli {
     #[clap(subcommand,)]
     pub mode: Mode,
@@ -67,7 +68,7 @@ pub struct SketchArgs {
     pub no_pseudotax: bool,
     #[clap(long="min-spacing", default_value_t = 30, help_heading = "ALGORITHM", help = "Minimum spacing between selected k-mers on the genomes")]
     pub min_spacing_kmer: usize,
-    #[clap(long="fpr", default_value_t = 0.0001, help_heading = "ALGORITHM", help = "False positive rate for read deduplicate hashing; valid values in [0,1).")]
+    #[clap(long="fpr", default_value_t = DEFAULT_FPR, help_heading = "ALGORITHM", help = "False positive rate for read deduplicate hashing; valid values in [0,1).")]
     pub fpr: f64,
     #[clap(short='1',long="first-pairs", multiple=true, help_heading = "PAIRED-END INPUT", help = "First pairs for paired end reads")]
     pub first_pair: Vec<String>,
@@ -77,10 +78,11 @@ pub struct SketchArgs {
 
 #[derive(Args)]
 pub struct ContainArgs {
-    #[clap(multiple=true, help = "Pre-sketched *.syldb/*.sylsp files. Raw fastq/fasta are allowed and will be automatically sketched to .sylsp/.syldb")]
+    #[clap(multiple=true, help = "Pre-sketched *.syldb/*.sylsp files. Raw single-end fastq/fasta are allowed and will be automatically sketched to .sylsp/.syldb")]
     pub files: Vec<String>,
 
-    #[clap(short='l',long="list", help = "Newline delimited file of file inputs")]
+    
+    #[clap(short='l',long="list", help = "Newline delimited file of file inputs",help_heading = "INPUT/OUTPUT")]
     pub file_list: Option<String>,
 
     #[clap(long,default_value_t = 3., help_heading = "ALGORITHM", help = "Minimum k-mer multiplicity needed for coverage correction. Higher values gives more precision but lower sensitivity")]
@@ -98,9 +100,10 @@ pub struct ContainArgs {
     #[clap(long="debug", help = "Debug output")]
     pub debug: bool,
 
-    #[clap(short='u', long="estimate-unknown", help_heading = "ALGORITHM", help = "Estimates true coverage and scales sequence abundance in `profile` by estimated unknown sequence percentage" )]
+    #[clap(short='u', long="estimate-unknown", help_heading = "ALGORITHM", help = "Estimate true coverage and scale sequence abundance in `profile` by estimated unknown sequence percentage" )]
     pub estimate_unknown: bool,
 
+    
     #[clap(short='I',long="read-seq-id", help_heading = "ALGORITHM", help = "Mean sequence identity of reads (0-100). Only used if --estimate-unknown is toggled. Consider this if automatic identity estimate fails" )]
     pub seq_id: Option<f64>,
 
@@ -110,6 +113,12 @@ pub struct ContainArgs {
     #[clap(short='R', long="redundancy-threshold", help_heading = "ALGORITHM", help = "Removes redundant genomes up to a rough ANI percentile when profiling", default_value_t = 99.0, hidden=true)]
     pub redundant_ani: f64,
 
+    #[clap(short='1', long="first-pairs", multiple=true, help = "First pairs for raw paired-end reads (fastx/gzip)",help_heading = "SKETCHING")]
+    pub first_pair: Vec<String>,
+
+    #[clap(short='2', long="second-pairs", multiple=true, help = "Second pairs for raw paired-end reads (fastx/gzip)",help_heading = "SKETCHING")]
+    pub second_pair: Vec<String>,
+
     #[clap(short, default_value_t = 200, help_heading = "SKETCHING", help = "Subsampling rate. Does nothing for pre-sketched files")]
     pub c: usize,
     #[clap(short, default_value_t = 31, help_heading = "SKETCHING", help = "Value of k. Only k = 21, 31 are currently supported. Does nothing for pre-sketched files")]
@@ -118,6 +127,12 @@ pub struct ContainArgs {
     pub individual: bool,
     #[clap(long="min-spacing", default_value_t = 30, help_heading = "SKETCHING", help = "Minimum spacing between selected k-mers on the database genomes. Does nothing for pre-sketched files")]
     pub min_spacing_kmer: usize,
+
+    #[clap(short='o',long="output-file", help = "Output to this file (TSV format). [default: stdout]", help_heading="INPUT/OUTPUT")]
+    pub out_file_name: Option<String>,
+    #[clap(long="log-reassignments", help = "Output information for how k-mers for genomes are reassigned during `profile`. Caution: can be verbose and slows down computation.")]
+    pub log_reassignments: bool,
+
 
     //Hidden options that are embedded in the args but no longer used... 
     #[clap(short, hidden=true, long="pseudotax", help_heading = "ALGORITHM", help = "Pseudo taxonomic classification mode. This removes shared k-mers between species by assigning k-mers to the highest ANI species. Requires sketches with --enable-pseudotax option" )]
@@ -134,9 +149,11 @@ pub struct ContainArgs {
     pub no_ci: bool,
     #[clap(long="no-adjust", hidden=true)]
     pub no_adj: bool,
+    #[clap(long="mean-coverage", help_heading = "ALGORITHM", help = "Use the robust mean coverage estimator instead of median estimator", hidden=true )]
+    pub mean_coverage: bool,
 
-    #[clap(short='o',long="output-file", help = "Output to this file instead of stdout")]
-    pub out_file_name: Option<String>,
+
+    
 
 
 }
