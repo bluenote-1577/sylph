@@ -14,50 +14,15 @@ fn fresh(){
 
 #[serial]
 #[test]
-fn test_profile_vs_query(){
-
-    let mut output = Command::cargo_bin("sylph").unwrap();
-    let output = output
-        .arg("profile")
-        .arg("./test_files/o157_reads.fastq.gz")
-        .arg("./test_files/e.coli-EC590.fasta.gz")
-        .output()
-        .expect("Output failed");
-    let stdout = str::from_utf8(&output.stdout).expect("Output was not valid UTF-8");
-    dbg!(stdout.matches('\n').count());
-    assert!(stdout.matches('\n').count() == 2);
-
-    let mut output = Command::cargo_bin("sylph").unwrap();
-    let output = output
-        .arg("query")
-        .arg("./test_files/o157_reads.fastq.gz")
-        .arg("./test_files/e.coli-EC590.fasta.gz")
-        .arg("./test_files/e.coli-o157.fasta.gz")
-        .arg("./test_files/e.coli-K12.fasta.gz")
-        .output()
-        .expect("Output failed");
-    let stdout = str::from_utf8(&output.stdout).expect("Output was not valid UTF-8");
-    dbg!(stdout.matches('\n').count());
-    println!("{}",stdout);
-    assert!(stdout.matches('\n').count() == 4);
-}
-
-#[serial]
-#[test]
 fn test_sketch_commands() {
-    Command::new("rm")
-        .arg("-r")
-        .args(["./tests/results/test_sketch_dir"])
-        .spawn();
-    let mut cmd = Command::cargo_bin("sylph").unwrap();
+   let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
-        .arg("./test_files/e.coli-EC590.fasta.gz")
-        .arg("./test_files/e.coli-K12.fasta.gz")
-        .arg("./test_files/o157_reads.fastq.gz")
-        .arg("./test_files/e.coli-W.fasta.gz")
+        .arg("test_files/e.coli-EC590.fasta.gz")
+        .arg("test_files/e.coli-K12.fasta.gz")
+        .arg("test_files/o157_reads.fastq.gz")
         .arg("-o")
-        .arg("./tests/results/test_sketch_dir/db")
+        .arg("tests/results/test_sketch_dir/db")
         .arg("-d")
         .arg("./tests/results/test_sketch_dir")
         .assert();
@@ -126,8 +91,6 @@ fn test_sketch_commands() {
     assert.success().code(0);
     assert!(Path::new("./tests/results/test_sketch_dir/t1.fq.paired.sylsp").exists(), "Output file was not created");
 
-
-
     fresh();
     let mut cmd= Command::cargo_bin("sylph").unwrap();
     let assert = cmd
@@ -144,7 +107,42 @@ fn test_sketch_commands() {
     assert.success().code(0);
     assert!(Path::new("./tests/results/test_sketch_dir/t2.fq.sylsp").exists(), "Output file was not created");
     assert!(Path::new("./tests/results/test_sketch_dir/testdb.syldb").exists(), "Output file was not created");
+}
 
+#[serial]
+#[test]
+fn test_profile_vs_query(){
+    fresh();
+
+    let mut output = Command::cargo_bin("sylph").unwrap();
+    let output = output
+        .arg("profile")
+        .arg("./test_files/o157_reads.fastq.gz")
+        .arg("./test_files/e.coli-EC590.fasta.gz")
+        .output()
+        .expect("Output failed");
+    let stdout = str::from_utf8(&output.stdout).expect("Output was not valid UTF-8");
+    dbg!(stdout.matches('\n').count());
+    assert!(stdout.matches('\n').count() == 2);
+
+    let mut output = Command::cargo_bin("sylph").unwrap();
+    let output = output
+        .arg("query")
+        .arg("./test_files/o157_reads.fastq.gz")
+        .arg("./test_files/e.coli-EC590.fasta.gz")
+        .arg("./test_files/e.coli-o157.fasta.gz")
+        .arg("./test_files/e.coli-K12.fasta.gz")
+        .output()
+        .expect("Output failed");
+    let stdout = str::from_utf8(&output.stdout).expect("Output was not valid UTF-8");
+    dbg!(stdout.matches('\n').count());
+    println!("{}",stdout);
+    assert!(stdout.matches('\n').count() == 4);
+}
+
+#[serial]
+#[test]
+fn test_sketch_list(){
     fresh();
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
@@ -163,7 +161,6 @@ fn test_sketch_commands() {
     assert!(!Path::new("./tests/results/test_sketch_dir/db.syldb").exists(), "Output file was created");
     fresh();
 
-    fresh();
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
@@ -210,7 +207,6 @@ fn test_sketch_commands() {
     fresh();
 
 }
-
 #[serial]
 #[test]
 fn test_profile_disabling(){
@@ -247,7 +243,6 @@ fn test_profile_disabling(){
 
     fresh();
 }
-
 #[serial]
 #[test]
 fn test_sketch_fasta_fastq_concord(){
@@ -298,7 +293,6 @@ fn test_sketch_fasta_fastq_concord(){
 
     fresh();
 }
-
 #[serial]
 #[test]
 fn test_sample_names(){
@@ -378,10 +372,7 @@ fn test_sample_names(){
     assert!(Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST_S1.paired.sylsp").exists(), "Output file was not created, -S");
 
     fresh();
-
-
 }
-
 #[serial]
 #[test]
 fn test_fpr(){
@@ -429,7 +420,6 @@ fn test_fpr(){
     fresh();
 
 }
-
 #[serial]
 #[test]
 fn test_raw_inputs_profile_simple(){
@@ -470,7 +460,6 @@ fn test_raw_inputs_profile_simple(){
     fresh();
     
 }
-
 #[serial]
 #[test]
 fn test_raw_inputs_profile_with_sketch(){

@@ -248,7 +248,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
             step = usize::max(args.threads/3 + 1, usize::min(num_raw_read_files, args.threads))
         }
         else{
-            step = 1
+            step = usize::max(1, usize::min(num_raw_read_files, args.threads))
         }
     }
 
