@@ -145,7 +145,7 @@ For incorporating taxonomy and manipulating output formats, see the [sylph-utils
 #### Version v0.6.0 - 2024-04-06. New input/output options.
 
 * `-1` and `-2` options are available for raw fastq profiling for `sylph profile` now. 
-* Output slightly changed. See the documentation below. 
+* Output slightly changed; kmers_reassigned column added (see explanation of TSV output). 
 
 See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
