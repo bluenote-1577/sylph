@@ -136,6 +136,10 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 1. #### [Sylph's TSV output and containment ANI explanation](https://github.com/bluenote-1577/sylph/wiki/Output-format)
 2. #### [Incoporating custom taxonomies to get CAMI-like or MetaPhlAn-like outputs](https://github.com/bluenote-1577/sylph/wiki/Integrating-taxonomic-information-with-sylph)
 
+### [sylph-utils](https://github.com/bluenote-1577/sylph-utils) 
+
+For incoporating taxonomy and manipulating output formats, see the [sylph-utils repository](https://github.com/bluenote-1577/sylph-utils).
+
 ### Changelog
 
 #### Version v0.6.0 - 2024-04-06. New input/output options.
