@@ -138,14 +138,14 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 
 ### [sylph-utils](https://github.com/bluenote-1577/sylph-utils) 
 
-For incoporating taxonomy and manipulating output formats, see the [sylph-utils repository](https://github.com/bluenote-1577/sylph-utils).
+For incorporating taxonomy and manipulating output formats, see the [sylph-utils repository](https://github.com/bluenote-1577/sylph-utils).
 
 ### Changelog
 
 #### Version v0.6.0 - 2024-04-06. New input/output options.
 
 * `-1` and `-2` options are available for raw fastq profiling for `sylph profile` now. 
-* Output slightly changed. See documentation below. 
+* Output slightly changed. See the documentation below. 
 
 See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
