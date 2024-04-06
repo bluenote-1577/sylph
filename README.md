@@ -15,8 +15,8 @@
    </i>
 </p>
 
-### Why sylph?
 
+### Why sylph?
 
 1. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken and about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
 
@@ -30,14 +30,25 @@
 
 sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI for low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
 
-## Changelog
+## Very quick start
 
-### Version v0.6.0 - 2024-04-06. New input/output options.
+#### Profile metagenome sample against GTDB-R214 (85,205 bacterial/archaeal genomes) 
 
-* `-1` and `-2` options are available for raw fastq profiling for `sylph profile` now. 
-* Output slightly changed. See documentation below. 
+```sh
+# see below for install options
+conda install -c bioconda sylph
 
-See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
+# download GTDB-R214 database
+wget https://storage.googleapis.com/sylph-stuff/v0.3-200-gtdb-r214.syldb
+
+# multi-sample paired-end profiling
+sylph profile v0.3-200-gtdb-r214.syldb -1 *_1.fastq.gz -2 *_2.fastq.gz -t (threads) > profiling.tsv
+
+# multi-sample single-end profiling
+sylph profile v0.3-200-gtdb-r214.syldb *.fastq -t (threads) > profiling.tsv
+```
+
+See below for more comprehensive usage information/tutorials/manuals. 
 
 ##  Install (current version v0.6.0)
 
@@ -81,7 +92,9 @@ chmod +x sylph
 
 Note: the binary is compiled with a different set of libraries (musl instead of glibc), probably impacting performance. 
 
-## Quick start
+## Standard usage
+
+#### Sketching reads/genomes (indexing)
 
 ```sh
 # all fasta -> one *.syldb; fasta are assumed to be genomes
@@ -94,15 +107,15 @@ sylph sketch -1 A_1.fq B_1.fq -2 A_2.fq B_2.fq -d read_sketch_folder
 # multi-sample sketching for single end reads, fastq are assumed to be reads
 sylph sketch reads.fq 
 #EQUIVALENT: sylph sketch -r reads.fq
+```
 
+#### Profiling or querying
+```sh
 # ANI querying 
 sylph query database.syldb read_sketch_folder/*.sylsp -t (threads) > ani_queries.tsv
 
 # taxonomic profiling 
 sylph profile database.syldb read_sketch_folder/*.sylsp -t (threads) > profiling.tsv
-
-# direct profiling w/o read sketching
-sylph profile database.syldb -1 *_1.fastq -2 *_2.fastq > profiling.tsv
 ```
 
 ## [Pre-built databases](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases)
@@ -122,6 +135,15 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 ### Manuals
 1. #### [Sylph's TSV output and containment ANI explanation](https://github.com/bluenote-1577/sylph/wiki/Output-format)
 2. #### [Incoporating custom taxonomies to get CAMI-like or MetaPhlAn-like outputs](https://github.com/bluenote-1577/sylph/wiki/Integrating-taxonomic-information-with-sylph)
+
+### Changelog
+
+#### Version v0.6.0 - 2024-04-06. New input/output options.
+
+* `-1` and `-2` options are available for raw fastq profiling for `sylph profile` now. 
+* Output slightly changed. See documentation below. 
+
+See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
 ## Citing sylph
 
