@@ -101,7 +101,7 @@ sylph query database.syldb read_sketch_folder/*.sylsp -t (threads) > ani_queries
 # taxonomic profiling 
 sylph profile database.syldb read_sketch_folder/*.sylsp -t (threads) > profiling.tsv
 
-# direct profiling w/o sketching
+# direct profiling w/o read sketching
 sylph profile database.syldb -1 *_1.fastq -2 *_2.fastq > profiling.tsv
 ```
 
