@@ -30,7 +30,7 @@
 
 sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI for low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
 
-## Very quick start
+<!--- ## Very quick start
 
 #### Profile metagenome sample against [GTDB-R214](https://gtdb.ecogenomic.org/) (85,205 bacterial/archaeal genomes) 
 
@@ -49,7 +49,7 @@ sylph profile v0.3-200-gtdb-r214.syldb *.fastq -t (threads) > profiling.tsv
 ```
 
 See below for more comprehensive usage information/tutorials/manuals. 
-
+--->
 ##  Install (current version v0.6.0)
 
 #### Option 1: conda install 
@@ -109,7 +109,7 @@ sylph sketch reads.fq
 #EQUIVALENT: sylph sketch -r reads.fq
 ```
 
-#### Profiling or querying
+#### Profiling or querying with sketch files
 ```sh
 # ANI querying 
 sylph query database.syldb read_sketch_folder/*.sylsp -t (threads) > ani_queries.tsv
