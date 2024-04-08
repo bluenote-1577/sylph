@@ -2,11 +2,11 @@
 
 ## Introduction
 
-**sylph** is a program that can perform ultrafast (1) **ANI querying** or (2) **metagenomic profiling** for metagenomic shotgun samples. 
+**sylph** is a program that performs ultrafast (1) **ANI querying** or (2) **metagenomic profiling** for metagenomic shotgun samples. 
 
-**Containment ANI querying**: sylph can search a genome, e.g. E. coli, against your sample. If sylph gives an estimate of 97% ANI, then a genome is contained in your sample with 97% ANI to the queried E. coli genome. 
+**Containment ANI querying**: sylph can search a genome, e.g. E. coli, against your sample. If sylph outputs an estimate of 97% ANI, your sample contains an E. coli with 97% ANI to the queried genome.
 
-**Metagenomic profiling**: Like e.g. Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _containment ANI in your metagenome_.
+**Metagenomic profiling**: Like Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _containment ANI in your metagenome_.
 
 <p align="center"><img src="assets/sylph.gif?raw=true"/></p>
 <p align="center">
@@ -28,9 +28,9 @@
 
 ### How does sylph work?
 
-sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, allowing accurate ANI for low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
+sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, giving accurate results for low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
 
-<!--- ## Very quick start
+## Very quick start
 
 #### Profile metagenome sample against [GTDB-R214](https://gtdb.ecogenomic.org/) (85,205 bacterial/archaeal genomes) 
 
@@ -49,7 +49,7 @@ sylph profile v0.3-200-gtdb-r214.syldb *.fastq -t (threads) > profiling.tsv
 ```
 
 See below for more comprehensive usage information/tutorials/manuals. 
---->
+
 ##  Install (current version v0.6.0)
 
 #### Option 1: conda install 
