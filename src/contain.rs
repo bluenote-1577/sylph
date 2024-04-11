@@ -11,7 +11,6 @@ use crate::types::*;
 use log::*;
 use rayon::prelude::*;
 use statrs::distribution::{DiscreteCDF, Poisson};
-use std::collections::HashSet;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Mutex;
@@ -252,12 +251,6 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
         }
     }
 
-    if args.estimate_unknown{
-        if args.seq_id.is_none(){
-            log::info!("--estimate-unknown specified but --read-seq-id is not. Estimating sequence identity from reads.");
-        }
-    }
-
     let read_sketch_files_as_vec = read_sketch_files.clone().into_iter().map(|x| vec![x]).collect::<Vec<Vec<&String>>>();
     read_files.extend(read_sketch_files_as_vec);
     let first_write = Mutex::new(true);
@@ -274,21 +267,14 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                 let first_read_file = read_files[j][0];
                 let sequence_sketch = sequence_sketch.unwrap();
                 
-                let kmer_id_opt;
-                if args.seq_id.is_some(){
-                    kmer_id_opt = Some((args.seq_id.unwrap()/100.).powf(sequence_sketch.k as f64));
-                }
-                else{
-                    kmer_id_opt = get_kmer_identity(&sequence_sketch, args.estimate_unknown);
-                }
-                if args.estimate_unknown{
-                    log::debug!("{} has estimated kmer identity {:.3}.", &first_read_file, kmer_id_opt.unwrap());
-                    if kmer_id_opt.is_some() && kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) > 0.98{
+                let mut kmer_id_opt = get_kmer_identity(&sequence_sketch, args.estimate_unknown);
+                if kmer_id_opt.is_none(){
+                    if args.estimate_unknown{
+                        log::warn!("{} sample has high diversity compared to sequencing depth or sequencing error (approx. avg depth < 3). Using {} (-I) as read accuracy estimate instead of automatic detection.", &first_read_file, args.seq_id);
                     }
-                    else if args.seq_id.is_none(){
-                        log::warn!("{} has estimated identity {:.3} < 98%, indicating low-depth of coverage, highly diverse samples, or noisy reads. If using accurate reads (> 98% id), --estimate-unknown option is unreliable. Strongly consider using --read-seq-id.",  &first_read_file, kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) * 100.);
-                    }
+                    kmer_id_opt = Some((args.seq_id/100.).powf(sequence_sketch.k as f64));
                 }
+                log::debug!("{} has estimated identity {:.3}.", &first_read_file, kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) * 100.);
                 
                 let stats_vec_seq: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
                 genome_index_vec.par_iter().for_each(|i| {
@@ -616,120 +602,6 @@ fn get_seq_sketch(
     }
 }
 
-fn _get_sketches_rewrite(args: &ContainArgs) -> (Vec<SequencesSketch>, Vec<GenomeSketch>) {
-    let mut read_sketch_files = vec![];
-    let mut genome_sketch_files = vec![];
-    let mut read_files = vec![];
-    let mut genome_files = vec![];
-    for file in args.files.iter() {
-        if file.ends_with(QUERY_FILE_SUFFIX) {
-            genome_sketch_files.push(file);
-        } else if file.ends_with(SAMPLE_FILE_SUFFIX) {
-            read_sketch_files.push(file);
-        } else if is_fasta(&file) {
-            genome_files.push(file);
-        } else if is_fastq(&file) {
-            read_files.push(file);
-        } else {
-            warn!(
-                "{} file extension is not a sketch or a fasta/fastq file.",
-                &file
-            );
-        }
-    }
-
-    let genome_sketches = Mutex::new(vec![]);
-    let read_sketches = Mutex::new(vec![]);
-    //read c can be lower than lowest genome c.
-    let mut lowest_genome_c = None;
-    let mut current_k = None;
-
-    read_sketch_files.into_par_iter().for_each(|read_sketch_file|{
-        let file = File::open(read_sketch_file.clone()).expect(&format!("The sketch `{}` could not be opened. Exiting ", &read_sketch_file));
-        let read_reader = BufReader::with_capacity(10_000_000, file);
-        let read_sketch_enc: SequencesSketchEncode = bincode::deserialize_from(read_reader).expect(&format!(
-            "The sketch `{}` is not a valid sketch. It is either corrupted or an older incompatible version ",
-            read_sketch_file
-        ));
-        let read_sketch = SequencesSketch::from_enc(read_sketch_enc);
-        if lowest_genome_c.is_some() && read_sketch.c > lowest_genome_c.unwrap(){
-            error!("Value of -c for {} is {} -- greater than the smallest value of -c for a genome sketch {}. Exiting.", read_sketch.c, read_sketch_file, lowest_genome_c.unwrap());
-            std::process::exit(1);
-        }
-        read_sketches.lock().unwrap().push(read_sketch);
-    });
-
-    for genome_sketch_file in genome_sketch_files {
-        let file =
-            File::open(genome_sketch_file.clone()).expect(&format!("The sketch `{}` could not be opened. Exiting ", genome_sketch_file));
-        let genome_reader = BufReader::with_capacity(10_000_000, file);
-        let genome_sketches_vec: Vec<GenomeSketch> = bincode::deserialize_from(genome_reader)
-            .expect(&format!(
-                "The sketch `{}` is not a valid sketch. It is either corrupted or an older incompatible version ",
-                &genome_sketch_file
-            ));
-        if genome_sketches_vec.is_empty() {
-            continue;
-        }
-        let c = genome_sketches_vec.first().unwrap().c;
-        let k = genome_sketches_vec.first().unwrap().k;
-        if lowest_genome_c.is_none() {
-            lowest_genome_c = Some(c);
-        } else if lowest_genome_c.unwrap() < c {
-            lowest_genome_c = Some(c);
-        }
-        if current_k.is_none() {
-            current_k = Some(genome_sketches_vec.first().unwrap().k);
-        } else if current_k.unwrap() != k {
-            error!("Query sketches have inconsistent -k. Exiting.");
-            std::process::exit(1);
-        }
-        genome_sketches.lock().unwrap().extend(genome_sketches_vec);
-    }
-
-    genome_files.into_par_iter().for_each(|genome_file|{
-        if lowest_genome_c.is_some() && lowest_genome_c.unwrap() < args.c{
-            error!("Value of -c for contain is {} -- greater than the smallest value of -c for a genome sketch {}. Continuing without sketching.", args.c, lowest_genome_c.unwrap());
-        }
-        else if current_k.is_some() && current_k.unwrap() != args.k{
-            error!("-k {} is not equal to -k {} found in sketches. Continuing without sketching.", args.k, current_k.unwrap());
-        }
-        else {
-            if args.individual{
-            let indiv_gn_sketches = sketch_genome_individual(args.c, args.k, genome_file, args.min_spacing_kmer, args.pseudotax);
-                genome_sketches.lock().unwrap().extend(indiv_gn_sketches);
-
-            }
-            else{
-                let genome_sketch_opt = sketch_genome(args.c, args.k, &genome_file, args.min_spacing_kmer, args.pseudotax);
-                if genome_sketch_opt.is_some() {
-                    genome_sketches.lock().unwrap().push(genome_sketch_opt.unwrap());
-                }
-            }
-        }
-    });
-
-    read_files.into_par_iter().for_each(|read_file|{
-        if lowest_genome_c.is_some() && lowest_genome_c.unwrap() < args.c{
-            error!("Value of -c for contain is {} -- greater than the smallest value of -c for a genome sketch {}. Continuing without sketching.", args.c, lowest_genome_c.unwrap());
-        }
-        else if current_k.is_some() && current_k.unwrap() != args.k{
-            error!("-k {} is not equal to -k {} found in sketches. Continuing without sketching.", args.k, current_k.unwrap());
-        }
-        else {
-            let read_sketch_opt = sketch_sequences_needle(&read_file,args.c, args.k, None, false);
-            if read_sketch_opt.is_some() {
-                read_sketches.lock().unwrap().push(read_sketch_opt.unwrap());
-            }
-        }
-    });
-
-    return (
-        read_sketches.into_inner().unwrap(),
-        genome_sketches.into_inner().unwrap(),
-    );
-}
-
 fn get_stats<'a>(
     args: &ContainArgs,
     genome_sketch: &'a GenomeSketch,
@@ -945,25 +817,6 @@ fn get_stats<'a>(
     return Some(ani_result);
 }
 
-fn _ani_from_lambda_moment(lambda: Option<f64>, mean: f64, k: f64) -> Option<f64> {
-    if lambda.is_none() {
-        return None;
-    }
-    let lambda = lambda.unwrap();
-    let pi = ((lambda + 1.) * mean - mean * mean - mean) / ((lambda + 1.) * mean - mean);
-    let ret_ani;
-    let ani = f64::powf(1. - pi, 1. / k);
-    if ani < 0. || ani.is_nan() {
-        ret_ani = None;
-    } else {
-        if ani > 1. {
-            ret_ani = Some(1.)
-        } else {
-            ret_ani = Some(ani);
-        }
-    }
-    return ret_ani;
-}
 
 fn ani_from_lambda(lambda: Option<f64>, _mean: f64, k: f64, full_cov: &[u32]) -> Option<f64> {
     if lambda.is_none() {
@@ -995,78 +848,6 @@ fn ani_from_lambda(lambda: Option<f64>, _mean: f64, k: f64, full_cov: &[u32]) ->
         }
     }
     return ret_ani;
-}
-
-fn mle_zip(full_covs: &[u32], _k: f64) -> Option<f64> {
-    let mut num_zero = 0;
-    let mut count_set: HashSet<_> = HashSet::default();
-
-    for x in full_covs {
-        if *x == 0 {
-            num_zero += 1;
-        } else {
-            count_set.insert(x);
-        }
-    }
-
-    //Lack of information for inference, retun None.
-    if count_set.len() == 1 {
-        return None;
-    }
-
-    if full_covs.len() - num_zero < SAMPLE_SIZE_CUTOFF {
-        return None;
-    }
-
-    let mean = mean(&full_covs).unwrap();
-    let lambda = newton_raphson(
-        (num_zero as f32 / full_covs.len() as f32).into(),
-        mean.into(),
-    );
-    //    log::trace!("lambda,pi {} {} {}", lambda,pi, num_zero as f64 / full_covs.len() as f64);
-    let ret_lambda;
-    if lambda < 0. || lambda.is_nan() {
-        ret_lambda = None
-    } else {
-        ret_lambda = Some(lambda);
-    }
-
-    return ret_lambda;
-}
-
-fn newton_raphson(rat: f64, mean: f64) -> f64 {
-    let mut curr = mean / (1. - rat);
-    //    dbg!(1. - mean,rat);
-    for _ in 0..1000 {
-        let t1 = (1. - rat) * curr;
-        let t2 = mean * (1. - f64::powf(2.78281828, -curr));
-        let t3 = 1. - rat;
-        let t4 = mean * (f64::powf(2.78281828, -curr));
-        curr = curr - (t1 - t2) / (t3 - t4);
-    }
-    return curr;
-}
-
-fn var(data: &[u32]) -> Option<f32> {
-    if data.is_empty() {
-        return None;
-    }
-    let mean = mean(data).unwrap();
-    let mut var = 0.;
-    for x in data {
-        var += (*x as f32 - mean) * (*x as f32 - mean)
-    }
-    return Some(var / data.len() as f32);
-}
-
-fn mean(data: &[u32]) -> Option<f32> {
-    let sum = data.iter().sum::<u32>() as f32;
-    let count = data.len();
-
-    match count {
-        positive if positive > 0 => Some(sum / count as f32),
-        _ => None,
-    }
 }
 
 fn bootstrap_interval(
@@ -1120,77 +901,34 @@ fn bootstrap_interval(
     return (low_ani, high_ani, low_lambda, high_lambda);
 }
 
-fn ratio_lambda(full_covs: &Vec<u32>, min_count_correct: f64) -> Option<f64> {
-    let mut num_zero = 0;
-    let mut count_map: FxHashMap<_, _> = FxHashMap::default();
-
-    for x in full_covs {
-        if *x == 0 {
-            num_zero += 1;
-        } else {
-            let c = count_map.entry(*x as usize).or_insert(0);
-            *c += 1;
-        }
-    }
-
-    //Lack of information for inference, retun None.
-    if count_map.len() == 1 {
-        return None;
-    }
-
-    if full_covs.len() - num_zero < SAMPLE_SIZE_CUTOFF {
-        return None;
-    } else {
-        let mut sort_vec: Vec<(_, _)> = count_map.iter().map(|x| (x.1, x.0)).collect();
-        sort_vec.sort_by(|x, y| y.cmp(&x));
-        let most_ind = sort_vec[0].1;
-        if !count_map.contains_key(&(most_ind + 1)) {
-            return None;
-        }
-        let count_p1 = count_map[&(most_ind + 1)] as f64;
-        let count = count_map[&most_ind] as f64;
-        if count_p1 < min_count_correct || count < min_count_correct{
-            return None;
-        }
-        let lambda = Some(count_p1 / count * ((most_ind + 1) as f64));
-        return lambda;
-    }
-}
-
-fn mme_lambda(full_covs: &[u32]) -> Option<f64> {
-    let mut num_zero = 0;
-    let mut count_set: HashSet<_> = HashSet::default();
-
-    for x in full_covs {
-        if *x == 0 {
-            num_zero += 1;
-        } else {
-            count_set.insert(x);
-        }
-    }
-
-    //Lack of information for inference, retun None.
-    if count_set.len() == 1 {
-        return None;
-    }
-
-    if full_covs.len() - num_zero < SAMPLE_SIZE_CUTOFF {
-        return None;
-    }
-
-    let mean = mean(&full_covs).unwrap();
-    let var = var(&full_covs).unwrap();
-    let lambda = var / mean + mean - 1.;
-    if lambda < 0. {
-        return None;
-    } else {
-        return Some(lambda as f64);
-    }
-}
 
 fn get_kmer_identity(seq_sketch: &SequencesSketch, estimate_unknown: bool) -> Option<f64>{
+
     if !estimate_unknown{
         return None
+    }
+
+    let mut median = 0;
+    let mut mov_avg_median = 0.;
+    let mut n = 1.;
+    for count in seq_sketch.kmer_counts.values(){
+        if *count > 1{
+            if *count > median{
+                median += 1;
+            }
+            else{
+                median -= 1;
+            }
+            mov_avg_median += median as f64;
+            n += 1.;
+        }
+    }
+
+    mov_avg_median /= n;
+    log::debug!("Estimated continuous median k-mer count for {} is {:.3}", &seq_sketch.file_name, mov_avg_median);
+
+    if mov_avg_median < MED_KMER_FOR_ID_EST{
+        return None;
     }
 
     let mut num_1s = 0;
@@ -1203,7 +941,8 @@ fn get_kmer_identity(seq_sketch: &SequencesSketch, estimate_unknown: bool) -> Op
             num_not1s += *count;
         }
     }
-    let eps = num_not1s as f64 / (num_not1s as f64 + num_1s as f64);
+    //0.1 so no div by 0 error
+    let eps = num_not1s as f64 / (num_not1s as f64 + num_1s as f64 + 0.1);
     if eps < 1.{
         return Some(eps)
     }

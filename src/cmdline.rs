@@ -89,7 +89,7 @@ pub struct ContainArgs {
     pub min_count_correct: f64,
     #[clap(short='M',long,default_value_t = 50., help_heading = "ALGORITHM", help = "Exclude genomes with less than this number of sampled k-mers")]
     pub min_number_kmers: f64,
-    #[clap(short, long="minimum-ani", help_heading = "ALGORITHM", help = "Minimum adjusted ANI to consider (0-100). Default is 90 for query and 95 for profile" )]
+    #[clap(short, long="minimum-ani", help_heading = "ALGORITHM", help = "Minimum adjusted ANI to consider (0-100). Default is 90 for query and 95 for profile. Smaller than 95 for profile will give inaccurate results." )]
     pub minimum_ani: Option<f64>,
     #[clap(short, default_value_t = 3, help = "Number of threads")]
     pub threads: usize,
@@ -104,8 +104,8 @@ pub struct ContainArgs {
     pub estimate_unknown: bool,
 
     
-    #[clap(short='I',long="read-seq-id", help_heading = "ALGORITHM", help = "Mean sequence identity of reads (0-100). Only used if --estimate-unknown is toggled. Consider this if automatic identity estimate fails" )]
-    pub seq_id: Option<f64>,
+    #[clap(short='I',long="read-seq-id", help_heading = "ALGORITHM", help = "Mean base-level identity (%) of reads. Only used in -u option as fallback if automatic detection fails.", default_value_t=99.5)]
+    pub seq_id: f64,
 
     //#[clap(short='l', long="read-length", help_heading = "ALGORITHM", help = "Read length (single-end length for pairs). Only necessary for short-read coverages when using --estimate-unknown. Not needed for long-reads" )]
     //pub read_length: Option<usize>,

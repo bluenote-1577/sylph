@@ -1,12 +1,15 @@
 use statrs::function::gamma::*;
+use fxhash::FxHashMap;
+use crate::constants::*;
+use std::collections::HashSet;
 
-fn r_from_moments_lambda(m: f64, v: f64, lambda: f64) -> f64{
+pub fn r_from_moments_lambda(m: f64, v: f64, lambda: f64) -> f64{
     //return (v / m - 1. - lambda + m) / lambda;
     //return 1000.;
     return lambda / (v - 1. + lambda + m)
 }
 
-fn ratio_formula(val: f64, r: f64, lambda: f64) -> f64{
+pub fn ratio_formula(val: f64, r: f64, lambda: f64) -> f64{
     if r < 100.{
        return gamma(r + val + 1.) / (val + 1.) / gamma(r + val) * lambda / (r + lambda)
     }
@@ -117,5 +120,123 @@ pub fn mean(data: &[u32]) -> Option<f64> {
     match count {
         positive if positive > 0 => Some(sum / count as f64),
         _ => None,
+    }
+}
+
+pub fn mme_lambda(full_covs: &[u32]) -> Option<f64> {
+    let mut num_zero = 0;
+    let mut count_set: HashSet<_> = HashSet::default();
+
+    for x in full_covs {
+        if *x == 0 {
+            num_zero += 1;
+        } else {
+            count_set.insert(x);
+        }
+    }
+
+    //Lack of information for inference, retun None.
+    if count_set.len() == 1 {
+        return None;
+    }
+
+    if full_covs.len() - num_zero < SAMPLE_SIZE_CUTOFF {
+        return None;
+    }
+
+    let mean = mean(&full_covs).unwrap();
+    let var = var(&full_covs).unwrap();
+    let lambda = var / mean + mean - 1.;
+    if lambda < 0. {
+        return None;
+    } else {
+        return Some(lambda as f64);
+    }
+}
+
+pub fn mle_zip(full_covs: &[u32], _k: f64) -> Option<f64> {
+    let mut num_zero = 0;
+    let mut count_set: HashSet<_> = HashSet::default();
+
+    for x in full_covs {
+        if *x == 0 {
+            num_zero += 1;
+        } else {
+            count_set.insert(x);
+        }
+    }
+
+    //Lack of information for inference, retun None.
+    if count_set.len() == 1 {
+        return None;
+    }
+
+    if full_covs.len() - num_zero < SAMPLE_SIZE_CUTOFF {
+        return None;
+    }
+
+    let mean = mean(&full_covs).unwrap();
+    let lambda = newton_raphson(
+        (num_zero as f32 / full_covs.len() as f32).into(),
+        mean.into(),
+    );
+    //    log::trace!("lambda,pi {} {} {}", lambda,pi, num_zero as f64 / full_covs.len() as f64);
+    let ret_lambda;
+    if lambda < 0. || lambda.is_nan() {
+        ret_lambda = None
+    } else {
+        ret_lambda = Some(lambda);
+    }
+
+    return ret_lambda;
+}
+
+fn newton_raphson(rat: f64, mean: f64) -> f64 {
+    let mut curr = mean / (1. - rat);
+    //    dbg!(1. - mean,rat);
+    for _ in 0..1000 {
+        let t1 = (1. - rat) * curr;
+        let t2 = mean * (1. - f64::powf(2.78281828, -curr));
+        let t3 = 1. - rat;
+        let t4 = mean * (f64::powf(2.78281828, -curr));
+        curr = curr - (t1 - t2) / (t3 - t4);
+    }
+    return curr;
+}
+
+pub fn ratio_lambda(full_covs: &Vec<u32>, min_count_correct: f64) -> Option<f64> {
+    let mut num_zero = 0;
+    let mut count_map: FxHashMap<_, _> = FxHashMap::default();
+
+    for x in full_covs {
+        if *x == 0 {
+            num_zero += 1;
+        } else {
+            let c = count_map.entry(*x as usize).or_insert(0);
+            *c += 1;
+        }
+    }
+
+    //Lack of information for inference, retun None.
+    if count_map.len() == 1 {
+        return None;
+    }
+
+    if full_covs.len() - num_zero < SAMPLE_SIZE_CUTOFF {
+        return None;
+    } else {
+        let mut sort_vec: Vec<(_, _)> = count_map.iter().map(|x| (x.1, x.0)).collect();
+        sort_vec.sort_by(|x, y| y.cmp(&x));
+        let most_ind = sort_vec[0].1;
+        if !count_map.contains_key(&(most_ind + 1)) {
+            return None;
+        }
+        let count_p1 = count_map[&(most_ind + 1)] as f64;
+        let count = count_map[&most_ind] as f64;
+        if count_p1 < min_count_correct || count < min_count_correct{
+            return None;
+        }
+        let lambda = Some(count_p1 / count * ((most_ind + 1) as f64));
+        return lambda;
     }
 }
