@@ -140,7 +140,7 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 
 For incorporating taxonomy and manipulating output formats, see the [sylph-utils repository](https://github.com/bluenote-1577/sylph-utils).
 
-### Changelog
+## Changelog
 
 #### Version v0.6.0 - 2024-04-06. New input/output options.
 
