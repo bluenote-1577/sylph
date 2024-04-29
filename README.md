@@ -50,7 +50,7 @@ sylph profile gtdb-r220-c200-dbv1.syldb *.fastq -t (threads) > profiling.tsv
 
 See below for more comprehensive usage information/tutorials/manuals. 
 
-##  Install (current version v0.6.0)
+##  Install (current version v0.6.1)
 
 #### Option 1: conda install 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
@@ -142,10 +142,9 @@ For incorporating taxonomy and manipulating output formats, see the [sylph-utils
 
 ## Changelog
 
-#### Version v0.6.0 - 2024-04-06. New input/output options.
+#### Version v0.6.1 - 2024-04-29. 
 
-* `-1` and `-2` options are available for raw fastq profiling for `sylph profile` now. 
-* Output slightly changed; kmers_reassigned column added (see explanation of TSV output). 
+* Made unknown estimation (-u) more robust for low-depth short-read sequencing. 
 
 See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
