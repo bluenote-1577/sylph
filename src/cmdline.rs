@@ -104,8 +104,8 @@ pub struct ContainArgs {
     pub estimate_unknown: bool,
 
     
-    #[clap(short='I',long="read-seq-id", help_heading = "ALGORITHM", help = "Mean base-level identity (%) of reads. Only used in -u option as fallback if automatic detection fails.", default_value_t=99.5)]
-    pub seq_id: f64,
+    #[clap(short='I',long="read-seq-id", help_heading = "ALGORITHM", help = "Sequence identity (%) of reads. Only used in -u option and overrides automatic detection. ")]
+    pub seq_id: Option<f64>,
 
     //#[clap(short='l', long="read-length", help_heading = "ALGORITHM", help = "Read length (single-end length for pairs). Only necessary for short-read coverages when using --estimate-unknown. Not needed for long-reads" )]
     //pub read_length: Option<usize>,

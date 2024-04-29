@@ -1,3 +1,15 @@
+## sylph v0.6.1: improved automatic detection of sequencing error for -u option
+
+### Major
+
+* Improved automatic estimation of sequencing error for estimating unknown abundances/coverages.
+
+Explanation:
+
+The -u option estimates the % of sequences that are "unknown" i.e. not captured by the database and the "true" coverage. This requires knowledge of sequencing error. Previous versions failed when the sample was too diverse compared to sequencing depth (e.g. low-throughput sequencing or complex (ocean/soil) metagenomes). 
+
+**New fallback added**: For short-reads only, if the diversity is too high relative to sequencing depth, (avg k-mer depth < 3) then 99.5% is used as a fallback sequence identity estimate. 
+
 ## sylph v0.6.0 release: New output column, lazy raw paired fastq profiling: 2024-04-06 
 
 ### Major

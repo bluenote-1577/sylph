@@ -267,14 +267,14 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                 let first_read_file = read_files[j][0];
                 let sequence_sketch = sequence_sketch.unwrap();
                 
-                let mut kmer_id_opt = get_kmer_identity(&sequence_sketch, args.estimate_unknown);
-                if kmer_id_opt.is_none(){
-                    if args.estimate_unknown{
-                        log::warn!("{} sample has high diversity compared to sequencing depth or sequencing error (approx. avg depth < 3). Using {} (-I) as read accuracy estimate instead of automatic detection.", &first_read_file, args.seq_id);
-                    }
-                    kmer_id_opt = Some((args.seq_id/100.).powf(sequence_sketch.k as f64));
+                let kmer_id_opt;
+                if args.seq_id.is_some(){
+                    kmer_id_opt = Some((args.seq_id.unwrap()/100.).powf(sequence_sketch.k as f64));
                 }
-                log::debug!("{} has estimated identity {:.3}.", &first_read_file, kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) * 100.);
+                else{
+                    kmer_id_opt = get_kmer_identity(&sequence_sketch, args.estimate_unknown);
+                    log::debug!("{} has estimated identity {:.3}.", &first_read_file, kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) * 100.);
+                }
                 
                 let stats_vec_seq: Mutex<Vec<AniResult>> = Mutex::new(vec![]);
                 genome_index_vec.par_iter().for_each(|i| {
@@ -926,11 +926,7 @@ fn get_kmer_identity(seq_sketch: &SequencesSketch, estimate_unknown: bool) -> Op
 
     mov_avg_median /= n;
     log::debug!("Estimated continuous median k-mer count for {} is {:.3}", &seq_sketch.file_name, mov_avg_median);
-
-    if mov_avg_median < MED_KMER_FOR_ID_EST{
-        return None;
-    }
-
+    
     let mut num_1s = 0;
     let mut num_not1s = 0;
     for count in seq_sketch.kmer_counts.values(){
@@ -943,10 +939,17 @@ fn get_kmer_identity(seq_sketch: &SequencesSketch, estimate_unknown: bool) -> Op
     }
     //0.1 so no div by 0 error
     let eps = num_not1s as f64 / (num_not1s as f64 + num_1s as f64 + 0.1);
+    //dbg!("Automatic id est, 1-to-2 ratio, 2-to-3", eps.powf(1./31.), num_1s as f64 / num_2s as f64, two_to_three);
+
+    if mov_avg_median < MED_KMER_FOR_ID_EST && seq_sketch.mean_read_length < 400.{
+        log::info!("{} short-read sample has high diversity compared to sequencing depth (approx. avg depth < 3). Using 99.5% as read accuracy estimate instead of automatic detection for --estimate-unknown.", &seq_sketch.file_name);
+        return Some(0.995f64.powf(seq_sketch.k as f64));
+    }
+
     if eps < 1.{
         return Some(eps)
     }
     else{
-        return None
+        return Some(1.)
     }
 }
