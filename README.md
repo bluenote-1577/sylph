@@ -35,9 +35,6 @@ sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's nove
 #### Profile metagenome sample against [GTDB-R220](https://gtdb.ecogenomic.org/) (113,104 bacterial/archaeal species representative genomes) 
 
 ```sh
-# see below for install options
-conda install -c bioconda sylph
-
 # download GTDB-R220 pre-built database (~13 GB)
 wget https://storage.googleapis.com/sylph-stuff/gtdb-r220-c200-dbv1.syldb
 
@@ -48,7 +45,7 @@ sylph profile gtdb-r220-c200-dbv1.syldb -1 *_1.fastq.gz -2 *_2.fastq.gz -t (thre
 sylph profile gtdb-r220-c200-dbv1.syldb *.fastq -t (threads) > profiling.tsv
 ```
 
-See below for more comprehensive usage information/tutorials/manuals. 
+See below for install and more comprehensive usage information/tutorials/manuals. 
 
 ##  Install (current version v0.6.1)
 
