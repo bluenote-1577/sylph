@@ -60,7 +60,7 @@ See below for more comprehensive usage information/tutorials/manuals.
 conda install -c bioconda sylph
 ```
 
-**WARNING**: conda install may break if you don't have AVX2 instructions (i.e. you're on an old machine). See the [issue here](https://github.com/bluenote-1577/sylph/issues/2). The binary and source install still work. 
+**WARNING**: conda may break if you don't have AVX2 instructions or for v0.6.0. See the [issue here](https://github.com/bluenote-1577/sylph/issues/2). The binary and source install still work. 
 
 #### Option 2: Build from source
 
