@@ -6,7 +6,7 @@
 
 **Containment ANI querying**: sylph can search a genome, e.g. E. coli, against your sample. If sylph outputs an estimate of 97% ANI, your sample contains an E. coli with 97% ANI to the queried genome.
 
-**Metagenomic profiling**: Like Kraken or MetaPhlAn, sylph can determine what species are in your sample and their abundances, as well as their _containment ANI in your metagenome_.
+**Metagenomic profiling**: sylph can determine the species/taxa in your sample and their abundances, just like [Kraken](https://ccb.jhu.edu/software/kraken/) or [MetaPhlAn](https://github.com/biobakery/MetaPhlAn).
 
 <p align="center"><img src="assets/sylph.gif?raw=true"/></p>
 <p align="center">
@@ -20,7 +20,7 @@
 
 1. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken and about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
 
-2. **Ultrafast, multithreaded, multi-sample**: sylph can be > 50x faster than MetaPhlAn for multi-sample processing. sylph only takes 13GB of RAM for profiling against the entire GTDB-R214 database (85k genomes).
+2. **Ultrafast, multithreaded, multi-sample**: sylph can be > 50x faster than MetaPhlAn for multi-sample processing. sylph only takes ~15GB of RAM for profiling against the entire GTDB-R220 database (110k genomes).
 
 3. **Accurate (containment) ANIs down to 0.1x effective coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
 
@@ -32,20 +32,20 @@ sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's nove
 
 ## Very quick start
 
-#### Profile metagenome sample against [GTDB-R214](https://gtdb.ecogenomic.org/) (85,205 bacterial/archaeal genomes) 
+#### Profile metagenome sample against [GTDB-R220](https://gtdb.ecogenomic.org/) (113,104 bacterial/archaeal species representative genomes) 
 
 ```sh
 # see below for install options
 conda install -c bioconda sylph
 
-# download GTDB-R214 pre-built database (~10 GB)
-wget https://storage.googleapis.com/sylph-stuff/v0.3-c200-gtdb-r214.syldb
+# download GTDB-R220 pre-built database (~13 GB)
+wget https://storage.googleapis.com/sylph-stuff/gtdb-r220-c200-dbv1.syldb
 
 # multi-sample paired-end profiling (sylph version >= 0.6)
-sylph profile v0.3-200-gtdb-r214.syldb -1 *_1.fastq.gz -2 *_2.fastq.gz -t (threads) > profiling.tsv
+sylph profile gtdb-r220-c200-dbv1.syldb -1 *_1.fastq.gz -2 *_2.fastq.gz -t (threads) > profiling.tsv
 
 # multi-sample single-end profiling
-sylph profile v0.3-200-gtdb-r214.syldb *.fastq -t (threads) > profiling.tsv
+sylph profile gtdb-r220-c200-dbv1.syldb *.fastq -t (threads) > profiling.tsv
 ```
 
 See below for more comprehensive usage information/tutorials/manuals. 
@@ -130,17 +130,17 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 
 ### Tutorials
 1. #### [Introduction: 5-minute sylph tutorial outlining basic usage](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
-2. #### [Taxonomic profiling against GTDB-R214 database with MetaPhlAn output format](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
+2. #### [Taxonomic profiling against GTDB database with MetaPhlAn output format](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
 
 ### Manuals
-1. #### [Sylph's TSV output and containment ANI explanation](https://github.com/bluenote-1577/sylph/wiki/Output-format)
+1. #### [Output format (TSV) and containment ANI explanation](https://github.com/bluenote-1577/sylph/wiki/Output-format)
 2. #### [Incoporating custom taxonomies to get CAMI-like or MetaPhlAn-like outputs](https://github.com/bluenote-1577/sylph/wiki/Integrating-taxonomic-information-with-sylph)
 
 ### [sylph-utils](https://github.com/bluenote-1577/sylph-utils) 
 
 For incorporating taxonomy and manipulating output formats, see the [sylph-utils repository](https://github.com/bluenote-1577/sylph-utils).
 
-### Changelog
+## Changelog
 
 #### Version v0.6.0 - 2024-04-06. New input/output options.
 
