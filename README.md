@@ -45,8 +45,6 @@ sylph profile gtdb-r220-c200-dbv1.syldb -1 *_1.fastq.gz -2 *_2.fastq.gz -t (thre
 sylph profile gtdb-r220-c200-dbv1.syldb *.fastq -t (threads) > profiling.tsv
 ```
 
-See below for install and more comprehensive usage information/tutorials/manuals. 
-
 ##  Install (current version v0.6.1)
 
 #### Option 1: conda install 
@@ -57,7 +55,8 @@ See below for install and more comprehensive usage information/tutorials/manuals
 conda install -c bioconda sylph
 ```
 
-**WARNING**: conda may break if you don't have AVX2 instructions or for v0.6.0. See the [issue here](https://github.com/bluenote-1577/sylph/issues/2). The binary and source install still work. 
+> [!WARNING]
+> conda install may break if AVX2 instructions are not available on your CPU. See the [issue here](https://github.com/bluenote-1577/sylph/issues/2). The binary and source install still work. 
 
 #### Option 2: Build from source
 
