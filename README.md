@@ -146,5 +146,5 @@ See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.m
 
 ## Citing sylph
 
-Jim Shaw and Yun William Yu. Metagenome profiling and containment estimation through abundance-corrected k-mer sketching with sylph (2023). bioRxiv.
+Jim Shaw and Yun William Yu. Metagenome profiling and containment estimation through abundance-corrected k-mer sketching with sylph (2023). bioRxiv. (Accepted for publication)
 
