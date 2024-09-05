@@ -18,7 +18,7 @@
 
 ### Why sylph?
 
-1. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken and about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
+1. **Precise species-level profiling**: Our tests show that sylph has less false positives than Kraken and is about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
 
 2. **Ultrafast, multithreaded, multi-sample**: sylph can be > 50x faster than other methods for multi-sample processing. sylph only takes ~15GB of RAM for profiling against the entire GTDB-R220 database (110k genomes).
 
