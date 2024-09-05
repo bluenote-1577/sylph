@@ -20,7 +20,7 @@
 
 1. **Precise species-level profiling**: Our tests show that sylph is more precise than Kraken and about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
 
-2. **Ultrafast, multithreaded, multi-sample**: sylph can be > 50x faster than MetaPhlAn for multi-sample processing. sylph only takes ~15GB of RAM for profiling against the entire GTDB-R220 database (110k genomes).
+2. **Ultrafast, multithreaded, multi-sample**: sylph can be > 50x faster than other methods for multi-sample processing. sylph only takes ~15GB of RAM for profiling against the entire GTDB-R220 database (110k genomes).
 
 3. **Accurate (containment) ANIs down to 0.1x effective coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
 
@@ -28,7 +28,7 @@
 
 ### How does sylph work?
 
-sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** within the sample, giving accurate results for low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
+sylph uses a k-mer containment method. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** , giving accurate results for low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
 
 ## Very quick start
 
@@ -36,7 +36,7 @@ sylph uses a k-mer containment method, similar to sourmash or Mash. sylph's nove
 
 ```sh
 # download GTDB-R220 pre-built database (~13 GB)
-wget https://storage.googleapis.com/sylph-stuff/gtdb-r220-c200-dbv1.syldb
+wget http://faust.compbio.cs.cmu.edu/sylph-stuff/gtdb-r220-c200-dbv1.syldb
 
 # multi-sample paired-end profiling (sylph version >= 0.6)
 sylph profile gtdb-r220-c200-dbv1.syldb -1 *_1.fastq.gz -2 *_2.fastq.gz -t (threads) > profiling.tsv
