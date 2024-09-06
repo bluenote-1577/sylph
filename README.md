@@ -24,7 +24,7 @@
 
 3. **Accurate (containment) ANIs down to 0.1x effective coverage**: for bacterial ANI queries of > 90% ANI, sylph can often give accurate ANI estimates down to 0.1x coverage.
 
-4. **Easily customized databases**: sylph can profile against [metagenome-assembled genomes (MAGs), viruses, eukaryotes](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases), and more. Taxonomic information can be incorporated downstream for traditional profiling reports. 
+4. **Customizable, versatile**: sylph can profile against [metagenome-assembled genomes (MAGs), viruses, eukaryotes](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases), and custom databases. **Long reads work too.** Taxonomic information can be incorporated downstream for traditional profiling reports. 
 
 ### How does sylph work?
 
