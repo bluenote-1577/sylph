@@ -90,32 +90,6 @@ chmod +x sylph
 
 Note: the binary is compiled with a different set of libraries (musl instead of glibc), probably impacting performance. 
 
-## Standard usage
-
-#### Sketching reads/genomes (indexing)
-
-```sh
-# all fasta -> one *.syldb; fasta are assumed to be genomes
-sylph sketch genome1.fa genome2.fa -o database
-#EQUIVALENT: sylph sketch -g genome1.fa genome2.fa -o database
-
-# multi-sample sketching of paired reads
-sylph sketch -1 A_1.fq B_1.fq -2 A_2.fq B_2.fq -d read_sketch_folder
-
-# multi-sample sketching for single end reads, fastq are assumed to be reads
-sylph sketch reads.fq 
-#EQUIVALENT: sylph sketch -r reads.fq
-```
-
-#### Profiling or querying with sketch files
-```sh
-# ANI querying 
-sylph query database.syldb read_sketch_folder/*.sylsp -t (threads) > ani_queries.tsv
-
-# taxonomic profiling 
-sylph profile database.syldb read_sketch_folder/*.sylsp -t (threads) > profiling.tsv
-```
-
 ## Tutorials, manuals, and pre-built databases
 
 ### [Pre-built databases](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases)
