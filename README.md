@@ -35,6 +35,8 @@ sylph uses a k-mer containment method. sylph's novelty lies in **using a statist
 #### Profile metagenome sample against [GTDB-R220](https://gtdb.ecogenomic.org/) (113,104 bacterial/archaeal species representative genomes) 
 
 ```sh
+conda install -c bioconda sylph
+
 # download GTDB-R220 pre-built database (~13 GB)
 wget http://faust.compbio.cs.cmu.edu/sylph-stuff/gtdb-r220-c200-dbv1.syldb
 
