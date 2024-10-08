@@ -104,7 +104,7 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 
 ### Tutorials
 1. #### [Introduction: 5-minute sylph tutorial outlining basic usage](https://github.com/bluenote-1577/sylph/wiki/5%E2%80%90minute-sylph-tutorial)
-2. #### [Taxonomic profiling against GTDB database with MetaPhlAn output format](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
+2. #### [Taxonomic profiling against GTDB database with MetaPhlAn-like output format](https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB%E2%80%90R214-database)
 
 ### Manuals
 1. #### [Output format (TSV) and containment ANI explanation](https://github.com/bluenote-1577/sylph/wiki/Output-format)
@@ -112,7 +112,7 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 
 ### [sylph-utils](https://github.com/bluenote-1577/sylph-utils) 
 
-For incorporating taxonomy and manipulating output formats, see the [sylph-utils repository](https://github.com/bluenote-1577/sylph-utils).
+For incorporating *taxonomy* and manipulating output formats, see the [sylph-utils repository](https://github.com/bluenote-1577/sylph-utils).
 
 ## Changelog
 
