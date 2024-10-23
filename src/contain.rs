@@ -559,10 +559,9 @@ fn get_seq_sketch(
             &read_sketch_file
         ));
         let read_reader = BufReader::with_capacity(10_000_000, file);
-        let read_sketch_enc: SequencesSketchEncode = bincode::deserialize_from(read_reader).expect(
+        let read_sketch: SequencesSketch = bincode::deserialize_from(read_reader).expect(
             &format!("The sketch `{}` is not a valid sketch. Perhaps it is an older incompatible version ", read_sketch_file),
         );
-        let read_sketch = SequencesSketch::from_enc(read_sketch_enc);
         if read_sketch.c > genome_c {
             error!("{} value of -c is {}; this is greater than the smallest value of -c = {} for a genome sketch. Exiting.", read_file, read_sketch.c, genome_c);
             return None;
