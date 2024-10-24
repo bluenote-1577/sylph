@@ -32,7 +32,7 @@ use std::collections::HashMap;
 use std::hash::{BuildHasherDefault, Hasher};
 use std::collections::HashSet;
 use smallvec::SmallVec;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer, Deserializer, de::Visitor};
 use fxhash::FxHashMap;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
@@ -98,8 +98,53 @@ pub type MMBuildHasher = BuildHasherDefault<MMHasher>;
 pub type MMHashMap<K, V> = HashMap<K, V, MMBuildHasher>;
 pub type MMHashSet<K> = HashSet<K, MMBuildHasher>;
 
+/// `serde` helpers to improve serialization of the `FxHashMap` storing k-mer counts.
+/// 
+/// Encoding the `FxHashMap` as a sequence instead of a map speeds up serialize
+/// and deserialize by a magnitude.
+mod kmer_counts {
+    use super::*;
+
+    struct FxHashMapVisitor;
+    
+    impl<'a> Visitor<'a> for FxHashMapVisitor {
+        type Value = FxHashMap<Kmer, u32>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a sequence of kmer counts")
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'a>
+        {
+            let mut counts = match seq.size_hint() {
+                Some(size) => FxHashMap::with_capacity_and_hasher(size, Default::default()),
+                None => FxHashMap::default(),
+            };
+            while let Some(item) = seq.next_element::<(Kmer, u32)>()? {
+                counts.insert(item.0, item.1);
+            }
+            Ok(counts)
+        }
+    }
+
+    pub fn serialize<S>(
+        kmer_counts: &FxHashMap<Kmer, u32>, 
+        serializer: S
+    ) -> Result<S::Ok, S::Error> 
+    where S: Serializer {
+        serializer.collect_seq(kmer_counts.into_iter())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<FxHashMap<Kmer, u32>, D::Error> where D: Deserializer<'de> {
+        deserializer.deserialize_seq(FxHashMapVisitor)
+    }
+}
+
 #[derive(Default, Deserialize, Serialize, Debug, PartialEq)]
 pub struct SequencesSketch{
+    #[serde(with = "kmer_counts")]
     pub kmer_counts: FxHashMap<Kmer, u32>,
     pub c: usize,
     pub k: usize,
@@ -109,40 +154,9 @@ pub struct SequencesSketch{
     pub mean_read_length: f64,
 }
 
-//Encoding kmer_counts as vec speeds up serialize/deserialize by
-//a magnitude. 
-#[derive(Default, Deserialize, Serialize, Debug, PartialEq)]
-pub struct SequencesSketchEncode{
-    pub kmer_counts: Vec<(Kmer, u32)>,
-    pub c: usize,
-    pub k: usize,
-    pub file_name: String,
-    pub sample_name: Option<String>,
-    pub paired: bool,
-    pub mean_read_length: f64,
-}
-
-impl SequencesSketchEncode{
-    pub fn new(sketch: SequencesSketch) -> SequencesSketchEncode{
-        let mut vec_map = Vec::with_capacity(sketch.kmer_counts.len());
-        for (key,val) in sketch.kmer_counts.into_iter(){
-            vec_map.push((key,val));
-        }
-        return SequencesSketchEncode{kmer_counts: vec_map, file_name: sketch.file_name, c: sketch.c, k: sketch.k, paired: sketch.paired, mean_read_length: sketch.mean_read_length, sample_name: sketch.sample_name };
-    }
-}
-
 impl SequencesSketch{
     pub fn new(file_name: String, c: usize, k: usize, paired: bool, sample_name: Option<String>, mean_read_length: f64) -> SequencesSketch{
         return SequencesSketch{kmer_counts : HashMap::default(), file_name, c, k, paired, sample_name, mean_read_length}
-    }
-    pub fn from_enc(sketch: SequencesSketchEncode) -> SequencesSketch{
-        let mut new_map = FxHashMap::default();
-        new_map.reserve(sketch.kmer_counts.len());
-        for item in sketch.kmer_counts.into_iter(){
-            new_map.insert(item.0, item.1);
-        }
-        return SequencesSketch{kmer_counts: new_map, file_name: sketch.file_name, c: sketch.c, k: sketch.k, paired: sketch.paired, mean_read_length: sketch.mean_read_length, sample_name: sketch.sample_name};
     }
 }
 

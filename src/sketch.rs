@@ -357,8 +357,7 @@ pub fn sketch(args: SketchArgs) {
                         .expect(&format!("{} path not valid; exiting ", file_path_str)),
                 );
 
-                let enc = SequencesSketchEncode::new(read_sketch);
-                bincode::serialize_into(&mut read_sk_file, &enc).unwrap();
+                bincode::serialize_into(&mut read_sk_file, &read_sketch).unwrap();
                 info!("Sketching {} complete.", file_path_str);
             }
         });
@@ -409,8 +408,7 @@ pub fn sketch(args: SketchArgs) {
                     .expect(&format!("{} path not valid; exiting.", file_path_str)),
             );
 
-            let enc = SequencesSketchEncode::new(read_sketch);
-            bincode::serialize_into(&mut read_sk_file, &enc).unwrap();
+            bincode::serialize_into(&mut read_sk_file, &read_sketch).unwrap();
             info!("Sketching {} complete.", file_path_str);
         }
     });
