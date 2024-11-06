@@ -24,6 +24,7 @@ regex = "1"
 fastrand = "2"
 memory-stats = "1"
 scalable_cuckoo_filter = "0.2"
+serde_yaml = "0.9"
 
 [target.'cfg(target_env = "musl")'.dependencies]
 tikv-jemallocator = "0"

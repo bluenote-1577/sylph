@@ -11,11 +11,17 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Mode {
     /// Sketch sequences into samples (reads) and databases (genomes). Each sample.fq -> sample.sylsp. All *.fa -> *.syldb. 
+    #[clap(display_order = 1)]
     Sketch(SketchArgs),
     /// Coverage-adjusted ANI querying between databases and samples.
+    #[clap(display_order = 3)]
     Query(ContainArgs),
     ///Species-level taxonomic profiling with abundances and ANIs. 
+    #[clap(display_order = 2)]
     Profile(ContainArgs),
+    ///Inspect sketched .syldb and .sylsp files.
+    #[clap(arg_required_else_help = true, display_order = 4)]
+    Inspect(InspectArgs),
 }
 
 
@@ -152,8 +158,14 @@ pub struct ContainArgs {
     #[clap(long="mean-coverage", help_heading = "ALGORITHM", help = "Use the robust mean coverage estimator instead of median estimator", hidden=true )]
     pub mean_coverage: bool,
 
+}
 
-    
-
+#[derive(Args)]
+pub struct InspectArgs {
+    #[clap(multiple=true, help = "Pre-sketched *.syldb/*.sylsp files.")]
+    pub files: Vec<String>,
+    #[clap(short='o',long="output-file", help = "Output to this file (YAML format). [default: stdout]")]
+    pub out_file_name: Option<String>,
 
 }
+    

@@ -499,3 +499,52 @@ fn test_raw_inputs_profile_with_sketch(){
 
     assert!(stdout_1 == stdout_2);
 }
+
+#[serial]
+#[test]
+fn test_inspect(){
+   let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("test_files/e.coli-EC590.fasta.gz")
+        .arg("test_files/e.coli-K12.fasta.gz")
+        .arg("test_files/o157_reads.fastq.gz")
+        .arg("-o")
+        .arg("tests/results/test_sketch_dir/db")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .assert();
+    assert.success().code(0);
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let assert = cmd
+        .arg("sketch")
+        .arg("-1")
+        .arg("test_files/k12_R1.fq")
+        .arg("-2")
+        .arg("test_files/k12_R2.fq")
+        .arg("-d")
+        .arg("./tests/results/test_sketch_dir")
+        .assert();
+    assert.success().code(0);
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let output = cmd
+        .arg("inspect")
+        .arg("./tests/results/test_sketch_dir/k12_R1.fq.paired.sylsp")
+        .output()
+        .expect("Output failed");
+
+    let stdout = str::from_utf8(&output.stdout).expect("Output was not valid UTF-8");
+    assert!(stdout.contains("k12_R1.fq"));
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let output = cmd
+        .arg("inspect")
+        .arg("./tests/results/test_sketch_dir/db.syldb")
+        .output()
+        .expect("Output failed");
+    let stdout = str::from_utf8(&output.stdout).expect("Output was not valid UTF-8");
+    assert!(stdout.contains("e.coli-EC590.fasta.gz"));
+    assert!(stdout.contains("e.coli-K12.fasta.gz"));
+
+}
