@@ -49,7 +49,7 @@ sylph profile gtdb-r220-c200-dbv1.syldb -1 *_1.fastq.gz -2 *_2.fastq.gz -t (thre
 sylph profile gtdb-r220-c200-dbv1.syldb *.fastq -t (threads) > profiling.tsv
 ```
 
-##  Install (current version v0.6.1)
+##  Install 
 
 #### Option 1: conda install 
 [![Anaconda-Server Badge](https://anaconda.org/bioconda/sylph/badges/version.svg)](https://anaconda.org/bioconda/sylph)
@@ -78,7 +78,7 @@ cd sylph
 
 # If default rust install directory is ~/.cargo
 cargo install --path . --root ~/.cargo
-sylph query test_files/*
+sylph profile test_files/*
 ```
 #### Option 3: Pre-built x86-64 linux statically compiled executable
 
@@ -116,9 +116,9 @@ For incorporating *taxonomy* and manipulating output formats, see the [sylph-uti
 
 ## Changelog
 
-#### Version v0.6.1 - 2024-04-29. 
+#### Version v0.7.0 - 2024-11-06. 
 
-* Made unknown estimation (-u) more robust for low-depth short-read sequencing. 
+* Added the `inspect` option to inspect `.syldb/.sylsp` files. 
 
 See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
