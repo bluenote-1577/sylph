@@ -2,6 +2,7 @@ use clap::Parser;
 use sylph::cmdline::*;
 use sylph::sketch;
 use sylph::contain;
+use sylph::inspect;
 //use std::panic::set_hook;
 
 //Use this allocator when statically compiling
@@ -25,5 +26,6 @@ fn main() {
         Mode::Sketch(sketch_args) => sketch::sketch(sketch_args),
         Mode::Query(contain_args) => contain::contain(contain_args, false),
         Mode::Profile(contain_args) => contain::contain(contain_args, true),
+        Mode::Inspect(inspect_args) => inspect::inspect(inspect_args),
     }
 }
