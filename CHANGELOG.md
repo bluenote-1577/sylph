@@ -1,3 +1,13 @@
+## sylph v0.7.1 (main branch + upcoming): 2024-11-XX
+
+* `inspect` uses much less memory thanks to Martin Larralde
+
+## sylph v0.7.0: `inspect` option - 2024-11-06
+
+### Major
+* Added `inspect` option for inspecting `.syldb/sylsp`.
+* Removed native compile flag. 
+
 ## sylph v0.6.1: improved automatic detection of sequencing error for -u option
 
 ### Major
