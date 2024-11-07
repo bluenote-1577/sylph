@@ -28,8 +28,8 @@ struct SequencesSketchInspect{
     pub paired: bool,
 }
 
-impl SequencesSketchInspect{
-    pub fn new(
+impl From<SequencesSketch> for SequencesSketchInspect{
+    fn from(
         sk: SequencesSketch
     ) -> Self {
         SequencesSketchInspect{
@@ -53,8 +53,8 @@ pub struct GenomeSketchInspect{
     pub genome_size: usize,
 }
 
-impl GenomeSketchInspect{
-    pub fn new(
+impl From<GenomeSketch> for GenomeSketchInspect {
+    fn from(
         sk: GenomeSketch
     ) -> Self {
         GenomeSketchInspect{
@@ -73,6 +73,44 @@ pub struct DatabaseSketch{
     pub k: usize,
     pub min_spacing_parameter: usize,
     pub genome_files: Vec<GenomeSketchInspect>,
+}
+
+#[derive(Debug, Default)]
+struct DatabaseVisitor {
+    c: Option<usize>,
+    k: Option<usize>,
+    min_spacing: Option<usize>,
+    sketches: Vec<GenomeSketchInspect>,
+}
+
+impl<'de> serde::de::Visitor<'de> for DatabaseVisitor {
+    type Value = Self;
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("sequence of struct GenomeSketch")
+    }
+
+    fn visit_seq<S>(mut self, mut seq: S) -> Result<Self, S::Error>
+        where
+            S: serde::de::SeqAccess<'de>,
+        {
+            while let Some(value) = seq.next_element::<GenomeSketch>()? {
+                self.c.get_or_insert(value.c);
+                self.k.get_or_insert(value.k);
+                self.min_spacing.get_or_insert(value.min_spacing);
+                self.sketches.push(value.into());
+            }
+
+            Ok(self)
+        }
+}
+
+impl<'de> Deserialize<'de> for DatabaseVisitor {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: serde::de::Deserializer<'de>
+    {
+        let inspector = DatabaseVisitor::default();
+        deserializer.deserialize_seq(inspector)
+    }
 }
 
 
@@ -149,12 +187,13 @@ fn get_db_sketch_inspect(
 
     let file = File::open(genome_sketch_file).expect(&format!("The sketch `{}` could not be opened. Exiting", genome_sketch_file));
     let genome_reader = BufReader::with_capacity(10_000_000, file);
-    let genome_sketches_vec: Vec<GenomeSketch> = bincode::deserialize_from(genome_reader)
+
+    let visitor: DatabaseVisitor = bincode::deserialize_from(genome_reader)
         .expect(&format!(
             "The database sketch `{}` is not a valid sketch. Perhaps it is an older, incompatible version ",
             &genome_sketch_file
         ));
-    if genome_sketches_vec.is_empty(){
+    if visitor.sketches.is_empty() {
         warn!(
             "The database sketch `{}` is empty. Skipping...",
             &genome_sketch_file
@@ -164,25 +203,16 @@ fn get_db_sketch_inspect(
 
     info!(
         "Database file {} processed with {} genomes",
-        genome_sketch_file, genome_sketches_vec.len()
+        genome_sketch_file, visitor.sketches.len()
     );
 
-    let c = genome_sketches_vec.first().unwrap().c;
-    let k = genome_sketches_vec.first().unwrap().k;
-    let min_spacing = Some(genome_sketches_vec.first().unwrap().min_spacing);
-
-    let inspect_sketch_vec = genome_sketches_vec.into_iter().map(|sk| GenomeSketchInspect::new(sk)).collect();
-
-    
-    let database_inspect = DatabaseSketch{
+    DatabaseSketch{
         database_file: genome_sketch_file.clone(),
-        c,
-        k,
-        min_spacing_parameter: min_spacing.unwrap(),
-        genome_files: inspect_sketch_vec,
-    };
-
-    return database_inspect;
+        c: visitor.c.unwrap(),
+        k: visitor.k.unwrap(),
+        min_spacing_parameter: visitor.min_spacing.unwrap(),
+        genome_files: visitor.sketches,
+    }
 }
 
 fn get_seq_sketch_inspect(
@@ -199,5 +229,5 @@ fn get_seq_sketch_inspect(
         "Sequence file {} processed",
         read_file,
     );
-    return SequencesSketchInspect::new(seq_sketch);
+    seq_sketch.into()
 }
