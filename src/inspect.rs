@@ -201,6 +201,11 @@ fn get_db_sketch_inspect(
         return DatabaseSketch::default();
     }
 
+    info!(
+        "Database file {} processed with {} genomes",
+        genome_sketch_file, visitor.sketches.len()
+    );
+
     DatabaseSketch{
         database_file: genome_sketch_file.clone(),
         c: visitor.c.unwrap(),
