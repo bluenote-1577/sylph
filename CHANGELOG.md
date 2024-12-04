@@ -1,6 +1,9 @@
-## sylph v0.7.1 (main branch + upcoming): 2024-11-XX
+## sylph v0.8.0: default output behaviour change + more efficient `inspect`.
 
-* `inspect` uses much less memory thanks to Martin Larralde
+### Major
+* `inspect` option takes much less memory (thanks to Martin Larralde/@althonos for this)
+* BREAKING: Changed default behaviour of sylph to write a TSV header even when no genomes are detected (thanks to Florian Plaza Onate for this suggestion)
+
 
 ## sylph v0.7.0: `inspect` option - 2024-11-06
 

@@ -253,12 +253,12 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
 
     let read_sketch_files_as_vec = read_sketch_files.clone().into_iter().map(|x| vec![x]).collect::<Vec<Vec<&String>>>();
     read_files.extend(read_sketch_files_as_vec);
-    let first_write = Mutex::new(true);
     let sequence_index_vec = (0..read_files.len()).collect::<Vec<usize>>();
     let out_writer:Mutex<Box<dyn Write + Send>> = Mutex::new(out_writer);
 
     let chunks = get_chunks(&sequence_index_vec, step);
 
+    print_header(args.pseudotax,&mut *out_writer.lock().unwrap(), args.estimate_unknown);
     chunks.into_iter().for_each(|chunk| {
         chunk.into_par_iter().for_each(|j|{
             let is_sketch = j >= read_files.len() - read_sketch_files.len();
@@ -328,14 +328,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                 else{
                     stats_vec_seq.sort_by(|x,y| y.final_est_ani.partial_cmp(&x.final_est_ani).unwrap());
                 }
-
-                if *first_write.lock().unwrap(){
-                    if !stats_vec_seq.is_empty(){
-                        *first_write.lock().unwrap() = false;
-                        print_header(args.pseudotax,&mut *out_writer.lock().unwrap(), args.estimate_unknown);
-                    }
-
-                }
+                
                 let mut out_writer = out_writer.lock().unwrap();
                 for res in stats_vec_seq{
                     print_ani_result(&res, args.pseudotax, &mut *out_writer);
