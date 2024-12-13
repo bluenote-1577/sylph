@@ -18,19 +18,19 @@
 
 ### Why sylph?
 
-1. **Precise species-level profiling**: Our tests show that sylph has less false positives than Kraken and is about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
+1. **Precise species-level profiling**: sylph has less false positives than Kraken and is about as precise and sensitive as marker gene methods (MetaPhlAn, mOTUs). 
 
-2. **Ultrafast, multithreaded, multi-sample**: sylph can be > 50x faster than other methods for multi-sample processing. sylph only takes ~15GB of RAM for profiling against the entire GTDB-R220 database (110k genomes).
+2. **Ultrafast, multithreaded, multi-sample**: sylph can be > 50x faster than other methods. Sylph only takes ~15GB of RAM for profiling against the entire GTDB-R220 database (110k genomes).
 
-3. **Accurate (containment) ANI information**: Sylph can often give accurate **ANI estimates** between reference genomes and your metagenome sample down to 0.1x coverage.
+3. **Accurate (containment) ANI information**: sylph can give accurate **ANI estimates** between reference genomes and your metagenome sample down to 0.1x coverage.
 
-4. **Customizable databases and pre-built databases**: We offer pre-built databases of [prokaryotes, viruses, eukaryotes](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases). Custom databases (e.g. using your own MAGs) are easy to build.  Taxonomic information can be incorporated downstream for traditional profiling reports.
+4. **Customizable databases and pre-built databases**: We offer pre-built databases of [prokaryotes, viruses, eukaryotes](https://github.com/bluenote-1577/sylph/wiki/Pre%E2%80%90built-databases). Custom databases (e.g. using your own MAGs) are easy to build.  
 
-5. **Short or long reads**: Sylph was primarily benchmarked against short reads, but sylph was also the most accurate method [on Oxford Nanopore's independent benchmarks](https://nanoporetech.com/resource-centre/genomic-and-epigenomic-insights-into-microbial-biology-with-nanopore-metagenomic-and-isolate-sequencing).
+5. **Short or long reads**: Sylph was also the most accurate method [on Oxford Nanopore's independent benchmarks](https://nanoporetech.com/resource-centre/genomic-and-epigenomic-insights-into-microbial-biology-with-nanopore-metagenomic-and-isolate-sequencing).
 
 ### How does sylph work?
 
-sylph uses a k-mer containment method. sylph's novelty lies in **using a statistical technique to correct ANI for low coverage genomes** , giving accurate results for low abundance genomes. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
+sylph uses a k-mer containment method. sylph's novelty lies in **using a statistical technique to estimate k-mer containment for low coverage genomes** , giving accurate results for low abundance organisms. See [here for more information on what sylph can and can not do](https://github.com/bluenote-1577/sylph/wiki/Introduction:-what-is-sylph-and-how-does-it-work%3F). 
 
 ## Very quick start
 
