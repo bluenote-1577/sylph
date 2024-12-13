@@ -110,15 +110,18 @@ For common use cases and fast explanations, see the above [cookbook](https://git
 1. #### [Output format (TSV) and containment ANI explanation](https://github.com/bluenote-1577/sylph/wiki/Output-format)
 2. #### [Incoporating custom taxonomies to get CAMI-like or MetaPhlAn-like outputs](https://github.com/bluenote-1577/sylph/wiki/Integrating-taxonomic-information-with-sylph)
 
-### [sylph-utils](https://github.com/bluenote-1577/sylph-utils) 
+### [sylph-tax](https://github.com/bluenote-1577/sylph-tax) 
 
-For incorporating *taxonomy* and manipulating output formats, see the [sylph-utils repository](https://github.com/bluenote-1577/sylph-utils).
+To incorporate *taxonomy* into sylph's outputs, see the [sylph-tax repository](https://github.com/bluenote-1577/sylph-tax). 
+
+> [!TIP] 
+> The new [sylph-tax](https://github.com/bluenote-1577/sylph-tax) program replaces the old [sylph-utils](https://github.com/bluenote-1577/sylph-utils) repository. 
 
 ## Changelog
 
-#### Version v0.7.0 - 2024-11-06. 
+#### Version v0.8.0 - 2024-12-12. 
 
-* Added the `inspect` option to inspect `.syldb/.sylsp` files. 
+* Made the `inspect` option much less memory intensive. Slightly changed outputs when no genomes are found.
 
 See the [CHANGELOG](https://github.com/bluenote-1577/sylph/blob/main/CHANGELOG.md) for complete details.
 
