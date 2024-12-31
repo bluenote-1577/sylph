@@ -1,5 +1,8 @@
 # sylph - fast and precise species-level metagenomic profiling with ANIs 
 
+> [!NOTE]
+> Documentation for sylph is migrating to https://sylph-docs.github.io/. The latest, more comprehensive docs will be stored at https://sylph-docs.github.io/. 
+
 ## Introduction
 
 **sylph** is a program that performs ultrafast (1) **ANI querying** or (2) **metagenomic profiling** for metagenomic shotgun samples. 
