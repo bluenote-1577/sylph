@@ -208,6 +208,10 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
         read_files.push(vec![first,second]);
     }
 
+    for read in args.reads.iter() {
+        read_files.push(vec![read]);
+    }
+
     if genome_sketch_files.is_empty() && genome_files.is_empty(){
         log::error!("No genome files found; see sylph query/profile -h for help. Exiting");
         std::process::exit(1);
