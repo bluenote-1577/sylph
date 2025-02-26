@@ -1,3 +1,8 @@
+## sylph v0.8.1: release date TODO
+
+### Minor
+- Allowing `-r` option for `profile` for single-ended reads (thanks again to Florian Plaza Onate for this) 
+
 ## sylph v0.8.0: default output behaviour change + more efficient `inspect`.
 
 ### Major
