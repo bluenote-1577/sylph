@@ -119,10 +119,13 @@ pub struct ContainArgs {
     #[clap(short='R', long="redundancy-threshold", help_heading = "ALGORITHM", help = "Removes redundant genomes up to a rough ANI percentile when profiling", default_value_t = 99.0, hidden=true)]
     pub redundant_ani: f64,
 
-    #[clap(short='1', long="first-pairs", multiple=true, help = "First pairs for raw paired-end reads (fastx/gzip)",help_heading = "SKETCHING")]
+    #[clap(short='r',long="reads", multiple=true, help = "Single-end raw reads (fastx/gzip)", display_order = 1, help_heading = "SKETCHING")]
+    pub reads: Vec<String>,
+
+    #[clap(short='1', long="first-pairs", multiple=true, help = "First pairs for raw paired-end reads (fastx/gzip)", help_heading = "SKETCHING")]
     pub first_pair: Vec<String>,
 
-    #[clap(short='2', long="second-pairs", multiple=true, help = "Second pairs for raw paired-end reads (fastx/gzip)",help_heading = "SKETCHING")]
+    #[clap(short='2', long="second-pairs", multiple=true, help = "Second pairs for raw paired-end reads (fastx/gzip)", help_heading = "SKETCHING")]
     pub second_pair: Vec<String>,
 
     #[clap(short, default_value_t = 200, help_heading = "SKETCHING", help = "Subsampling rate. Does nothing for pre-sketched files")]
