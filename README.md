@@ -1,6 +1,6 @@
 # sylph - fast and precise species-level metagenomic profiling with ANIs 
 
-> [!NOTE]
+> [!IMPORTANT]
 > All documentation for sylph is migrating to https://sylph-docs.github.io/.
 >
 > The GitHub versions of the README/Wikis/Manuals will be frozen and removed in the near future. 
