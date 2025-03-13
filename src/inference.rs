@@ -196,9 +196,9 @@ fn newton_raphson(rat: f64, mean: f64) -> f64 {
     //    dbg!(1. - mean,rat);
     for _ in 0..1000 {
         let t1 = (1. - rat) * curr;
-        let t2 = mean * (1. - f64::powf(2.78281828, -curr));
+        let t2 = mean * (1. - f64::exp(-curr));
         let t3 = 1. - rat;
-        let t4 = mean * (f64::powf(2.78281828, -curr));
+        let t4 = mean * (f64::exp(-curr));
         curr = curr - (t1 - t2) / (t3 - t4);
     }
     return curr;

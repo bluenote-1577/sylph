@@ -1,4 +1,10 @@
+
+
 ## sylph v0.8.1: release date TODO
+
+### Major
+
+- There was a bug in the defn of the "e" constant; fixed now (thanks to Benjamin Lieser). Results may change by about ~2%. 
 
 ### Minor
 - Allowing `-r` option for `profile` for single-ended reads (thanks again to Florian Plaza Onate for this) 

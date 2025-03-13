@@ -830,7 +830,7 @@ fn ani_from_lambda(lambda: Option<f64>, _mean: f64, k: f64, full_cov: &[u32]) ->
 
     let lambda = lambda.unwrap();
     let adj_index =
-        contain_count as f64 / (1. - f64::powf(2.78281828, -lambda)) / full_cov.len() as f64;
+        contain_count as f64 / (1. - f64::exp(-lambda)) / full_cov.len() as f64;
     let ret_ani;
     //let ani = f64::powf(1. - pi, 1./k);
     let ani = f64::powf(adj_index, 1. / k);
