@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > All documentation for sylph is migrating to https://sylph-docs.github.io/.
 >
-> The GitHub versions of the README/Wikis/Manuals will be frozen and removed in the near future. 
+> The GitHub versions of the README/Wikis/Manuals are now OUTDATED. 
 
 ## Introduction
 
