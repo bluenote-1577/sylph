@@ -1,5 +1,5 @@
-use std::arch::x86_64::*;
 use crate::types::*;
+use std::arch::x86_64::*;
 
 #[inline]
 #[target_feature(enable = "avx2")]
@@ -26,7 +26,7 @@ pub unsafe fn mm_hash256(kmer: __m256i) -> __m256i {
     let s6 = _mm256_slli_epi64(key, 31);
     key = _mm256_add_epi64(key, s6);
 
-    return key;
+    key
 }
 
 #[target_feature(enable = "avx2")]
@@ -39,7 +39,7 @@ pub unsafe fn extract_markers_avx2(string: &[u8], kmer_vec: &mut Vec<u64>, c: us
     let string2 = &string[len..2 * len + k - 1];
     let string3 = &string[2 * len..3 * len + k - 1];
     let string4 = &string[3 * len..4 * len + k - 1];
-    if string.len() < k+1{
+    if string.len() < k + 1 {
         return;
     }
 
@@ -78,7 +78,7 @@ pub unsafe fn extract_markers_avx2(string: &[u8], kmer_vec: &mut Vec<u64>, c: us
     }
 
     let marker_mask = (Kmer::MAX >> (std::mem::size_of::<Kmer>() * 8 - 2 * k)) as i64;
-    let rev_marker_mask: i64 = !(0 | (3 << 2 * k - 2));
+    let rev_marker_mask: i64 = !(3 << (2 * k - 2));
     //    let rev_marker_mask = i64::from_le_bytes(rev_marker_mask.to_le_bytes());
     //    dbg!(u64::MAX / (c as u64));
     //    dbg!((u64::MAX / (c as u64)) as i64);
@@ -148,7 +148,13 @@ pub unsafe fn extract_markers_avx2(string: &[u8], kmer_vec: &mut Vec<u64>, c: us
 }
 
 #[target_feature(enable = "avx2")]
-pub unsafe fn extract_markers_avx2_positions(string: &[u8], kmer_vec: &mut Vec<(usize, usize,u64)>, c: usize, k: usize, contig_number: usize) {
+pub unsafe fn extract_markers_avx2_positions(
+    string: &[u8],
+    kmer_vec: &mut Vec<(usize, usize, u64)>,
+    c: usize,
+    k: usize,
+    contig_number: usize,
+) {
     if string.len() < k {
         return;
     }
@@ -196,7 +202,7 @@ pub unsafe fn extract_markers_avx2_positions(string: &[u8], kmer_vec: &mut Vec<(
     }
 
     let marker_mask = (Kmer::MAX >> (std::mem::size_of::<Kmer>() * 8 - 2 * k)) as i64;
-    let rev_marker_mask: i64 = !(0 | (3 << 2 * k - 2));
+    let rev_marker_mask: i64 = !(3 << (2 * k - 2));
     //    let rev_marker_mask = i64::from_le_bytes(rev_marker_mask.to_le_bytes());
     //    dbg!(u64::MAX / (c as u64));
     //    dbg!((u64::MAX / (c as u64)) as i64);
@@ -257,10 +263,10 @@ pub unsafe fn extract_markers_avx2_positions(string: &[u8], kmer_vec: &mut Vec<(
             kmer_vec.push((contig_number, len + i, v2 as u64));
         }
         if v3 < threshold_marker {
-            kmer_vec.push((contig_number, 2*len + i, v3 as u64));
+            kmer_vec.push((contig_number, 2 * len + i, v3 as u64));
         }
         if v4 < threshold_marker {
-            kmer_vec.push((contig_number, 3*len + i, v4 as u64));
+            kmer_vec.push((contig_number, 3 * len + i, v4 as u64));
         }
     }
 }

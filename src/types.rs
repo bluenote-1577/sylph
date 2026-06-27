@@ -25,26 +25,24 @@
 //SOFTWARE.
 //******************************
 
-
 use std::collections::HashMap;
 
 // bytecheck can be used to validate your data if you want
-use std::hash::{BuildHasherDefault, Hasher};
-use std::collections::HashSet;
-use smallvec::SmallVec;
-use serde::{Deserialize, Serialize, Serializer, Deserializer, de::Visitor};
 use fxhash::FxHashMap;
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
+use smallvec::SmallVec;
+use std::collections::HashSet;
+use std::hash::{BuildHasherDefault, Hasher};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[derive(Default)]
 pub enum AdjustStatus {
     Lambda(f64),
+    #[default]
     Low,
     High,
 }
 
-impl Default for AdjustStatus {
-    fn default() -> Self {AdjustStatus::Low }
-}
 
 pub type Kmer = u64;
 pub const BYTE_TO_SEQ: [u8; 256] = [
@@ -60,7 +58,7 @@ pub const BYTE_TO_SEQ: [u8; 256] = [
 
 #[inline]
 pub fn mm_hash(bytes: &[u8]) -> usize {
-    let mut key = usize::from_ne_bytes(bytes.try_into().unwrap()) as usize;
+    let mut key = usize::from_ne_bytes(bytes.try_into().unwrap());
     key = (!key).wrapping_add(key << 21); // key = (key << 21) - key - 1;
     key = key ^ key >> 24;
     key = (key.wrapping_add(key << 3)).wrapping_add(key << 8); // key * 265
@@ -68,7 +66,7 @@ pub fn mm_hash(bytes: &[u8]) -> usize {
     key = (key.wrapping_add(key << 2)).wrapping_add(key << 4); // key * 21
     key = key ^ key >> 28;
     key = key.wrapping_add(key << 31);
-    return key;
+    key
 }
 
 pub struct MMHasher {
@@ -99,14 +97,14 @@ pub type MMHashMap<K, V> = HashMap<K, V, MMBuildHasher>;
 pub type MMHashSet<K> = HashSet<K, MMBuildHasher>;
 
 /// `serde` helpers to improve serialization of the `FxHashMap` storing k-mer counts.
-/// 
+///
 /// Encoding the `FxHashMap` as a sequence instead of a map speeds up serialize
 /// and deserialize by a magnitude.
 mod kmer_counts {
     use super::*;
 
     struct FxHashMapVisitor;
-    
+
     impl<'a> Visitor<'a> for FxHashMapVisitor {
         type Value = FxHashMap<Kmer, u32>;
 
@@ -115,8 +113,8 @@ mod kmer_counts {
         }
 
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'a>
+        where
+            A: serde::de::SeqAccess<'a>,
         {
             let mut counts = match seq.size_hint() {
                 Some(size) => FxHashMap::with_capacity_and_hasher(size, Default::default()),
@@ -130,20 +128,25 @@ mod kmer_counts {
     }
 
     pub fn serialize<S>(
-        kmer_counts: &FxHashMap<Kmer, u32>, 
-        serializer: S
-    ) -> Result<S::Ok, S::Error> 
-    where S: Serializer {
-        serializer.collect_seq(kmer_counts.into_iter())
+        kmer_counts: &FxHashMap<Kmer, u32>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_seq(kmer_counts)
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<FxHashMap<Kmer, u32>, D::Error> where D: Deserializer<'de> {
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<FxHashMap<Kmer, u32>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
         deserializer.deserialize_seq(FxHashMapVisitor)
     }
 }
 
 #[derive(Default, Deserialize, Serialize, Debug, PartialEq)]
-pub struct SequencesSketch{
+pub struct SequencesSketch {
     #[serde(with = "kmer_counts")]
     pub kmer_counts: FxHashMap<Kmer, u32>,
     pub c: usize,
@@ -154,14 +157,29 @@ pub struct SequencesSketch{
     pub mean_read_length: f64,
 }
 
-impl SequencesSketch{
-    pub fn new(file_name: String, c: usize, k: usize, paired: bool, sample_name: Option<String>, mean_read_length: f64) -> SequencesSketch{
-        return SequencesSketch{kmer_counts : HashMap::default(), file_name, c, k, paired, sample_name, mean_read_length}
+impl SequencesSketch {
+    pub fn new(
+        file_name: String,
+        c: usize,
+        k: usize,
+        paired: bool,
+        sample_name: Option<String>,
+        mean_read_length: f64,
+    ) -> SequencesSketch {
+        SequencesSketch {
+            kmer_counts: HashMap::default(),
+            file_name,
+            c,
+            k,
+            paired,
+            sample_name,
+            mean_read_length,
+        }
     }
 }
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Hash, PartialOrd, Eq, Ord, Default, Clone)]
-pub struct GenomeSketch{
+pub struct GenomeSketch {
     pub genome_kmers: Vec<Kmer>,
     pub pseudotax_tracked_nonused_kmers: Option<Vec<Kmer>>,
     pub file_name: String,
@@ -172,10 +190,9 @@ pub struct GenomeSketch{
     pub min_spacing: usize,
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
-#[derive(Default, Clone)]
-pub struct MultGenomeSketch{
-    pub genome_kmer_index: Vec<(Kmer,SmallVec<[u32;1]>)>,
+#[derive(Deserialize, Serialize, Debug, PartialEq, Default, Clone)]
+pub struct MultGenomeSketch {
+    pub genome_kmer_index: Vec<(Kmer, SmallVec<[u32; 1]>)>,
     pub file_names: Vec<String>,
     pub contig_names: Vec<String>,
     pub c: usize,
@@ -183,7 +200,7 @@ pub struct MultGenomeSketch{
 }
 
 #[derive(Debug, PartialEq)]
-pub struct AniResult<'a>{
+pub struct AniResult<'a> {
     pub naive_ani: f64,
     pub final_est_ani: f64,
     pub final_est_cov: f64,
@@ -192,13 +209,12 @@ pub struct AniResult<'a>{
     pub contig_name: &'a str,
     pub mean_cov: f64,
     pub median_cov: f64,
-    pub containment_index: (usize,usize),
+    pub containment_index: (usize, usize),
     pub lambda: AdjustStatus,
-    pub ani_ci: (Option<f64>,Option<f64>),
-    pub lambda_ci: (Option<f64>,Option<f64>),
+    pub ani_ci: (Option<f64>, Option<f64>),
+    pub lambda_ci: (Option<f64>, Option<f64>),
     pub genome_sketch: &'a GenomeSketch,
     pub rel_abund: Option<f64>,
     pub seq_abund: Option<f64>,
     pub kmers_lost: Option<usize>,
-
 }

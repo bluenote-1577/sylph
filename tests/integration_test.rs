@@ -1,11 +1,11 @@
 use assert_cmd::prelude::*; // Add methods on commands
-use std::str;
+use serial_test::serial;
 use std::fs;
 use std::path::Path;
-use serial_test::serial;
-use std::process::Command; // Run programs
+use std::process::Command;
+use std::str; // Run programs
 
-fn fresh(){
+fn fresh() {
     Command::new("rm")
         .arg("-r")
         .args(["./tests/results/test_sketch_dir"])
@@ -15,7 +15,7 @@ fn fresh(){
 #[serial]
 #[test]
 fn test_sketch_commands() {
-   let mut cmd = Command::cargo_bin("sylph").unwrap();
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
         .arg("test_files/e.coli-EC590.fasta.gz")
@@ -44,7 +44,6 @@ fn test_sketch_commands() {
         .assert();
     assert.success().code(0);
 
-
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("profile")
@@ -64,7 +63,7 @@ fn test_sketch_commands() {
         .assert();
     assert.success().code(0);
 
-    let mut cmd= Command::cargo_bin("sylph").unwrap();
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
         .arg("-1")
@@ -75,10 +74,13 @@ fn test_sketch_commands() {
         .arg("./tests/results/test_sketch_dir")
         .assert();
     assert.success().code(0);
-    assert!(Path::new("./tests/results/test_sketch_dir/t1.fq.paired.sylsp").exists(), "Output file was not created");
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/t1.fq.paired.sylsp").exists(),
+        "Output file was not created"
+    );
     fresh();
 
-    let mut cmd= Command::cargo_bin("sylph").unwrap();
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
         .arg("--l1")
@@ -89,10 +91,13 @@ fn test_sketch_commands() {
         .arg("./tests/results/test_sketch_dir")
         .assert();
     assert.success().code(0);
-    assert!(Path::new("./tests/results/test_sketch_dir/t1.fq.paired.sylsp").exists(), "Output file was not created");
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/t1.fq.paired.sylsp").exists(),
+        "Output file was not created"
+    );
 
     fresh();
-    let mut cmd= Command::cargo_bin("sylph").unwrap();
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
         .arg("-g")
@@ -105,13 +110,19 @@ fn test_sketch_commands() {
         .arg("./tests/results/test_sketch_dir/testdb")
         .assert();
     assert.success().code(0);
-    assert!(Path::new("./tests/results/test_sketch_dir/t2.fq.sylsp").exists(), "Output file was not created");
-    assert!(Path::new("./tests/results/test_sketch_dir/testdb.syldb").exists(), "Output file was not created");
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/t2.fq.sylsp").exists(),
+        "Output file was not created"
+    );
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/testdb.syldb").exists(),
+        "Output file was not created"
+    );
 }
 
 #[serial]
 #[test]
-fn test_profile_vs_query(){
+fn test_profile_vs_query() {
     fresh();
 
     let mut output = Command::cargo_bin("sylph").unwrap();
@@ -136,13 +147,13 @@ fn test_profile_vs_query(){
         .expect("Output failed");
     let stdout = str::from_utf8(&output.stdout).expect("Output was not valid UTF-8");
     dbg!(stdout.matches('\n').count());
-    println!("{}",stdout);
+    println!("{}", stdout);
     assert!(stdout.matches('\n').count() == 4);
 }
 
 #[serial]
 #[test]
-fn test_sketch_list(){
+fn test_sketch_list() {
     fresh();
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
@@ -156,9 +167,18 @@ fn test_sketch_list(){
         .arg("./tests/results/test_sketch_dir")
         .assert();
     assert.success().code(0);
-    assert!(Path::new("./tests/results/test_sketch_dir/e.coli-EC590.fasta.gz.sylsp").exists(), "Output file was not created");
-    assert!(Path::new("./tests/results/test_sketch_dir/o157_reads.fastq.gz.sylsp").exists(), "Output file was not created");
-    assert!(!Path::new("./tests/results/test_sketch_dir/db.syldb").exists(), "Output file was created");
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/e.coli-EC590.fasta.gz.sylsp").exists(),
+        "Output file was not created"
+    );
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/o157_reads.fastq.gz.sylsp").exists(),
+        "Output file was not created"
+    );
+    assert!(
+        !Path::new("./tests/results/test_sketch_dir/db.syldb").exists(),
+        "Output file was created"
+    );
     fresh();
 
     let mut cmd = Command::cargo_bin("sylph").unwrap();
@@ -173,9 +193,18 @@ fn test_sketch_list(){
         .arg("./tests/results/test_sketch_dir")
         .assert();
     assert.success().code(0);
-    assert!(!Path::new("./tests/results/test_sketch_dir/e.coli-EC590.fasta.gz.sylsp").exists(), "Output file was created");
-    assert!(!Path::new("./tests/results/test_sketch_dir/o157_reads.fastq.gz.sylsp").exists(), "Output file was created");
-    assert!(Path::new("./tests/results/test_sketch_dir/db.syldb").exists(), "Output file was not created");
+    assert!(
+        !Path::new("./tests/results/test_sketch_dir/e.coli-EC590.fasta.gz.sylsp").exists(),
+        "Output file was created"
+    );
+    assert!(
+        !Path::new("./tests/results/test_sketch_dir/o157_reads.fastq.gz.sylsp").exists(),
+        "Output file was created"
+    );
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/db.syldb").exists(),
+        "Output file was not created"
+    );
     fresh();
 
     let mut cmd = Command::cargo_bin("sylph").unwrap();
@@ -187,7 +216,10 @@ fn test_sketch_list(){
         .arg("./tests/results/test_sketch_dir/db")
         .assert();
     assert.success().code(0);
-    assert!(Path::new("./tests/results/test_sketch_dir/db.syldb").exists(), "Output file was not created");
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/db.syldb").exists(),
+        "Output file was not created"
+    );
     fresh();
 
     let mut cmd = Command::cargo_bin("sylph").unwrap();
@@ -201,15 +233,23 @@ fn test_sketch_list(){
         .arg("./tests/results/test_sketch_dir")
         .assert();
     assert.success().code(0);
-    assert!(!Path::new("./tests/results/test_sketch_dir/db.syldb").exists(), "Output file was not created");
-    assert!(Path::new("./tests/results/test_sketch_dir/e.coli-EC590.fasta.gz.sylsp").exists(), "Output file was not created");
-    assert!(Path::new("./tests/results/test_sketch_dir/o157_reads.fastq.gz.sylsp").exists(), "Output file was not created");
+    assert!(
+        !Path::new("./tests/results/test_sketch_dir/db.syldb").exists(),
+        "Output file was not created"
+    );
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/e.coli-EC590.fasta.gz.sylsp").exists(),
+        "Output file was not created"
+    );
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/o157_reads.fastq.gz.sylsp").exists(),
+        "Output file was not created"
+    );
     fresh();
-
 }
 #[serial]
 #[test]
-fn test_profile_disabling(){
+fn test_profile_disabling() {
     fresh();
 
     let mut cmd = Command::cargo_bin("sylph").unwrap();
@@ -245,7 +285,7 @@ fn test_profile_disabling(){
 }
 #[serial]
 #[test]
-fn test_sketch_fasta_fastq_concord(){
+fn test_sketch_fasta_fastq_concord() {
     fresh();
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
@@ -295,7 +335,7 @@ fn test_sketch_fasta_fastq_concord(){
 }
 #[serial]
 #[test]
-fn test_sample_names(){
+fn test_sample_names() {
     fresh();
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
@@ -310,7 +350,10 @@ fn test_sample_names(){
         .arg("./test_files/single_sample.txt")
         .assert();
     assert.success().code(0);
-    assert!(Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST.paired.sylsp").exists(), "Output file was not created");
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST.paired.sylsp").exists(),
+        "Output file was not created"
+    );
     fresh();
 
     let mut cmd = Command::cargo_bin("sylph").unwrap();
@@ -324,15 +367,22 @@ fn test_sample_names(){
         .arg("./test_files/sample_list.txt")
         .assert();
     assert.success().code(0);
-    assert!(Path::new("./tests/results/test_sketch_dir/S1.sylsp").exists(), "Output file was not created");
-    assert!(Path::new("./tests/results/test_sketch_dir/S2.sylsp").exists(), "Output file was not created");
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/S1.sylsp").exists(),
+        "Output file was not created"
+    );
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/S2.sylsp").exists(),
+        "Output file was not created"
+    );
 
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let output = cmd
         .arg("profile")
         .arg("./tests/results/test_sketch_dir/S2.sylsp")
         .arg("./test_files/e.coli-EC590.fasta.gz")
-        .output().unwrap();
+        .output()
+        .unwrap();
     let stdout = str::from_utf8(&output.stdout).expect("Output was not valid UTF-8");
     dbg!(&stdout);
     assert!(stdout.contains("S2"));
@@ -351,7 +401,10 @@ fn test_sample_names(){
         .arg("SAMPLE_TEST_S")
         .assert();
     assert.success().code(0);
-    assert!(Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST_S.paired.sylsp").exists(), "Output file was not created, -S");
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST_S.paired.sylsp").exists(),
+        "Output file was not created, -S"
+    );
 
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
@@ -369,13 +422,16 @@ fn test_sample_names(){
         .arg("SAMPLE_TEST_S1")
         .assert();
     assert.success().code(0);
-    assert!(Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST_S1.paired.sylsp").exists(), "Output file was not created, -S");
+    assert!(
+        Path::new("./tests/results/test_sketch_dir/SAMPLE_TEST_S1.paired.sylsp").exists(),
+        "Output file was not created, -S"
+    );
 
     fresh();
 }
 #[serial]
 #[test]
-fn test_fpr(){
+fn test_fpr() {
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
@@ -418,11 +474,10 @@ fn test_fpr(){
         .assert();
     assert.failure().code(1);
     fresh();
-
 }
 #[serial]
 #[test]
-fn test_raw_inputs_profile_simple(){
+fn test_raw_inputs_profile_simple() {
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("profile")
@@ -458,12 +513,11 @@ fn test_raw_inputs_profile_simple(){
         .assert();
     assert.success().code(0);
     fresh();
-    
 }
 
 #[serial]
 #[test]
-fn test_estimate_read_counts(){
+fn test_estimate_read_counts() {
     let mut cmd = Command::cargo_bin("sylph").unwrap();
     let output = cmd
         .arg("profile")
@@ -480,7 +534,7 @@ fn test_estimate_read_counts(){
     dbg!(stdout_1);
     lines.next();
     let output = lines.next().unwrap();
-    let split : Vec<&str> = output.split('\t').collect();
+    let split: Vec<&str> = output.split('\t').collect();
     assert!(split[3].parse::<f64>().unwrap() > 1000.0);
 
     fresh();
@@ -500,17 +554,15 @@ fn test_estimate_read_counts(){
     dbg!(stdout_1);
     lines.next();
     let output = lines.next().unwrap();
-    let split : Vec<&str> = output.split('\t').collect();
+    let split: Vec<&str> = output.split('\t').collect();
     assert!(split[3].parse::<f64>().unwrap() < 101.00);
 
     fresh();
-
 }
 
 #[serial]
 #[test]
-fn test_raw_inputs_profile_with_sketch(){
-    
+fn test_raw_inputs_profile_with_sketch() {
     let mut output = Command::cargo_bin("sylph").unwrap();
     let output = output
         .arg("profile")
@@ -549,8 +601,8 @@ fn test_raw_inputs_profile_with_sketch(){
 
 #[serial]
 #[test]
-fn test_inspect(){
-   let mut cmd = Command::cargo_bin("sylph").unwrap();
+fn test_inspect() {
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
     let assert = cmd
         .arg("sketch")
         .arg("test_files/e.coli-EC590.fasta.gz")
@@ -593,5 +645,4 @@ fn test_inspect(){
     let stdout = str::from_utf8(&output.stdout).expect("Output was not valid UTF-8");
     assert!(stdout.contains("e.coli-EC590.fasta.gz"));
     assert!(stdout.contains("e.coli-K12.fasta.gz"));
-
 }

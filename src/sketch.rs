@@ -26,7 +26,7 @@ type Marker = u32;
 
 pub fn check_vram_and_block(max_ram: usize, file: &str) {
     if let Some(usage) = memory_stats() {
-        let mut gb_usage_curr = usage.virtual_mem as f64 / 1_000_000_000 as f64;
+        let mut gb_usage_curr = usage.virtual_mem as f64 / 1_000_000_000_f64;
         if (max_ram as f64) < gb_usage_curr {
             log::debug!(
                 "Max memory reached. Blocking sketch for {}. Curr memory {}, max mem {}",
@@ -39,7 +39,7 @@ pub fn check_vram_and_block(max_ram: usize, file: &str) {
             let five_second = Duration::from_secs(1);
             thread::sleep(five_second);
             if let Some(usage) = memory_stats() {
-                gb_usage_curr = usage.virtual_mem as f64 / 1_000_000_000 as f64;
+                gb_usage_curr = usage.virtual_mem as f64 / 1_000_000_000_f64;
                 if (max_ram as f64) >= gb_usage_curr {
                     log::debug!("Sketching for {} freed", file);
                 }
@@ -93,31 +93,19 @@ pub fn extract_markers_positions(
 }
 
 pub fn is_fastq(file: &str) -> bool {
-    if file.ends_with(".fq")
+    file.ends_with(".fq")
         || file.ends_with(".fnq")
         || file.ends_with(".fastq")
         || file.ends_with(".fq.gz")
-        || file.ends_with(".fnq.gz")
-        || file.ends_with(".fastq.gz")
-    {
-        return true;
-    } else {
-        return false;
-    }
+        || file.ends_with(".fnq.gz") || file.ends_with(".fastq.gz")
 }
 
 pub fn is_fasta(file: &str) -> bool {
-    if file.ends_with(".fa")
+    file.ends_with(".fa")
         || file.ends_with(".fna")
         || file.ends_with(".fasta")
         || file.ends_with(".fa.gz")
-        || file.ends_with(".fna.gz")
-        || file.ends_with(".fasta.gz")
-    {
-        return true;
-    } else {
-        return false;
-    }
+        || file.ends_with(".fna.gz") || file.ends_with(".fasta.gz")
 }
 
 fn check_args_valid(args: &SketchArgs) {
@@ -259,7 +247,7 @@ fn parse_line_file(file_name: &str, vec: &mut Vec<String>) {
 
 fn parse_sample_names(args: &SketchArgs) -> Option<Vec<String>> {
     if args.list_sample_names.is_none() && args.sample_names.is_none() {
-        return None;
+        None
     } else {
         let mut sample_names = vec![];
         if let Some(file) = &args.list_sample_names {
@@ -269,7 +257,7 @@ fn parse_sample_names(args: &SketchArgs) -> Option<Vec<String>> {
         if let Some(vec) = &args.sample_names {
             sample_names.extend(vec.clone());
         }
-        return Some(sample_names);
+        Some(sample_names)
     }
 }
 
@@ -344,7 +332,7 @@ pub fn sketch(args: SketchArgs) {
                 }
 
                 let read_file_path = Path::new(&sketch_name).file_name().unwrap();
-                let file_path = pref.join(&read_file_path);
+                let file_path = pref.join(read_file_path);
 
                 let file_path_str = format!(
                     "{}.paired{}",
@@ -354,7 +342,7 @@ pub fn sketch(args: SketchArgs) {
 
                 let mut read_sk_file = BufWriter::new(
                     File::create(&file_path_str)
-                        .expect(&format!("{} path not valid; exiting ", file_path_str)),
+                        .unwrap_or_else(|_| panic!("{} path not valid; exiting ", file_path_str)),
                 );
 
                 bincode::serialize_into(&mut read_sk_file, &read_sketch).unwrap();
@@ -381,8 +369,8 @@ pub fn sketch(args: SketchArgs) {
             sample_name = Some(name[i + first_pairs.len()].clone());
         }
 
-        let read_sketch_opt;
-        read_sketch_opt = sketch_sequences_needle(
+        
+        let read_sketch_opt = sketch_sequences_needle(
             read_file,
             args.c,
             args.k,
@@ -399,13 +387,13 @@ pub fn sketch(args: SketchArgs) {
                 sketch_name = &read_sketch.file_name;
             }
             let read_file_path = Path::new(&sketch_name).file_name().unwrap();
-            let file_path = pref.join(&read_file_path);
+            let file_path = pref.join(read_file_path);
 
             let file_path_str = format!("{}{}", file_path.to_str().unwrap(), SAMPLE_FILE_SUFFIX);
 
             let mut read_sk_file = BufWriter::new(
                 File::create(&file_path_str)
-                    .expect(&format!("{} path not valid; exiting.", file_path_str)),
+                    .unwrap_or_else(|_| panic!("{} path not valid; exiting.", file_path_str)),
             );
 
             bincode::serialize_into(&mut read_sk_file, &read_sketch).unwrap();
@@ -456,7 +444,7 @@ pub fn sketch(args: SketchArgs) {
             }
             let mut c = counter.lock().unwrap();
             *c += 1;
-            if *c % 100 == 0 && *c != 0 {
+            if (*c).is_multiple_of(100) && *c != 0 {
                 info!("{} genomes processed.", *c);
             }
         });
@@ -468,7 +456,7 @@ pub fn sketch(args: SketchArgs) {
             );
         } else {
             let mut genome_sk_file = BufWriter::new(
-                File::create(&file_path_str).expect(&format!("{} not valid ", file_path_str)),
+                File::create(&file_path_str).unwrap_or_else(|_| panic!("{} not valid ", file_path_str)),
             );
             info!("Wrote all genome sketches to {}", file_path_str);
             bincode::serialize_into(&mut genome_sk_file, &all_genome_sketches).unwrap();
@@ -485,10 +473,10 @@ pub fn sketch_genome_individual(
     min_spacing: usize,
     pseudotax: bool,
 ) -> Vec<GenomeSketch> {
-    let reader = parse_fastx_file(&ref_file);
-    if !reader.is_ok() {
+    let reader = parse_fastx_file(ref_file);
+    if reader.is_err() {
         warn!("{} is not a valid fasta/fastq file; skipping.", ref_file);
-        return vec![];
+        vec![]
     } else {
         let mut reader = reader.unwrap();
         let mut return_vec = vec![];
@@ -500,7 +488,7 @@ pub fn sketch_genome_individual(
             if record.is_ok() {
                 let mut pseudotax_track_kmers = vec![];
                 let mut kmer_vec = vec![];
-                let record = record.expect(&format!("Invalid record for file {} ", ref_file));
+                let record = record.unwrap_or_else(|_| panic!("Invalid record for file {} ", ref_file));
                 let contig_name = String::from_utf8_lossy(record.id()).to_string();
                 let contig_name_notab = contig_name.replace('\t', " ");
                 return_genome_sketch.first_contig_name = contig_name_notab.to_owned();
@@ -544,7 +532,7 @@ pub fn sketch_genome_individual(
                 return vec![];
             }
         }
-        return return_vec;
+        return_vec
     }
 }
 
@@ -555,12 +543,12 @@ pub fn sketch_genome(
     min_spacing: usize,
     pseudotax: bool,
 ) -> Option<GenomeSketch> {
-    let reader = parse_fastx_file(&ref_file);
+    let reader = parse_fastx_file(ref_file);
     let mut vec = vec![];
     let mut pseudotax_track_kmers = vec![];
-    if !reader.is_ok() {
+    if reader.is_err() {
         warn!("{} is not a valid fasta/fastq file; skipping.", ref_file);
-        return None;
+        None
     } else {
         let mut reader = reader.unwrap();
         let mut first = true;
@@ -571,7 +559,7 @@ pub fn sketch_genome(
         let mut contig_number = 0;
         while let Some(record) = reader.next() {
             if record.is_ok() {
-                let record = record.expect(&format!("Invalid record for file {} ", ref_file));
+                let record = record.unwrap_or_else(|_| panic!("Invalid record for file {} ", ref_file));
                 if first {
                     let contig_name = String::from_utf8_lossy(record.id()).to_string();
                     let contig_name_notab = contig_name.replace('\t', " ");
@@ -619,7 +607,7 @@ pub fn sketch_genome(
         if pseudotax {
             return_genome_sketch.pseudotax_tracked_nonused_kmers = Some(pseudotax_track_kmers);
         }
-        return Some(return_genome_sketch);
+        Some(return_genome_sketch)
     }
 }
 
@@ -627,7 +615,7 @@ pub fn sketch_genome(
 fn pair_kmer_single(s1: &[u8]) -> Option<([Marker; 2], [Marker; 2])> {
     let k = std::mem::size_of::<Marker>() * 4;
     if s1.len() < 4 * k + 2 {
-        return None;
+        None
     } else {
         let mut kmer_f = 0;
         let mut kmer_g = 0;
@@ -653,7 +641,7 @@ fn pair_kmer_single(s1: &[u8]) -> Option<([Marker; 2], [Marker; 2])> {
             kmer_t <<= 2;
             kmer_t |= nuc_4;
         }
-        return Some(([kmer_f, kmer_r], [kmer_g, kmer_t]));
+        Some(([kmer_f, kmer_r], [kmer_g, kmer_t]))
     }
 }
 
@@ -661,7 +649,7 @@ fn pair_kmer_single(s1: &[u8]) -> Option<([Marker; 2], [Marker; 2])> {
 fn pair_kmer(s1: &[u8], s2: &[u8]) -> Option<([Marker; 2], [Marker; 2])> {
     let k = std::mem::size_of::<Marker>() * 4;
     if s1.len() < 2 * k + 1 || s2.len() < 2 * k + 1 {
-        return None;
+        None
     } else {
         let mut kmer_f = 0;
         let mut kmer_g = 0;
@@ -685,7 +673,7 @@ fn pair_kmer(s1: &[u8], s2: &[u8]) -> Option<([Marker; 2], [Marker; 2])> {
             kmer_t <<= 2;
             kmer_t |= nuc_4;
         }
-        return Some(([kmer_f, kmer_r], [kmer_g, kmer_t]));
+        Some(([kmer_f, kmer_r], [kmer_g, kmer_t]))
     }
 }
 
@@ -779,8 +767,8 @@ pub fn sketch_pair_sequences(
     no_dedup: bool,
     dedup_fpr: f64,
 ) -> Option<SequencesSketch> {
-    let r1o = parse_fastx_file(&read_file1);
-    let r2o = parse_fastx_file(&read_file2);
+    let r1o = parse_fastx_file(read_file1);
+    let r2o = parse_fastx_file(read_file2);
     let mut read_sketch = SequencesSketch::new(read_file1.to_string(), c, k, true, sample_name, 0.);
     if r1o.is_err() || r2o.is_err() {
         log::error!("Paired end reading failed for '{}' and '{}'. Make sure the files are present or the sequences are valid.", read_file1, read_file2);
@@ -885,7 +873,9 @@ pub fn sketch_pair_sequences(
             break;
         }
     }
-    let percent = (num_dup_removed as f64)/((read_sketch.kmer_counts.values().sum::<u32>() as f64) + num_dup_removed as f64) * 100.;
+    let percent = (num_dup_removed as f64)
+        / ((read_sketch.kmer_counts.values().sum::<u32>() as f64) + num_dup_removed as f64)
+        * 100.;
     log::debug!(
         "Number of sketched k-mers removed due to read duplication for {}: {}. Percentage: {:.2}%",
         read_sketch.file_name,
@@ -893,7 +883,7 @@ pub fn sketch_pair_sequences(
         percent,
     );
     read_sketch.mean_read_length = mean_read_length;
-    return Some(read_sketch);
+    Some(read_sketch)
 }
 
 pub fn sketch_sequences_needle(
@@ -905,21 +895,21 @@ pub fn sketch_sequences_needle(
 ) -> Option<SequencesSketch> {
     let mut kmer_map = HashMap::default();
     let ref_file = &read_file;
-    let reader = parse_fastx_file(&ref_file);
+    let reader = parse_fastx_file(ref_file);
     let mut mean_read_length = 0.;
     let mut counter = 0.;
     let mut kmer_to_pair_table = FxHashSet::default();
     let mut num_dup_removed = 0;
 
-    if !reader.is_ok() {
+    if reader.is_err() {
         warn!("{} is not a valid fasta/fastq file; skipping.", ref_file);
-        return None
+        return None;
     } else {
         let mut reader = reader.unwrap();
         while let Some(record) = reader.next() {
             if record.is_ok() {
                 let mut vec = vec![];
-                let record = record.expect(&format!("Invalid record for file {} ", ref_file));
+                let record = record.unwrap_or_else(|_| panic!("Invalid record for file {} ", ref_file));
                 let seq = record.seq();
                 let kmer_pair;
                 if seq.len() > 400 {
@@ -949,13 +939,13 @@ pub fn sketch_sequences_needle(
         }
     }
 
-    return Some(SequencesSketch {
+    Some(SequencesSketch {
         kmer_counts: kmer_map,
         file_name: read_file.to_string(),
         c,
         k,
         paired: false,
-        sample_name: sample_name,
+        sample_name,
         mean_read_length,
-    });
+    })
 }

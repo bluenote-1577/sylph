@@ -24,7 +24,7 @@ pub fn rev_hash_64(hashed_key: u64) -> u64 {
 
     // Invert h_key = h_key ^ h_key >> 28;
     tmp = key ^ key >> 28;
-    key = key ^ tmp >> 28;
+    key ^= tmp >> 28;
 
     // Invert h_key = h_key.wrapping_add(h_key << 2).wrapping_add(h_key << 4)
     key = key.wrapping_mul(14933078535860113213u64);
@@ -33,14 +33,14 @@ pub fn rev_hash_64(hashed_key: u64) -> u64 {
     tmp = key ^ key >> 14;
     tmp = key ^ tmp >> 14;
     tmp = key ^ tmp >> 14;
-    key = key ^ tmp >> 14;
+    key ^= tmp >> 14;
 
     // Invert h_key = h_key.wrapping_add(h_key << 3).wrapping_add(h_key << 8)
     key = key.wrapping_mul(15244667743933553977u64);
 
     // Invert h_key = h_key ^ h_key >> 24
     tmp = key ^ key >> 24;
-    key = key ^ tmp >> 24;
+    key ^= tmp >> 24;
 
     // Invert h_key = (!h_key).wrapping_add(h_key << 21)
     tmp = !key;
@@ -53,13 +53,13 @@ pub fn rev_hash_64(hashed_key: u64) -> u64 {
 
 pub fn decode(byte: u64) -> u8 {
     if byte == 0 {
-        return b'A';
+        b'A'
     } else if byte == 1 {
-        return b'C';
+        b'C'
     } else if byte == 2 {
-        return b'G';
+        b'G'
     } else if byte == 3 {
-        return b'T';
+        b'T'
     } else {
         panic!("decoding failed")
     }
@@ -68,7 +68,7 @@ pub fn print_string(kmer: u64, k: usize) {
     let mut bytes = vec![];
     let mask = 3;
     for i in 0..k {
-        let val = kmer >> 2 * i;
+        let val = kmer >> (2 * i);
         let val = val & mask;
         bytes.push(decode(val));
     }
@@ -83,12 +83,7 @@ fn _position_min<T: Ord>(slice: &[T]) -> Option<usize> {
         .map(|(idx, _)| idx)
 }
 
-pub fn fmh_seeds(
-    string: &[u8],
-    kmer_vec: &mut Vec<u64>,
-    c: usize,
-    k: usize
-) {
+pub fn fmh_seeds(string: &[u8], kmer_vec: &mut Vec<u64>, c: usize, k: usize) {
     type MarkerBits = u64;
     if string.len() < k {
         return;
@@ -116,7 +111,7 @@ pub fn fmh_seeds(
         rolling_kmer_r_marker >>= 2;
         rolling_kmer_r_marker |= nuc_r << marker_reverse_shift_dist;
     }
-    for i in marker_k-1..len {
+    for i in marker_k - 1..len {
         let nuc_byte = string[i] as usize;
         let nuc_f = BYTE_TO_SEQ[nuc_byte] as u64;
         let nuc_r = 3 - nuc_f;
@@ -147,10 +142,10 @@ pub fn fmh_seeds(
 
 pub fn fmh_seeds_positions(
     string: &[u8],
-    kmer_vec: &mut Vec<(usize,usize,u64)>,
+    kmer_vec: &mut Vec<(usize, usize, u64)>,
     c: usize,
     k: usize,
-    contig_number: usize
+    contig_number: usize,
 ) {
     type MarkerBits = u64;
     if string.len() < k {
@@ -179,7 +174,7 @@ pub fn fmh_seeds_positions(
         rolling_kmer_r_marker >>= 2;
         rolling_kmer_r_marker |= nuc_r << marker_reverse_shift_dist;
     }
-    for i in marker_k-1..len {
+    for i in marker_k - 1..len {
         let nuc_byte = string[i] as usize;
         let nuc_f = BYTE_TO_SEQ[nuc_byte] as u64;
         let nuc_r = 3 - nuc_f;
