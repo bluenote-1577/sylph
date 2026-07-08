@@ -1,6 +1,12 @@
 use crate::cmdline::*;
+use rand::SeedableRng;
 use scalable_cuckoo_filter::ScalableCuckooFilter;
 use scalable_cuckoo_filter::ScalableCuckooFilterBuilder;
+
+/// Fixed seed for the dedup cuckoo filters' eviction RNG. The default builder seeds
+/// from entropy, which makes a handful of dedup decisions (and thus a few k-mer counts)
+/// vary run-to-run; a constant seed makes read sketches reproducible.
+const DEDUP_RNG_SEED: u64 = 0;
 
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
@@ -732,10 +738,10 @@ fn dup_removal_lsh_full_exact(
     *c += 1;
 }
 
-fn dup_removal_lsh_full(
+fn dup_removal_lsh_full<R: rand::Rng>(
     kmer_counts: &mut FxHashMap<Kmer, u32>,
     //kmer_to_pair_set: &mut FxHashSet<(u64,[Marker;2])>,
-    kmer_to_pair_set: &mut ScalableCuckooFilter<(u64, [Marker; 2]), FxHasher>,
+    kmer_to_pair_set: &mut ScalableCuckooFilter<(u64, [Marker; 2]), FxHasher, R>,
     //kmer_to_pair_set: &mut GrowableBloom,
     km: &u64,
     kmer_pair: Option<([Marker; 2], [Marker; 2])>,
@@ -803,6 +809,9 @@ pub fn sketch_pair_sequences(
         .initial_capacity(1_000_000_0)
         .false_positive_probability(fpr)
         .hasher(FxHasher::default())
+        // Fixed-seed RNG so the cuckoo filter's random eviction is deterministic,
+        // making paired/interleaved read sketches byte-reproducible run-to-run.
+        .rng(rand::rngs::StdRng::seed_from_u64(DEDUP_RNG_SEED))
         .finish();
 
     let mut mean_read_length: f64 = 0.;

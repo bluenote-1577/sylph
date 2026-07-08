@@ -19,11 +19,13 @@ clap = { version = "3", features = ["derive"] }
 flate2 = { version = "1.0.17", features = ["zlib-ng"], default-features = false }
 statrs="0.16"
 nalgebra="0"
-rand = "0"
+# Pinned to 0.9 to match scalable_cuckoo_filter 0.5's Rng trait, so the dedup
+# filters can be given a fixed-seed StdRng for reproducible sketching.
+rand = "0.9"
 regex = "1"
 fastrand = "2"
 memory-stats = "1"
-scalable_cuckoo_filter = "0.2"
+scalable_cuckoo_filter = "0.5"
 serde_yaml = "0.9"
 
 [target.'cfg(target_env = "musl")'.dependencies]
