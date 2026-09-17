@@ -1,3 +1,16 @@
+# Unreleased
+
+- `convert-db-two-screen --small-genome-screen` chooses how a `.syl2db` stores the mixture of stage-1 screen rates that `--min-sparse-kmers` creates for small (viral/plasmid/short-contig) genomes. All three modes screen the same per-genome k-mer set, so they detect the same genomes; they differ in what that costs.
+    - `loosen` (default, the previous behaviour): widen the single pooled screen index to the densest rate any genome needed. One 8 kb genome drags the whole database's effective screen rate toward the dense `-c`.
+    - `band`: keep the pooled index at exactly `--screen-c` and put the extra keys of small genomes in an appended value band. The band block is appended after the existing index, so an older sylph reads such a database as a plain nominal-rate one instead of failing.
+    - `none`: no floor at all, i.e. what a build without small-genome handling writes.
+- `profile`/`query --screen-small-genomes N` screens genomes with fewer than N stored stage-1 k-mers directly, reading their smallest N dense k-mers back when the database is opened. This recovers small-genome sensitivity on a `--small-genome-screen none` database (including one built by an older sylph) at a per-sample cost proportional to the number of such genomes.
+- `sylph inspect` reports a `.syl2db`'s `effective_screen_c` (the densest rate anything in it is screened at) alongside `screen_c`, plus the band-1 key/genome counts.
+- Per-genome conversion diagnostics are now aggregated into one counted warning with examples, instead of one line per genome: a viral database densifies millions of genomes, and the old output buried everything else.
+- Fixed: `profile --debug` without `-u/--estimate-unknown` aborted on the first sample (it unwrapped an estimated-identity value that only exists with `-u`).
+- The hidden debug flag `--screen-dump` now identifies each stage-1 survivor by genome id and contig name, not only by source file (a database built from multi-record FASTA has one file for millions of genomes), and writes its rows in genome order so two runs' dumps can be compared directly.
+- Benchmark harness for the above under `benchmarks/mixed_screen_c` (snakemake; MetaVR + GTDB, with a smoke test and a full-corpus configuration).
+
 # sylph v1.0.0: Major performance improvements with new optional database formats - 09-10-2026
 
 - Added a new database format (courtesy of Ben Woodcroft's [weebill](https://github.com/wwood/weebill) fork): `.syl2db`. This uses a two-stage profiling approach: first stage with really sparse k-mers, and second stage with dense k-mers (default `-c 200` as before). This improves speed and memory usage by several times for *prokaryotic genomes* at little to no sensitive cost. 

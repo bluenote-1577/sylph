@@ -42,3 +42,8 @@ pub const DEFAULT_SKETCH_BATCH_MAX_BYTES: usize = 4_000_000;
 /// Default minimum stage-1 sparse/screen k-mers per genome in a `.syl2db`
 /// (see `write_two_stage_db`'s adaptive floor).
 pub const SPARSE_TARGET_MIN_DEFAULT: usize = 50;
+/// Bits per key in the band-1 bloom pre-filter of a value-banded screen index
+/// (`--small-genome-screen band`). Two hash functions, so ~2% false-positive
+/// rate: enough that sample k-mers in band 1's value range almost never reach
+/// the (cache-missing) binary search.
+pub const BAND_BLOOM_BITS_PER_KEY: usize = 8;
