@@ -1,0 +1,235 @@
+Using profile aqua for setting default command line arguments.
+Support for alternative conda frontends has been deprecated in favor of simpler support and code base. This should not cause issues since current conda releases rely on fast solving via libmamba. Ignoring the alternative conda frontend setting (mamba).
+Config file config.yaml is extended by additional config specified via the command line.
+
+SNAKEMAKE
+=========
+  Date: 2026-09-17 08:08:52
+  Workflow ID: 3d16374b-3a96-427d-a29c-8c249c6170bf
+  Platform: Linux-5.14.0-570.136.1.el9_6.x86_64-x86_64-with-glibc2.36
+  Host: cpu1n001
+  User: woodcrob
+  Snakemake version: 9.27.0
+  Python version: 3.12.14 (main, Sep  2 2026, 23:27:36) [GCC 15.3.0]
+  Command: /mnt/weka/pkg/cmr/woodcrob/pixi/cache/envs/mixed_screen_c-14364593719743372650/envs/default/bin/snakemake --profile aqua --configfile config_full.yaml
+  Snakefile: /mnt/hpccs01/home/woodcrob/git/sylph/benchmarks/mixed_screen_c/Snakefile
+  Base directory: /mnt/hpccs01/home/woodcrob/git/sylph/benchmarks/mixed_screen_c
+  Run directory: /mnt/hpccs01/home/woodcrob/git/sylph/benchmarks/mixed_screen_c
+  Working directory: /mnt/hpccs01/home/woodcrob/git/sylph/benchmarks/mixed_screen_c
+  Config file(s): [PosixPath('/mnt/hpccs01/home/woodcrob/git/sylph/benchmarks/mixed_screen_c/config_full.yaml'), 'config.yaml']
+  Config MD5: e1b7d195e7024d64c4df5dcfa7aba618
+
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided remote nodes: 10000
+Job stats:
+job                    count
+-------------------  -------
+multisample_list           2
+profile_multisample        8
+collect_multisample        1
+report                     1
+all                        1
+total                     13
+
+Select jobs to execute...
+Execute 2 jobs...
+
+[Thu Sep 17 08:08:52 2026]
+localrule multisample_list:
+    input: /container_home/n/sylph_two_stage_inputs/human.paired.sylsp
+    output: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/human.n100.list.txt
+    log: logs_full/multisample_list_human_100.log
+    jobid: 86
+    reason: Missing output files: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/human.n100.list.txt
+    wildcards: sample=human, n=100
+    resources: tmpdir=/tmp
+[Thu Sep 17 08:08:53 2026]
+localrule multisample_list:
+    input: /container_home/n/sylph_two_stage_inputs/marine.paired.sylsp
+    output: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/marine.n100.list.txt
+    log: logs_full/multisample_list_marine_100.log
+    jobid: 88
+    reason: Missing output files: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/marine.n100.list.txt
+    wildcards: sample=marine, n=100
+    resources: tmpdir=/tmp
+[Thu Sep 17 08:08:53 2026]
+Finished jobid: 86 (Rule: multisample_list)
+1 of 13 steps (8%) done
+Select jobs to execute...
+Execute 4 jobs...
+
+[Thu Sep 17 08:08:53 2026]
+rule profile_multisample:
+    input: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/db/g143614_v12705282.none.syl2db, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/human.n100.list.txt
+    output: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.nofloor.human.n100.tsv
+    log: logs_full/multisample/g143614_v12705282.nofloor.human.n100.log
+    jobid: 93
+    benchmark: benchmarks_full/multisample/g143614_v12705282.nofloor.human.n100.tsv
+    reason: Missing output files: logs_full/multisample/g143614_v12705282.nofloor.human.n100.log, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.nofloor.human.n100.tsv, benchmarks_full/multisample/g143614_v12705282.nofloor.human.n100.tsv; Input files updated by another job: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/human.n100.list.txt
+    wildcards: ng=143614, nv=12705282, arm=nofloor, sample=human, n=100
+    threads: 16
+    resources: tmpdir=<TBD>, runtime=120, mem_mb=96000, mem=96 GB, mem_mib=91553
+Submitted job 93 with external jobid '25402085.aqua'.
+
+[Thu Sep 17 08:08:54 2026]
+rule profile_multisample:
+    input: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/db/g143614_v12705282.none.syl2db, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/human.n100.list.txt
+    output: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.reader.human.n100.tsv
+    log: logs_full/multisample/g143614_v12705282.reader.human.n100.log
+    jobid: 91
+    benchmark: benchmarks_full/multisample/g143614_v12705282.reader.human.n100.tsv
+    reason: Missing output files: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.reader.human.n100.tsv, logs_full/multisample/g143614_v12705282.reader.human.n100.log, benchmarks_full/multisample/g143614_v12705282.reader.human.n100.tsv; Input files updated by another job: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/human.n100.list.txt
+    wildcards: ng=143614, nv=12705282, arm=reader, sample=human, n=100
+    threads: 16
+    resources: tmpdir=<TBD>, runtime=120, mem_mb=96000, mem=96 GB, mem_mib=91553
+Submitted job 91 with external jobid '25402086.aqua'.
+
+[Thu Sep 17 08:08:54 2026]
+rule profile_multisample:
+    input: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/db/g143614_v12705282.band.syl2db, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/human.n100.list.txt
+    output: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.band.human.n100.tsv
+    log: logs_full/multisample/g143614_v12705282.band.human.n100.log
+    jobid: 89
+    benchmark: benchmarks_full/multisample/g143614_v12705282.band.human.n100.tsv
+    reason: Missing output files: benchmarks_full/multisample/g143614_v12705282.band.human.n100.tsv, logs_full/multisample/g143614_v12705282.band.human.n100.log, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.band.human.n100.tsv; Input files updated by another job: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/human.n100.list.txt
+    wildcards: ng=143614, nv=12705282, arm=band, sample=human, n=100
+    threads: 16
+    resources: tmpdir=<TBD>, runtime=120, mem_mb=96000, mem=96 GB, mem_mib=91553
+Submitted job 89 with external jobid '25402087.aqua'.
+
+[Thu Sep 17 08:08:55 2026]
+rule profile_multisample:
+    input: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/db/g143614_v12705282.loosen.syl2db, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/human.n100.list.txt
+    output: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.loosen.human.n100.tsv
+    log: logs_full/multisample/g143614_v12705282.loosen.human.n100.log
+    jobid: 85
+    benchmark: benchmarks_full/multisample/g143614_v12705282.loosen.human.n100.tsv
+    reason: Missing output files: logs_full/multisample/g143614_v12705282.loosen.human.n100.log, benchmarks_full/multisample/g143614_v12705282.loosen.human.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.loosen.human.n100.tsv; Input files updated by another job: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/human.n100.list.txt
+    wildcards: ng=143614, nv=12705282, arm=loosen, sample=human, n=100
+    threads: 16
+    resources: tmpdir=<TBD>, runtime=120, mem_mb=96000, mem=96 GB, mem_mib=91553
+Submitted job 85 with external jobid '25402088.aqua'.
+[Thu Sep 17 08:08:56 2026]
+Finished jobid: 88 (Rule: multisample_list)
+2 of 13 steps (15%) done
+Select jobs to execute...
+Execute 4 jobs...
+
+[Thu Sep 17 08:08:56 2026]
+rule profile_multisample:
+    input: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/db/g143614_v12705282.band.syl2db, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/marine.n100.list.txt
+    output: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.band.marine.n100.tsv
+    log: logs_full/multisample/g143614_v12705282.band.marine.n100.log
+    jobid: 90
+    benchmark: benchmarks_full/multisample/g143614_v12705282.band.marine.n100.tsv
+    reason: Missing output files: benchmarks_full/multisample/g143614_v12705282.band.marine.n100.tsv, logs_full/multisample/g143614_v12705282.band.marine.n100.log, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.band.marine.n100.tsv; Input files updated by another job: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/marine.n100.list.txt
+    wildcards: ng=143614, nv=12705282, arm=band, sample=marine, n=100
+    threads: 16
+    resources: tmpdir=<TBD>, runtime=120, mem_mb=96000, mem=96 GB, mem_mib=91553
+Submitted job 90 with external jobid '25402089.aqua'.
+
+[Thu Sep 17 08:08:56 2026]
+rule profile_multisample:
+    input: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/db/g143614_v12705282.loosen.syl2db, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/marine.n100.list.txt
+    output: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.loosen.marine.n100.tsv
+    log: logs_full/multisample/g143614_v12705282.loosen.marine.n100.log
+    jobid: 87
+    benchmark: benchmarks_full/multisample/g143614_v12705282.loosen.marine.n100.tsv
+    reason: Missing output files: benchmarks_full/multisample/g143614_v12705282.loosen.marine.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.loosen.marine.n100.tsv, logs_full/multisample/g143614_v12705282.loosen.marine.n100.log; Input files updated by another job: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/marine.n100.list.txt
+    wildcards: ng=143614, nv=12705282, arm=loosen, sample=marine, n=100
+    threads: 16
+    resources: tmpdir=<TBD>, runtime=120, mem_mb=96000, mem=96 GB, mem_mib=91553
+Submitted job 87 with external jobid '25402090.aqua'.
+
+[Thu Sep 17 08:08:57 2026]
+rule profile_multisample:
+    input: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/db/g143614_v12705282.none.syl2db, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/marine.n100.list.txt
+    output: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.nofloor.marine.n100.tsv
+    log: logs_full/multisample/g143614_v12705282.nofloor.marine.n100.log
+    jobid: 94
+    benchmark: benchmarks_full/multisample/g143614_v12705282.nofloor.marine.n100.tsv
+    reason: Missing output files: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.nofloor.marine.n100.tsv, benchmarks_full/multisample/g143614_v12705282.nofloor.marine.n100.tsv, logs_full/multisample/g143614_v12705282.nofloor.marine.n100.log; Input files updated by another job: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/marine.n100.list.txt
+    wildcards: ng=143614, nv=12705282, arm=nofloor, sample=marine, n=100
+    threads: 16
+    resources: tmpdir=<TBD>, runtime=120, mem_mb=96000, mem=96 GB, mem_mib=91553
+Submitted job 94 with external jobid '25402091.aqua'.
+
+[Thu Sep 17 08:08:58 2026]
+rule profile_multisample:
+    input: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/db/g143614_v12705282.none.syl2db, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/marine.n100.list.txt
+    output: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.reader.marine.n100.tsv
+    log: logs_full/multisample/g143614_v12705282.reader.marine.n100.log
+    jobid: 92
+    benchmark: benchmarks_full/multisample/g143614_v12705282.reader.marine.n100.tsv
+    reason: Missing output files: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.reader.marine.n100.tsv, benchmarks_full/multisample/g143614_v12705282.reader.marine.n100.tsv, logs_full/multisample/g143614_v12705282.reader.marine.n100.log; Input files updated by another job: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/marine.n100.list.txt
+    wildcards: ng=143614, nv=12705282, arm=reader, sample=marine, n=100
+    threads: 16
+    resources: tmpdir=<TBD>, runtime=120, mem_mb=96000, mem=96 GB, mem_mib=91553
+Submitted job 92 with external jobid '25402092.aqua'.
+[Thu Sep 17 08:14:02 2026]
+Finished jobid: 93 (Rule: profile_multisample)
+3 of 13 steps (23%) done
+[Thu Sep 17 08:15:29 2026]
+Finished jobid: 91 (Rule: profile_multisample)
+4 of 13 steps (31%) done
+[Thu Sep 17 08:16:42 2026]
+Finished jobid: 89 (Rule: profile_multisample)
+5 of 13 steps (38%) done
+[Thu Sep 17 08:17:21 2026]
+Finished jobid: 85 (Rule: profile_multisample)
+6 of 13 steps (46%) done
+[Thu Sep 17 08:21:12 2026]
+Finished jobid: 94 (Rule: profile_multisample)
+7 of 13 steps (54%) done
+[Thu Sep 17 08:22:59 2026]
+Finished jobid: 92 (Rule: profile_multisample)
+8 of 13 steps (62%) done
+[Thu Sep 17 08:24:39 2026]
+Finished jobid: 90 (Rule: profile_multisample)
+9 of 13 steps (69%) done
+[Thu Sep 17 08:32:39 2026]
+Finished jobid: 87 (Rule: profile_multisample)
+10 of 13 steps (77%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Thu Sep 17 08:32:39 2026]
+localrule collect_multisample:
+    input: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.loosen.human.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.loosen.marine.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.band.human.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.band.marine.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.reader.human.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.reader.marine.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.nofloor.human.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.nofloor.marine.n100.tsv, logs_full/multisample/g143614_v12705282.loosen.human.n100.log, logs_full/multisample/g143614_v12705282.loosen.marine.n100.log, logs_full/multisample/g143614_v12705282.band.human.n100.log, logs_full/multisample/g143614_v12705282.band.marine.n100.log, logs_full/multisample/g143614_v12705282.reader.human.n100.log, logs_full/multisample/g143614_v12705282.reader.marine.n100.log, logs_full/multisample/g143614_v12705282.nofloor.human.n100.log, logs_full/multisample/g143614_v12705282.nofloor.marine.n100.log, benchmarks_full/multisample/g143614_v12705282.loosen.human.n100.tsv, benchmarks_full/multisample/g143614_v12705282.loosen.marine.n100.tsv, benchmarks_full/multisample/g143614_v12705282.band.human.n100.tsv, benchmarks_full/multisample/g143614_v12705282.band.marine.n100.tsv, benchmarks_full/multisample/g143614_v12705282.reader.human.n100.tsv, benchmarks_full/multisample/g143614_v12705282.reader.marine.n100.tsv, benchmarks_full/multisample/g143614_v12705282.nofloor.human.n100.tsv, benchmarks_full/multisample/g143614_v12705282.nofloor.marine.n100.tsv
+    output: results_full/multisample_metrics.tsv
+    log: logs_full/collect_multisample.log
+    jobid: 84
+    reason: Missing output files: results_full/multisample_metrics.tsv; Input files updated by another job: benchmarks_full/multisample/g143614_v12705282.reader.marine.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.loosen.marine.n100.tsv, benchmarks_full/multisample/g143614_v12705282.band.marine.n100.tsv, benchmarks_full/multisample/g143614_v12705282.nofloor.marine.n100.tsv, benchmarks_full/multisample/g143614_v12705282.reader.human.n100.tsv, logs_full/multisample/g143614_v12705282.loosen.human.n100.log, benchmarks_full/multisample/g143614_v12705282.band.human.n100.tsv, benchmarks_full/multisample/g143614_v12705282.loosen.marine.n100.tsv, logs_full/multisample/g143614_v12705282.reader.human.n100.log, benchmarks_full/multisample/g143614_v12705282.nofloor.human.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.reader.human.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.nofloor.human.n100.tsv, logs_full/multisample/g143614_v12705282.band.marine.n100.log, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.band.marine.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.reader.marine.n100.tsv, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.nofloor.marine.n100.tsv, logs_full/multisample/g143614_v12705282.reader.marine.n100.log, logs_full/multisample/g143614_v12705282.nofloor.human.n100.log, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.loosen.human.n100.tsv, logs_full/multisample/g143614_v12705282.loosen.marine.n100.log, /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full/multisample/g143614_v12705282.band.human.n100.tsv, logs_full/multisample/g143614_v12705282.nofloor.marine.n100.log, benchmarks_full/multisample/g143614_v12705282.loosen.human.n100.tsv, logs_full/multisample/g143614_v12705282.band.human.n100.log
+    resources: tmpdir=/tmp
+[Thu Sep 17 08:33:13 2026]
+Finished jobid: 84 (Rule: collect_multisample)
+11 of 13 steps (85%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Thu Sep 17 08:33:13 2026]
+localrule report:
+    input: results_full/build_metrics.tsv, results_full/screen_metrics.tsv, results_full/agreement.tsv, results_full/recall.tsv, results_full/stability.tsv, results_full/screen_kmers.tsv, results_full/multisample_metrics.tsv
+    output: RESULTS_FULL.md
+    log: logs_full/report.log
+    jobid: 95
+    reason: Input files updated by another job: results_full/multisample_metrics.tsv; Set of input files has changed since last execution; Code has changed since last execution
+    resources: tmpdir=/tmp
+[Thu Sep 17 08:33:13 2026]
+Finished jobid: 95 (Rule: report)
+12 of 13 steps (92%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Thu Sep 17 08:33:13 2026]
+localrule all:
+    input: results_full/build_metrics.tsv, results_full/screen_metrics.tsv, results_full/agreement.tsv, results_full/recall.tsv, results_full/stability.tsv, results_full/screen_kmers.tsv, results_full/multisample_metrics.tsv, RESULTS_FULL.md
+    jobid: 0
+    reason: Input files updated by another job: RESULTS_FULL.md, results_full/multisample_metrics.tsv
+    resources: tmpdir=/tmp
+[Thu Sep 17 08:33:13 2026]
+Finished jobid: 0 (Rule: all)
+13 of 13 steps (100%) done
+Complete log(s): /mnt/hpccs01/home/woodcrob/git/sylph/benchmarks/mixed_screen_c/.snakemake/log/2026-09-17T080852.074055.snakemake.log
+Elapsed time: 0:24:27.810157

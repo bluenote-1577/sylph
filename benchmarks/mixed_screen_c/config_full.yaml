@@ -1,0 +1,78 @@
+# Full-corpus configuration: all of GTDB R226 + all of MetaVR, one grid point.
+#
+#     pixi run snakemake --profile aqua --configfile config_full.yaml
+#
+# `config.yaml` sweeps the number of small genomes to find where the two options
+# cross over; this config answers the question the sweep can only extrapolate:
+# what happens at the size the MetaVR scan actually needs (12.7 M vOTUs, 127x the
+# largest grid point). Option B's cost is O(small references), so this is where it
+# is most exposed -- and option A's band 1 stops being a "handful of keys" here
+# too, so the crossover the sweep suggests has to be checked, not assumed.
+#
+# Everything not listed here is inherited from config.yaml, which snakemake merges
+# underneath this file (`configfile:` in the Snakefile), so only the differences
+# appear below.
+
+# Separate outputs throughout: a full run must not overwrite the sweep's.
+workdir: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c_full
+resultsdir: results_full
+report: RESULTS_FULL.md
+logdir: logs_full
+benchdir: benchmarks_full
+
+# --------------------------------------------------------------- the one point
+# The whole of both corpora. Both scripts fail loudly if the corpus turns out to
+# be smaller than this, so these numbers cannot silently become subsets:
+#   143,614 = GTDB R226 species representatives
+#   12,705,282 = MetaVR vOTU representatives (sum of metavr_shard_counts)
+n_gtdb: [143614]
+n_metavr: [12705282]
+
+# Per-shard vOTU counts, which is how the Snakefile knows the above n_metavr is
+# the whole corpus and can therefore sketch the shards where they are instead of
+# rewriting 106 GB of FASTA to "select" all of it.
+metavr_shard_counts: /work/microbiome/msingle/mess/235_sylph_metavr/db/shard_counts.tsv
+
+# ------------------------------------------------------------------- sketching
+# 16 sketch jobs per source: ~9k GTDB genomes each (~2.5 GB of sketch, which one
+# process can hold comfortably) and 4 MetaVR shards each. `convert` takes all 32
+# .syldb files, so they never have to be merged.
+sketch_groups: 16
+
+# ------------------------------------------------------------------ the arms
+# No `single` (unscreened) arm at this size: it would have to load every one of
+# 12.8 M genomes' dense k-mers -- ~50 GB of bincode -- which is precisely what the
+# two-stage format exists to avoid, nine times over. Sensitivity is instead
+# measured absolutely against the simulated sample's known truth, and the
+# agreement table is quoted against the incumbent screen.
+single_stage_reference: false
+reference_arm: loosen
+
+replicates: 3
+
+# One `sylph profile db -l list.txt` process per arm x sample, 100 copies of one
+# real sample -- this is where band's/reader's one-time open cost (measured in
+# the seconds, at this reference size) is most worth amortizing.
+multisample_n: 100
+multisample_samples: [human, marine]
+
+# ------------------------------------------------------------------- resources
+# Extrapolated from the sweep's measurements (see results/build_metrics.tsv):
+# ~190 kB of database per GTDB genome and ~0.8 kB per vOTU, so ~40 GB per
+# .syl2db, and conversion peaks at roughly 3x its own output.
+threads_sketch: 16
+mem_mb_sketch: 64000
+runtime_sketch: 4h
+
+threads_convert: 32
+mem_mb_convert: 300000
+runtime_convert: 6h
+
+# `inspect` materialises one record per genome and then the whole YAML string, so
+# it needs a few times the ~12.7 M x ~150 B of records, but nothing like convert.
+mem_mb_inspect: 64000
+runtime_inspect: 4h
+
+threads_profile: 16
+mem_mb_profile: 96000
+runtime_profile: 4h

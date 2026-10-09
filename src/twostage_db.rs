@@ -38,6 +38,42 @@
 //! (see `experiments/7_mphf_screen_again`), but multi-owner because `.syl2db`
 //! keeps shared k-mers.
 //!
+//! ### Small genomes and mixed screen rates
+//!
+//! A genome of a few kb has almost no k-mers below the nominal `screen_c`
+//! threshold (a mean-length viral vOTU at `-c 100 --screen-c 3000` gets ~2), so
+//! the stage-1 screen misses it however much of it the sample contains. The fix
+//! is a per-genome floor (`--min-sparse-kmers`): a genome whose nominal subsample
+//! falls short instead uses its `min_sparse_kmers` *smallest* dense hashes, i.e.
+//! a denser, genome-specific screen rate. `--small-genome-screen` chooses how
+//! that mixture of rates is stored and screened. Every mode screens the same
+//! per-genome k-mer set and therefore yields the same survivors; they differ only
+//! in cost:
+//!
+//!   * `loosen` -- one pooled MPHF, its key set widened to the densest
+//!     genome-specific threshold any genome needed. Simple, but one 8 kb genome
+//!     drags the *whole* database's effective screen rate toward `c`: the MPHF
+//!     grows toward the dense k-mer count and every sample k-mer below
+//!     `MAX/c` (i.e. all of them) has to be looked up in it.
+//!   * `band` -- value-banded tiers. Keys are partitioned by hash *value*, not by
+//!     genome: band 0 (`h < MAX/screen_c`) is the pooled MPHF at exactly the
+//!     nominal rate, so it costs what an unloosened build costs; band 1
+//!     (`MAX/screen_c <= h < MAX/dense_c`) holds only the extra keys densified
+//!     genomes needed, as a sorted `Vec<u64>` behind a bloom pre-filter -- no
+//!     MPHF, no fingerprints. A sample k-mer picks its band with two
+//!     comparisons. Band 1 is appended after the band-0 index block, which
+//!     `ScreenIndex::read` consumes sequentially, so an older reader simply does
+//!     not see it (and gets the `none` behaviour).
+//!   * `none` -- no floor at all; the file is what a build with no small-genome
+//!     handling would write, so it stays readable by stock sylph with no loss.
+//!     Small-genome sensitivity then comes from the *reader* side:
+//!     `--screen-small-genomes N` reconstructs the short genomes' sparse prefix
+//!     from their dense blocks at open time (`dense_sparse_prefix`) and
+//!     intersects each against the sample hashmap directly. That costs
+//!     O(number of short references) per sample instead of O(sample), so it wins
+//!     only while short genomes are a small minority -- but it also works on
+//!     databases built by stock sylph.
+//!
 //! **Stage 2 (dense, Golomb-Rice, loaded on demand).** Each genome's *full*
 //! `genome_kmers` and `pseudotax_tracked_nonused_kmers` are an independently
 //! Golomb-Rice-coded block at a known offset. Only the genomes that pass the
@@ -53,6 +89,7 @@ use crate::types::*;
 use boomphf::Mphf;
 use fxhash::FxHashMap;
 use log::*;
+use rayon::prelude::*;
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::os::unix::fs::FileExt;
@@ -340,6 +377,250 @@ pub(crate) fn screen_threshold(screen_c: usize) -> u64 {
     u64::MAX / screen_c.max(1) as u64
 }
 
+/// How a build stores the mixture of screen rates that small genomes force (see
+/// the module docs). All modes screen the same per-genome k-mer set -- a genome
+/// short of `min_sparse_kmers` at the nominal rate uses its `min_sparse_kmers`
+/// smallest dense hashes -- except `None`, which applies no floor at all.
+#[derive(clap::ArgEnum, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SmallGenomeMode {
+    /// Widen the single pooled MPHF to the densest rate any genome needed.
+    Loosen,
+    /// Keep the pooled MPHF at the nominal rate; put the extra keys of
+    /// densified genomes in a separate value band.
+    Band,
+    /// No floor: strictly the nominal `screen_c` (see
+    /// `--screen-small-genomes` for the reader-side alternative).
+    None,
+}
+
+impl std::fmt::Display for SmallGenomeMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let s = match self {
+            SmallGenomeMode::Loosen => "loosen",
+            SmallGenomeMode::Band => "band",
+            SmallGenomeMode::None => "none",
+        };
+        f.write_str(s)
+    }
+}
+
+// --- band-1 index (value-banded screen tiers) -------------------------------
+
+const BAND_MAGIC: &[u8; 4] = b"BND1";
+
+/// Two independent bloom bit positions from one hash (splitmix-style mixing;
+/// the input is already a hash, but its low bits are what the FracMinHash
+/// threshold constrains, so it must be re-mixed).
+#[inline]
+fn bloom_bits(h: u64) -> (u64, u64) {
+    let mut a = h.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    a ^= a >> 29;
+    let mut b = h.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    b ^= b >> 31;
+    (a, b)
+}
+
+/// Stage-1 screen keys in the value band `[lo, hi)` above the nominal
+/// `screen_c` threshold: the extra keys that densified (small) genomes need,
+/// and nothing else. Deliberately not an MPHF -- there are few enough of these
+/// in the intended (mostly-large-genomes) case that a sorted `Vec<u64>` behind
+/// a bloom pre-filter is cache-resident and cheaper than a perfect hash plus
+/// fingerprint array.
+pub struct BandIndex {
+    /// Inclusive lower bound: the nominal `screen_threshold(screen_c)`.
+    pub lo: u64,
+    /// Exclusive upper bound: one past the largest key any genome needed.
+    pub hi: u64,
+    /// Sorted, distinct keys.
+    keys: Vec<u64>,
+    /// CSR row offsets, length `keys.len() + 1`.
+    owner_offsets: Vec<u32>,
+    /// CSR owner genome ids (a multiset, as in `ScreenIndex`).
+    owners: Vec<u32>,
+    /// Bloom pre-filter over `keys`, `BAND_BLOOM_BITS_PER_KEY` bits per key.
+    bloom: Vec<u64>,
+    bloom_word_mask: u64,
+    /// Per genome: number of band-1 keys it owns (absent = none).
+    counts: FxHashMap<u32, u32>,
+}
+
+impl BandIndex {
+    /// Build from `(key, genome)` pairs; `pairs` may be unsorted and may repeat
+    /// a `(key, genome)` pair (a genome carrying the same k-mer twice), which is
+    /// preserved so counts match a per-genome intersection.
+    fn build(mut pairs: Vec<(u64, u32)>, lo: u64, hi: u64) -> BandIndex {
+        pairs.sort_unstable();
+        let mut counts: FxHashMap<u32, u32> = FxHashMap::default();
+        for &(_, g) in &pairs {
+            *counts.entry(g).or_insert(0) += 1;
+        }
+        let mut keys: Vec<u64> = Vec::new();
+        let mut owners: Vec<u32> = Vec::with_capacity(pairs.len());
+        let mut owner_offsets: Vec<u32> = vec![0];
+        let mut i = 0;
+        while i < pairs.len() {
+            let h = pairs[i].0;
+            keys.push(h);
+            while i < pairs.len() && pairs[i].0 == h {
+                owners.push(pairs[i].1);
+                i += 1;
+            }
+            owner_offsets.push(owners.len() as u32);
+        }
+        let (bloom, bloom_word_mask) = Self::build_bloom(&keys);
+        BandIndex {
+            lo,
+            hi,
+            keys,
+            owner_offsets,
+            owners,
+            bloom,
+            bloom_word_mask,
+            counts,
+        }
+    }
+
+    fn build_bloom(keys: &[u64]) -> (Vec<u64>, u64) {
+        let want_bits = (keys.len() * BAND_BLOOM_BITS_PER_KEY).max(64);
+        let n_words = (want_bits / 64).next_power_of_two();
+        let mut bloom = vec![0u64; n_words];
+        let mask = (n_words - 1) as u64;
+        for &h in keys {
+            let (a, b) = bloom_bits(h);
+            bloom[((a >> 6) & mask) as usize] |= 1u64 << (a & 63);
+            bloom[((b >> 6) & mask) as usize] |= 1u64 << (b & 63);
+        }
+        (bloom, mask)
+    }
+
+    #[inline]
+    fn bloom_maybe(&self, h: u64) -> bool {
+        let (a, b) = bloom_bits(h);
+        let m = self.bloom_word_mask;
+        self.bloom[((a >> 6) & m) as usize] & (1u64 << (a & 63)) != 0
+            && self.bloom[((b >> 6) & m) as usize] & (1u64 << (b & 63)) != 0
+    }
+
+    /// Genomes owning `h`, or empty if `h` is outside the band or not a key.
+    /// Two comparisons and (almost always) one bloom word for a non-key.
+    #[inline]
+    fn owners_of(&self, h: u64) -> &[u32] {
+        if h < self.lo || h >= self.hi || !self.bloom_maybe(h) {
+            return &[];
+        }
+        match self.keys.binary_search(&h) {
+            Ok(i) => {
+                &self.owners[self.owner_offsets[i] as usize..self.owner_offsets[i + 1] as usize]
+            }
+            Err(_) => &[],
+        }
+    }
+
+    pub fn num_keys(&self) -> usize {
+        self.keys.len()
+    }
+    pub fn num_owners(&self) -> usize {
+        self.owners.len()
+    }
+    pub fn num_genomes(&self) -> usize {
+        self.counts.len()
+    }
+    #[inline]
+    fn count(&self, g: u32) -> u32 {
+        self.counts.get(&g).copied().unwrap_or(0)
+    }
+
+    /// Append the band block. Keys are delta+uvarint coded (they are sorted and
+    /// dense within a narrow value range) and the bloom is rebuilt on read, so
+    /// only keys/owners cost file space.
+    fn write_to_vec(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(BAND_MAGIC);
+        out.extend_from_slice(&self.lo.to_le_bytes());
+        out.extend_from_slice(&self.hi.to_le_bytes());
+        write_uvarint(out, self.keys.len() as u64);
+        write_uvarint(out, self.owners.len() as u64);
+        write_uvarint(out, self.counts.len() as u64);
+        let mut prev = self.lo;
+        for &h in &self.keys {
+            write_uvarint(out, h - prev);
+            prev = h;
+        }
+        for i in 0..self.keys.len() {
+            write_uvarint(
+                out,
+                (self.owner_offsets[i + 1] - self.owner_offsets[i]) as u64,
+            );
+        }
+        for &o in &self.owners {
+            out.extend_from_slice(&o.to_le_bytes());
+        }
+        let mut entries: Vec<(u32, u32)> = self.counts.iter().map(|(&g, &c)| (g, c)).collect();
+        entries.sort_unstable();
+        for (g, c) in entries {
+            write_uvarint(out, g as u64);
+            write_uvarint(out, c as u64);
+        }
+    }
+
+    /// Parse a band block whose magic has already been confirmed present.
+    fn read(r: &mut &[u8]) -> io::Result<BandIndex> {
+        let mut magic = [0u8; 4];
+        r.read_exact(&mut magic)?;
+        debug_assert_eq!(&magic, BAND_MAGIC);
+        let mut buf = [0u8; 8];
+        r.read_exact(&mut buf)?;
+        let lo = u64::from_le_bytes(buf);
+        r.read_exact(&mut buf)?;
+        let hi = u64::from_le_bytes(buf);
+        let n_keys = read_uvarint(r)? as usize;
+        let n_owners = read_uvarint(r)? as usize;
+        let n_counts = read_uvarint(r)? as usize;
+        let mut keys = Vec::with_capacity(n_keys);
+        let mut prev = lo;
+        for _ in 0..n_keys {
+            prev += read_uvarint(r)?;
+            keys.push(prev);
+        }
+        let mut owner_offsets = Vec::with_capacity(n_keys + 1);
+        owner_offsets.push(0u32);
+        let mut acc = 0u32;
+        for _ in 0..n_keys {
+            acc += read_uvarint(r)? as u32;
+            owner_offsets.push(acc);
+        }
+        if acc as usize != n_owners {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "band-1 owner counts do not sum to the owner total",
+            ));
+        }
+        let mut owners = Vec::with_capacity(n_owners);
+        for _ in 0..n_owners {
+            let mut b = [0u8; 4];
+            r.read_exact(&mut b)?;
+            owners.push(u32::from_le_bytes(b));
+        }
+        let mut counts: FxHashMap<u32, u32> =
+            FxHashMap::with_capacity_and_hasher(n_counts, Default::default());
+        for _ in 0..n_counts {
+            let g = read_uvarint(r)? as u32;
+            let c = read_uvarint(r)? as u32;
+            counts.insert(g, c);
+        }
+        let (bloom, bloom_word_mask) = Self::build_bloom(&keys);
+        Ok(BandIndex {
+            lo,
+            hi,
+            keys,
+            owner_offsets,
+            owners,
+            bloom,
+            bloom_word_mask,
+            counts,
+        })
+    }
+}
+
 /// Pooled stage-1 screen index: one MPHF over the distinct sparse k-mers of all
 /// genomes, plus a multi-owner CSR (a k-mer may belong to several genomes).
 /// Owners are a *multiset* -- a genome appears once per occurrence of the k-mer
@@ -356,8 +637,12 @@ pub struct ScreenIndex {
     owner_offsets: Vec<u32>,
     /// CSR owner genome ids (flat); slot `s` owns `owners[off[s]..off[s+1]]`.
     owners: Vec<u32>,
-    /// Per genome: number of sparse k-mers (the `n_kmers` ANI denominator).
+    /// Per genome: number of sparse k-mers in *this* (band-0) structure. Use
+    /// `screen_kmers` for the ANI denominator, which also counts band 1.
     pub sparse_count: Vec<u32>,
+    /// Optional band-1 tier (`--small-genome-screen band`), holding the keys
+    /// above the nominal threshold that densified genomes needed.
+    pub band: Option<BandIndex>,
 }
 
 impl ScreenIndex {
@@ -430,6 +715,7 @@ impl ScreenIndex {
             owner_offsets,
             owners,
             sparse_count,
+            band: None,
         }
     }
 
@@ -437,15 +723,35 @@ impl ScreenIndex {
         self.sparse_count.len()
     }
 
+    /// Total number of stage-1 screen k-mers for genome `g` across all bands --
+    /// the `n_kmers` ANI denominator, and what a per-genome `get_stats` screen
+    /// would use.
+    #[inline]
+    pub fn screen_kmers(&self, g: u32) -> u32 {
+        self.sparse_count[g as usize] + self.band.as_ref().map_or(0, |b| b.count(g))
+    }
+
     /// Single inverted pass over the sample: for each sample k-mer below the
     /// screen threshold with non-zero count, look it up and push its coverage to
     /// every owning genome. Returns `genome -> matched coverage counts`, exactly
     /// the per-genome `covs` a `get_stats(.., None, ..)` screen would collect.
+    /// With a band-1 tier present, each sample k-mer picks its band with two
+    /// comparisons: below the nominal threshold it goes to the MPHF, otherwise
+    /// (and below the band ceiling) to the small band-1 structure.
     pub fn gather_hits(&self, sample: &SequencesSketch) -> FxHashMap<u32, Vec<u32>> {
         let thresh = screen_threshold(self.screen_c);
+        let band_hi = self.band.as_ref().map_or(0, |b| b.hi);
         let mut hits: FxHashMap<u32, Vec<u32>> = FxHashMap::default();
         for (&h, &cnt) in sample.kmer_counts.iter() {
-            if h >= thresh || cnt == 0 {
+            if cnt == 0 {
+                continue;
+            }
+            if h >= thresh {
+                if h < band_hi {
+                    for &g in self.band.as_ref().unwrap().owners_of(h) {
+                        hits.entry(g).or_default().push(cnt);
+                    }
+                }
                 continue;
             }
             if let Some(slot) = self.mphf.try_hash(&h) {
@@ -484,6 +790,12 @@ impl ScreenIndex {
         for &c in &self.sparse_count {
             out.extend_from_slice(&c.to_le_bytes());
         }
+        // Band 1 is *appended*: `read` consumes everything above sequentially and
+        // stops, so a reader that predates banding sees a plain nominal-rate
+        // index (and screens exactly band 0) rather than failing.
+        if let Some(band) = &self.band {
+            band.write_to_vec(out);
+        }
         Ok(())
     }
 
@@ -512,6 +824,12 @@ impl ScreenIndex {
         let owner_offsets = read_u32_vec(&mut r, n_slots + 1)?;
         let owners = read_u32_vec(&mut r, n_owners)?;
         let sparse_count = read_u32_vec(&mut r, n_genomes)?;
+        // Optional trailing band-1 block (absent in a `loosen`/`none` build).
+        let band = if r.len() >= BAND_MAGIC.len() && &r[..BAND_MAGIC.len()] == BAND_MAGIC {
+            Some(BandIndex::read(&mut r)?)
+        } else {
+            None
+        };
 
         Ok(ScreenIndex {
             screen_c,
@@ -521,6 +839,7 @@ impl ScreenIndex {
             owner_offsets,
             owners,
             sparse_count,
+            band,
         })
     }
 }
@@ -535,23 +854,37 @@ impl ScreenIndex {
 /// this size is inherently poor.
 const SPARSE_WARN_THRESHOLD: usize = 20;
 
+/// Number of offending genomes named in an aggregated build diagnostic. The
+/// counts matter; the names are only there to make the problem findable.
+const DIAGNOSTIC_EXAMPLES: usize = 3;
+
 /// Re-pack genome sketches into the two-stage seekable layout and write to `w`.
 /// `screen_c` is the (coarser) stage-1 subsampling rate; it must be `>= c`.
 /// Dense blocks are Golomb-Rice coded. Each genome's sparse stage-1 set is
-/// selected at `screen_c` if that clears `min_sparse_kmers`, otherwise at a
-/// denser, genome-specific rate that does; the database-wide effective screen
-/// rate stored in the footer/index is derived from whichever genome ended up
-/// densest, so the pooled screen index's early-exit filter stays correct for
-/// every genome (see `ScreenIndex`). `min_sparse_kmers` must be `>= 1` --
-/// callers must enforce this (see `run_db_convert`'s validation), since 0
-/// would let a genome's sparse set end up empty, making it silently invisible
-/// to the stage-1 screen forever.
+/// selected at `screen_c` if that clears `min_sparse_kmers`, otherwise (unless
+/// `mode` is `None`) it is that genome's `min_sparse_kmers` smallest dense
+/// hashes -- a denser, genome-specific rate. `mode` decides how that mixture of
+/// rates is stored (see `SmallGenomeMode` and the module docs):
+///
+///   * `Loosen` widens the single pooled MPHF, so the database-wide effective
+///     screen rate in the footer is derived from whichever genome ended up
+///     densest and the pooled index's early-exit filter stays correct for every
+///     genome.
+///   * `Band` keeps the pooled MPHF at exactly `screen_c` and puts the extra
+///     keys in an appended band-1 block, leaving the footer's `screen_c`
+///     nominal.
+///   * `None` applies no floor, so nothing is densified at all.
+///
+/// `min_sparse_kmers` must be `>= 1` -- callers must enforce this (see
+/// `run_db_convert`'s validation), since 0 would let a genome's sparse set end
+/// up empty, making it silently invisible to the stage-1 screen forever.
 pub fn write_two_stage_db<W: Write>(
     mut w: W,
     sketches: &[GenomeSketch],
     screen_c: usize,
     min_sparse_kmers: usize,
     min_contain: usize,
+    mode: SmallGenomeMode,
 ) -> io::Result<()> {
     let c = sketches.first().map(|s| s.c).unwrap_or(0);
     let k = sketches.first().map(|s| s.k).unwrap_or(0);
@@ -569,16 +902,33 @@ pub fn write_two_stage_db<W: Write>(
     // effective screen threshold must be at least this permissive so the
     // pooled index's early-exit never prunes a real stored key.
     let mut thresh_needed: u64 = 0;
+    // `Band` mode only: (key, genome) pairs above the nominal threshold.
+    let mut band_pairs: Vec<(u64, u32)> = Vec::new();
+    // Per-genome diagnostics are counted and reported once at the end: a viral
+    // database densifies millions of genomes, and one `warn!` each would bury
+    // everything else (and dwarf the database itself in log bytes).
+    let mut n_densified = 0usize;
+    let mut n_too_few = 0usize;
+    let mut too_few_examples: Vec<String> = Vec::new();
+    let mut skipped_examples: Vec<String> = Vec::new();
+    let mut n_skipped = 0usize;
 
     for gs in sketches {
         let dense_total = gs.genome_kmers.len();
         if dense_total < min_contain {
-            warn!(
-                "genome '{}' (file {}) has only {} dense k-mers (< --min-contain={}); it would \
-                 never pass `profile`/`query`'s hit threshold at that setting anyway (or is \
-                 likely an erroneous/fragmentary genome), so it is excluded from this two-stage \
-                 database.",
-                gs.first_contig_name, gs.file_name, dense_total, min_contain
+            n_skipped += 1;
+            if skipped_examples.len() < DIAGNOSTIC_EXAMPLES {
+                skipped_examples.push(format!(
+                    "'{}' (file {}, {} dense k-mers)",
+                    gs.first_contig_name, gs.file_name, dense_total
+                ));
+            }
+            trace!(
+                "genome '{}' (file {}) has only {} dense k-mers (< --min-contain={}); excluded",
+                gs.first_contig_name,
+                gs.file_name,
+                dense_total,
+                min_contain
             );
             continue;
         }
@@ -593,54 +943,80 @@ pub fn write_two_stage_db<W: Write>(
             None => body.push(0),
         }
 
-        let (sparse, genome_thresh): (Vec<u64>, u64) = if dense_total <= min_sparse_kmers {
-            // Fewer dense k-mers than the target to begin with -- use them all.
-            (gs.genome_kmers.clone(), dense_thresh)
-        } else {
-            let nominal: Vec<u64> = gs
-                .genome_kmers
-                .iter()
-                .copied()
-                .filter(|&h| h < nominal_thresh)
-                .collect();
-            if nominal.len() >= min_sparse_kmers {
-                (nominal, nominal_thresh)
-            } else {
-                // Adaptive: select exactly the min_sparse_kmers smallest
-                // hashes from the full dense set via O(n) partial selection.
-                warn!("genome '{}' (file {}) has only {} total sparse k-mers (< {} at -c={}), \
-                       using a denser genome-specific stage-1 screen rate to reach the target",
-                      gs.first_contig_name, gs.file_name, nominal.len(), min_sparse_kmers, screen_c);
-                let mut v = gs.genome_kmers.clone();
-                let kth = min_sparse_kmers - 1;
-                v.select_nth_unstable(kth);
-                let kth_val = v[kth];
-                v.truncate(kth + 1);
-                (v, kth_val.saturating_add(1))
+        // The nominal (`screen_c`) subsample, which is all any mode ever puts in
+        // band 0 / the pooled MPHF.
+        let nominal: Vec<u64> = gs
+            .genome_kmers
+            .iter()
+            .copied()
+            .filter(|&h| h < nominal_thresh)
+            .collect();
+        // Extra keys above the nominal threshold needed to reach the floor: the
+        // difference between the `min_sparse_kmers` smallest dense hashes and
+        // `nominal`. Empty unless this genome is too small (or `mode` is `None`).
+        let mut extra: Vec<u64> = Vec::new();
+        let mut genome_thresh = nominal_thresh;
+        if mode != SmallGenomeMode::None && nominal.len() < min_sparse_kmers {
+            n_densified += 1;
+            // O(n) partial selection of the `want` smallest hashes; `want` is the
+            // whole dense set when the genome has fewer than the floor to begin
+            // with.
+            let want = min_sparse_kmers.min(dense_total);
+            let mut v = gs.genome_kmers.clone();
+            if want < v.len() {
+                v.select_nth_unstable(want - 1);
+                v.truncate(want);
             }
-        };
-
-        // The warning below always means "didn't reach your own configured
-        // target": stays at the fixed SPARSE_WARN_THRESHOLD for any target >=
-        // that (the common case), shrinks only if min_sparse_kmers itself was
-        // set below it, so it never misfires on a genome that hit its own
-        // (deliberately small) target.
-        let effective_warn_threshold = SPARSE_WARN_THRESHOLD.min(min_sparse_kmers);
-        if sparse.len() < effective_warn_threshold {
-            warn!(
-                "genome '{}' (file {}) has only {} total dense k-mers (< {}); its two-stage \
-                 sparse screen entry uses all of them, and because it is (one of) the \
-                 densest genome(s) in this database it forces the WHOLE database's stage-1 \
-                 screen rate down toward c={} (matching the dense rate), reducing screening \
-                 speed for every sample. Detection reliability at this size is inherently \
-                 poor -- consider excluding tiny genomes/contigs/plasmids from two-stage \
-                 databases, or check that this genome/contig was sketched as intended.",
-                gs.first_contig_name, gs.file_name, sparse.len(), effective_warn_threshold, c
+            let kth_val = v.iter().copied().max().unwrap_or(0);
+            debug_assert!(kth_val < dense_thresh || dense_total == 0);
+            genome_thresh = kth_val.saturating_add(1);
+            extra = v.into_iter().filter(|&h| h >= nominal_thresh).collect();
+            trace!(
+                "genome '{}' (file {}) has only {} sparse k-mers at --screen-c {}; densified to \
+                 {} using a genome-specific rate",
+                gs.first_contig_name,
+                gs.file_name,
+                nominal.len(),
+                screen_c,
+                want
             );
         }
 
+        // "Didn't reach your own configured target" -- stays at the fixed
+        // SPARSE_WARN_THRESHOLD for any target >= that (the common case),
+        // shrinks only if min_sparse_kmers itself was set below it, so it never
+        // misfires on a genome that hit its own (deliberately small) target.
+        let effective_warn_threshold = SPARSE_WARN_THRESHOLD.min(min_sparse_kmers);
+        if nominal.len() + extra.len() < effective_warn_threshold {
+            n_too_few += 1;
+            if too_few_examples.len() < DIAGNOSTIC_EXAMPLES {
+                too_few_examples.push(format!(
+                    "'{}' (file {}, {} screen k-mers)",
+                    gs.first_contig_name,
+                    gs.file_name,
+                    nominal.len() + extra.len()
+                ));
+            }
+        }
+
         thresh_needed = thresh_needed.max(genome_thresh);
-        sparse_per_genome.push(sparse);
+        let g_id = genomes.len() as u32;
+        match mode {
+            // One pooled structure: the extra keys join the nominal ones and the
+            // database-wide screen rate is loosened to cover them.
+            SmallGenomeMode::Loosen => {
+                let mut sparse = nominal;
+                sparse.extend_from_slice(&extra);
+                sparse_per_genome.push(sparse);
+            }
+            // Partition by hash value: nominal keys to band 0, extra keys to
+            // band 1, which leaves band 0 exactly as an unfloored build.
+            SmallGenomeMode::Band => {
+                band_pairs.extend(extra.iter().map(|&h| (h, g_id)));
+                sparse_per_genome.push(nominal);
+            }
+            SmallGenomeMode::None => sparse_per_genome.push(nominal),
+        }
         genomes.push(GenomeMeta {
             file_name: gs.file_name.clone(),
             first_contig_name: gs.first_contig_name.clone(),
@@ -662,12 +1038,60 @@ pub fn write_two_stage_db<W: Write>(
         ));
     }
 
+    if n_skipped > 0 {
+        warn!(
+            "{} of {} genome(s) had fewer than --min-contain={} dense k-mers and were excluded \
+             from this two-stage database (they could never pass `profile`/`query`'s hit \
+             threshold at that setting anyway, or are likely erroneous/fragmentary). Examples: {}",
+            n_skipped,
+            sketches.len(),
+            min_contain,
+            skipped_examples.join(", ")
+        );
+    }
+    if n_densified > 0 {
+        let extra_note = match mode {
+            SmallGenomeMode::Loosen => {
+                "they force the WHOLE database's stage-1 screen rate down toward the dense -c, \
+                 which slows the screen for every sample (see --small-genome-screen band)"
+            }
+            SmallGenomeMode::Band => {
+                "their extra keys live in the band-1 tier, leaving the band-0 screen rate nominal"
+            }
+            SmallGenomeMode::None => unreachable!("no genome is densified in `none` mode"),
+        };
+        info!(
+            "{} of {} genome(s) had fewer than --min-sparse-kmers={} k-mers at --screen-c {} and \
+             use a denser genome-specific stage-1 screen rate; {}",
+            n_densified,
+            genomes.len(),
+            min_sparse_kmers,
+            screen_c,
+            extra_note
+        );
+    }
+    if n_too_few > 0 {
+        warn!(
+            "{} of {} genome(s) have fewer than {} stage-1 screen k-mers even after \
+             densification: their whole dense sketch is that small, so detection reliability at \
+             this size is inherently poor. Consider excluding tiny genomes/contigs/plasmids, or \
+             check that they were sketched as intended. Examples: {}",
+            n_too_few,
+            genomes.len(),
+            SPARSE_WARN_THRESHOLD.min(min_sparse_kmers),
+            too_few_examples.join(", ")
+        );
+    }
+
     // Database-wide effective screen rate: safe by the number-theory identity
     // floor(a / floor(a/b)) >= b for positive integers a, b -- so
     // screen_threshold(effective_screen_c) >= thresh_needed, and every
     // genome's actually-stored k-mers (each < their own genome_thresh <=
-    // thresh_needed) pass the pooled index's early-exit filter.
-    let effective_screen_c = if thresh_needed == 0 {
+    // thresh_needed) pass the pooled index's early-exit filter. Only `loosen`
+    // pays this: the other modes keep every band-0 key below the nominal
+    // threshold, so their footer rate stays nominal (and an older reader that
+    // ignores band 1 still filters correctly).
+    let effective_screen_c = if thresh_needed == 0 || mode != SmallGenomeMode::Loosen {
         screen_c
     } else {
         (u64::MAX / thresh_needed).max(1) as usize
@@ -680,9 +1104,23 @@ pub fn write_two_stage_db<W: Write>(
         );
     }
 
-    // Pooled stage-1 screen index, then footer metadata.
-    let screen_index = ScreenIndex::build(&sparse_per_genome, effective_screen_c, k);
+    // Pooled stage-1 screen index (band 0), then the optional band-1 tier.
+    let mut screen_index = ScreenIndex::build(&sparse_per_genome, effective_screen_c, k);
     drop(sparse_per_genome);
+    if mode == SmallGenomeMode::Band && !band_pairs.is_empty() {
+        let n_pairs = band_pairs.len();
+        let band = BandIndex::build(band_pairs, nominal_thresh, thresh_needed);
+        info!(
+            "band-1 tier: {} distinct keys ({} owners) over {} genome(s), value band \
+             [MAX/{}, MAX/{})",
+            band.num_keys(),
+            n_pairs,
+            band.num_genomes(),
+            screen_c,
+            (u64::MAX / thresh_needed.max(1)).max(1)
+        );
+        screen_index.band = Some(band);
+    }
     let mut index_block: Vec<u8> = Vec::new();
     screen_index.write_to_vec(&mut index_block)?;
 
@@ -695,6 +1133,25 @@ pub fn write_two_stage_db<W: Write>(
     let footer_bytes = bincode::serialize(&footer).map_err(io::Error::other)?;
     let index_offset = HEADER_LEN + body.len() as u64;
     let footer_offset = index_offset + index_block.len() as u64;
+
+    // One machine-readable line summarising what this build cost, so a
+    // benchmark harness can compare modes without re-reading the database.
+    // Debug-level: the format is for parsers, not for people.
+    debug!(
+        "bench_build mode={} screen_c={} effective_screen_c={} min_sparse_kmers={} genomes={} \
+         densified={} band_keys={} band_owners={} dense_bytes={} index_bytes={} footer_bytes={}",
+        mode,
+        screen_c,
+        effective_screen_c,
+        min_sparse_kmers,
+        footer.genomes.len(),
+        n_densified,
+        screen_index.band.as_ref().map_or(0, |b| b.num_keys()),
+        screen_index.band.as_ref().map_or(0, |b| b.num_owners()),
+        body.len(),
+        index_block.len(),
+        footer_bytes.len(),
+    );
 
     w.write_all(MAGIC)?;
     w.write_all(&[VERSION])?;
@@ -739,6 +1196,9 @@ pub struct TwoStageDb {
     pub c: usize,
     pub k: usize,
     pub screen_c: usize,
+    /// Path this database was opened from (empty for in-memory readers); used
+    /// only for diagnostics.
+    pub path: String,
     /// File offset where the dense-block region ends (start of the screen index);
     /// used to bound the last genome's block for positional reads.
     index_offset: u64,
@@ -746,8 +1206,49 @@ pub struct TwoStageDb {
     /// Pooled stage-1 screen index (Path B). Replaces the per-genome sparse
     /// sketches; querying a sample against it yields the contained genomes.
     pub screen_index: ScreenIndex,
+    /// Reader-side small-genome screen (`--screen-small-genomes`); see
+    /// `SmallGenomeScreen`.
+    pub small_screen: Option<SmallGenomeScreen>,
     data: DenseData,
     cache: Mutex<FxHashMap<u32, Arc<GenomeSketch>>>,
+}
+
+/// Reader-side small-genome screen: the stage-1 screen k-mers of genomes the
+/// *stored* index left short are reconstructed from their dense blocks when the
+/// database is opened, and intersected against the sample directly instead of
+/// through the pooled index.
+///
+/// This needs no index change at all -- a database written with
+/// `--small-genome-screen none` is what a build with no small-genome handling
+/// writes, so this also gives small-genome sensitivity on stock-sylph databases.
+/// The trade-off is where the work goes: cost is O(retained reference k-mers)
+/// per sample rather than O(sample), which is a win only while the short genomes
+/// are a small minority of the reference.
+/// Retained k-mers are stored flat (CSR), not as a `Vec` per genome: a viral
+/// reference can put millions of genomes in here, and a `Vec` each would add an
+/// allocation header per genome and a pointer chase per genome per sample.
+pub struct SmallGenomeScreen {
+    /// Genomes the stored index left below `floor`, ascending.
+    genome_ids: Vec<u32>,
+    /// Row offsets into `hashes`, length `genome_ids.len() + 1`.
+    offsets: Vec<u32>,
+    /// Each genome's `floor` smallest dense hashes -- exactly the set a
+    /// densified build stores for it.
+    hashes: Vec<u64>,
+    /// Screen k-mer counts (the ANI denominator) for those genomes.
+    counts: FxHashMap<u32, u32>,
+    /// One past the largest retained hash, i.e. the densest rate this screen
+    /// reaches (the reader's analogue of a `loosen` build's widened threshold).
+    densest_thresh: u64,
+}
+
+impl SmallGenomeScreen {
+    pub fn num_genomes(&self) -> usize {
+        self.genome_ids.len()
+    }
+    pub fn num_kmers(&self) -> usize {
+        self.hashes.len()
+    }
 }
 
 /// Parse the magic + version header; return `(index_offset, footer_offset)`.
@@ -775,14 +1276,17 @@ fn build_db(
     index_offset: u64,
     screen_index: ScreenIndex,
     data: DenseData,
+    path: String,
 ) -> TwoStageDb {
     TwoStageDb {
         c: footer.c,
         k: footer.k,
         screen_c: footer.screen_c,
+        path,
         index_offset,
         genomes: footer.genomes,
         screen_index,
+        small_screen: None,
         data,
         cache: Mutex::new(FxHashMap::default()),
     }
@@ -805,7 +1309,13 @@ fn from_bytes(data: DenseData) -> io::Result<TwoStageDb> {
         footer.screen_c,
         footer.k,
     )?;
-    Ok(build_db(footer, index_offset, screen_index, data))
+    Ok(build_db(
+        footer,
+        index_offset,
+        screen_index,
+        data,
+        String::new(),
+    ))
 }
 
 /// Open a `.syl2db` from an in-memory reader (reads it all into memory).
@@ -868,6 +1378,134 @@ impl TwoStageDb {
                 f(&buf)
             }
         }
+    }
+
+    /// The `n` smallest hashes of genome `g`'s dense block -- exactly the sparse
+    /// set a densified (`--min-sparse-kmers n`) build would have stored for it,
+    /// since `read_hashes` returns the block in ascending order. Reads only the
+    /// `genome_kmers` block, not the (longer) pseudotax one.
+    pub fn dense_sparse_prefix(&self, g: u32, n: usize) -> io::Result<Vec<u64>> {
+        let mut hashes = self.with_block(g, |bytes| {
+            let mut cur = bytes;
+            read_hashes(&mut cur)
+        })?;
+        hashes.truncate(n);
+        Ok(hashes)
+    }
+
+    /// Build the reader-side small-genome screen (see `SmallGenomeScreen`):
+    /// every genome with fewer than `floor` *stored* screen k-mers gets its
+    /// `floor` smallest dense hashes read back and retained in memory.
+    pub fn enable_small_genome_screen(&mut self, floor: usize) -> io::Result<()> {
+        let genome_ids: Vec<u32> = (0..self.len() as u32)
+            .filter(|&g| (self.screen_index.screen_kmers(g) as usize) < floor)
+            .collect();
+        let per_genome: Vec<Vec<u64>> = genome_ids
+            .par_iter()
+            .map(|&g| self.dense_sparse_prefix(g, floor))
+            .collect::<io::Result<Vec<_>>>()?;
+
+        // Row offsets are u32, as everywhere else in this format. 12.7 M viral
+        // genomes at the default floor need 0.6 G of them, but a large enough
+        // `floor` on a large enough reference would wrap silently, so refuse.
+        let total_kmers: usize = per_genome.iter().map(Vec::len).sum();
+        if total_kmers > u32::MAX as usize {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "--screen-small-genomes {} would retain {} k-mers across {} genomes, more than \
+                     this index can address; use a smaller value",
+                    floor,
+                    total_kmers,
+                    genome_ids.len()
+                ),
+            ));
+        }
+        let mut offsets: Vec<u32> = Vec::with_capacity(genome_ids.len() + 1);
+        offsets.push(0);
+        let mut hashes: Vec<u64> = Vec::with_capacity(total_kmers);
+        let mut counts: FxHashMap<u32, u32> =
+            FxHashMap::with_capacity_and_hasher(genome_ids.len(), Default::default());
+        let mut densest_thresh = 0u64;
+        for (&g, v) in genome_ids.iter().zip(&per_genome) {
+            counts.insert(g, v.len() as u32);
+            // `dense_sparse_prefix` returns the block in ascending order, so the
+            // last hash is this genome's own (densest) screen threshold.
+            if let Some(&last) = v.last() {
+                densest_thresh = densest_thresh.max(last.saturating_add(1));
+            }
+            hashes.extend_from_slice(v);
+            offsets.push(hashes.len() as u32);
+        }
+        self.small_screen = Some(SmallGenomeScreen {
+            genome_ids,
+            offsets,
+            hashes,
+            counts,
+            densest_thresh,
+        });
+        Ok(())
+    }
+
+    /// Stage-1 screen k-mer count for genome `g` (the ANI denominator), taking
+    /// whichever screen actually covers it.
+    #[inline]
+    pub fn screen_kmers(&self, g: u32) -> u32 {
+        if let Some(s) = &self.small_screen {
+            if let Some(&c) = s.counts.get(&g) {
+                return c;
+            }
+        }
+        self.screen_index.screen_kmers(g)
+    }
+
+    /// The densest stage-1 screen rate anything in this database is screened at.
+    /// Coarse-rate assumptions (e.g. scaling `-M` from the dense rate to the
+    /// screen rate) must use this, not the footer's nominal `screen_c`, or they
+    /// over-reject the genomes that needed a denser rate.
+    pub fn effective_screen_c(&self) -> usize {
+        let mut thresh = screen_threshold(self.screen_c);
+        if let Some(b) = &self.screen_index.band {
+            thresh = thresh.max(b.hi);
+        }
+        if let Some(s) = &self.small_screen {
+            thresh = thresh.max(s.densest_thresh);
+        }
+        (u64::MAX / thresh.max(1)).max(1) as usize
+    }
+
+    /// Stage 1: matched coverage counts per genome, from the pooled index (plus
+    /// its band-1 tier) and, if enabled, the reader-side small-genome screen.
+    pub fn screen(&self, sample: &SequencesSketch) -> FxHashMap<u32, Vec<u32>> {
+        let mut hits = self.screen_index.gather_hits(sample);
+        if let Some(s) = &self.small_screen {
+            // The retained prefix is a superset of whatever the stored index
+            // holds for these genomes, so it replaces (never adds to) their
+            // entry -- otherwise shared k-mers would be counted twice.
+            let extra: Vec<(u32, Vec<u32>)> = (0..s.genome_ids.len())
+                .into_par_iter()
+                .filter_map(|i| {
+                    let (lo, hi) = (s.offsets[i] as usize, s.offsets[i + 1] as usize);
+                    let mut covs: Vec<u32> = Vec::new();
+                    for h in &s.hashes[lo..hi] {
+                        if let Some(&cnt) = sample.kmer_counts.get(h) {
+                            if cnt != 0 {
+                                covs.push(cnt);
+                            }
+                        }
+                    }
+                    if covs.is_empty() {
+                        None
+                    } else {
+                        Some((s.genome_ids[i], covs))
+                    }
+                })
+                .collect();
+            for (g, covs) in extra {
+                hits.insert(g, covs);
+            }
+        }
+        hits
     }
 
     /// Decode genome `g`'s full dense `GenomeSketch` without touching the cache.
@@ -944,6 +1582,7 @@ pub fn open_file(path: &str) -> io::Result<TwoStageDb> {
         index_offset,
         screen_index,
         DenseData::File(file),
+        path.to_string(),
     ))
 }
 
@@ -1032,16 +1671,24 @@ pub fn run_db_convert(args: DbConvertArgs) {
         }
     }
     info!(
-        "Converting {} genomes (dense -c {}, stage-1 screen -c {}) -> {}",
+        "Converting {} genomes (dense -c {}, stage-1 screen -c {}, small-genome screen {}) -> {}",
         sketches.len(),
         c,
         args.screen_c,
+        args.small_genome_screen,
         out
     );
     let w =
         BufWriter::new(File::create(&out).unwrap_or_else(|_| panic!("Could not create {}", out)));
-    write_two_stage_db(w, &sketches, args.screen_c, args.min_sparse_kmers, args.min_contain)
-        .unwrap_or_else(|e| panic!("Failed to write {}: {}", out, e));
+    write_two_stage_db(
+        w,
+        &sketches,
+        args.screen_c,
+        args.min_sparse_kmers,
+        args.min_contain,
+        args.small_genome_screen,
+    )
+    .unwrap_or_else(|e| panic!("Failed to write {}: {}", out, e));
     info!("Wrote two-stage database to {}", out);
 }
 
@@ -1109,7 +1756,15 @@ mod tests {
         ];
 
         let mut buf = Vec::new();
-        write_two_stage_db(&mut buf, &sketches, 200, SPARSE_TARGET_MIN_DEFAULT, 0).unwrap();
+        write_two_stage_db(
+            &mut buf,
+            &sketches,
+            200,
+            SPARSE_TARGET_MIN_DEFAULT,
+            0,
+            SmallGenomeMode::Loosen,
+        )
+        .unwrap();
         let db = open(std::io::Cursor::new(buf)).unwrap();
 
         assert_eq!(db.c, 50);
@@ -1256,7 +1911,15 @@ mod tests {
             gsketch("g1.fa", g1.clone(), Some(vec![2])),
         ];
         let mut buf = Vec::new();
-        write_two_stage_db(&mut buf, &sketches, 200, SPARSE_TARGET_MIN_DEFAULT, 0).unwrap();
+        write_two_stage_db(
+            &mut buf,
+            &sketches,
+            200,
+            SPARSE_TARGET_MIN_DEFAULT,
+            0,
+            SmallGenomeMode::Loosen,
+        )
+        .unwrap();
         let db = open(std::io::Cursor::new(buf)).unwrap();
 
         let sample = sample_from(&[(5, 4), (7, 6), (thresh - 1, 1), (thresh - 2, 9)]);
@@ -1271,8 +1934,8 @@ mod tests {
     }
 
     /// Genomes with <= SPARSE_TARGET_MIN_DEFAULT total dense k-mers use all of
-    /// them as their sparse set (regardless of the nominal screen_c), and force
-    /// the database-wide effective screen_c down toward the dense rate `c`.
+    /// them as their sparse set (regardless of the nominal screen_c), and loosen
+    /// the database-wide effective screen_c to cover them.
     #[test]
     fn write_two_stage_db_small_genomes_use_all_kmers() {
         let small_a: Vec<u64> = (1..=15u64).collect(); // 15 total: < SPARSE_WARN_THRESHOLD
@@ -1282,18 +1945,36 @@ mod tests {
             gsketch("b.fa", small_b.clone(), None),
         ];
         let mut buf = Vec::new();
-        write_two_stage_db(&mut buf, &sketches, 3000, SPARSE_TARGET_MIN_DEFAULT, 0).unwrap();
+        write_two_stage_db(
+            &mut buf,
+            &sketches,
+            3000,
+            SPARSE_TARGET_MIN_DEFAULT,
+            0,
+            SmallGenomeMode::Loosen,
+        )
+        .unwrap();
         let db = open(std::io::Cursor::new(buf)).unwrap();
 
         assert_eq!(db.screen_index.sparse_count[0] as usize, small_a.len());
         assert_eq!(db.screen_index.sparse_count[1] as usize, small_b.len());
 
-        // Both genomes are far below SPARSE_TARGET_MIN_DEFAULT, so their
-        // genome_thresh is the DB's own dense threshold (c=50, from `gsketch`)
-        // -- the database-wide effective screen_c collapses toward that.
-        let expected_screen_c = (u64::MAX / screen_threshold(50)).max(1) as usize;
+        // Both genomes are far below SPARSE_TARGET_MIN_DEFAULT, so both use every
+        // dense k-mer they have and the database-wide effective screen_c is
+        // loosened to whatever covers the largest of those (here b's 1034) --
+        // never coarser, or the pooled index's early-exit would prune real keys.
+        let largest_stored = *small_b.iter().max().unwrap();
+        let expected_screen_c = (u64::MAX / (largest_stored + 1)).max(1) as usize;
         assert_eq!(db.screen_c, expected_screen_c);
-        assert!(db.screen_c < 3000, "small genomes should force a denser effective screen_c");
+        assert!(
+            screen_threshold(db.screen_c) > largest_stored,
+            "the effective screen threshold must cover every stored k-mer"
+        );
+        // ... and the screen really does find them.
+        let sample = sample_from(&[(small_a[0], 2), (largest_stored, 5)]);
+        let hits = db.screen_index.gather_hits(&sample);
+        assert_eq!(hits[&0], vec![2]);
+        assert_eq!(hits[&1], vec![5]);
     }
 
     /// A genome whose nominal (screen_c) sparse subset falls short of
@@ -1315,7 +1996,15 @@ mod tests {
 
         let sketches = vec![gsketch("c.fa", kmers.clone(), None)];
         let mut buf = Vec::new();
-        write_two_stage_db(&mut buf, &sketches, screen_c, SPARSE_TARGET_MIN_DEFAULT, 0).unwrap();
+        write_two_stage_db(
+            &mut buf,
+            &sketches,
+            screen_c,
+            SPARSE_TARGET_MIN_DEFAULT,
+            0,
+            SmallGenomeMode::Loosen,
+        )
+        .unwrap();
         let db = open(std::io::Cursor::new(buf)).unwrap();
 
         assert_eq!(db.screen_index.sparse_count[0] as usize, SPARSE_TARGET_MIN_DEFAULT);
@@ -1339,5 +2028,223 @@ mod tests {
         let sample_out = sample_from(&[(kmers[50], 3)]);
         let hits_out = db.screen_index.gather_hits(&sample_out);
         assert!(hits_out.get(&0).is_none(), "51st-smallest k-mer should not have been kept");
+    }
+
+    // --- small-genome screen modes ------------------------------------------
+
+    const MODE_SCREEN_C: usize = 3000;
+
+    /// One genome big enough to have plenty of k-mers at the nominal screen rate,
+    /// and one so small that *all* of its k-mers sit above the nominal threshold
+    /// (the viral/plasmid case that motivates the floor).
+    fn big_and_tiny() -> (Vec<GenomeSketch>, Vec<u64>, Vec<u64>) {
+        let nominal_thresh = screen_threshold(MODE_SCREEN_C);
+        let dense_thresh = screen_threshold(50); // c=50, matching `gsketch`
+        let big: Vec<u64> = (1..=100u64).map(|i| i * (nominal_thresh / 200)).collect();
+        let step = (dense_thresh - nominal_thresh) / 100;
+        let tiny: Vec<u64> = (0..40u64).map(|i| nominal_thresh + 1 + i * step).collect();
+        assert!(big.iter().all(|&h| h < nominal_thresh));
+        assert!(tiny.iter().all(|&h| h > nominal_thresh && h < dense_thresh));
+        let sketches = vec![
+            gsketch("big.fa", big.clone(), None),
+            gsketch("tiny.fa", tiny.clone(), None),
+        ];
+        (sketches, big, tiny)
+    }
+
+    fn build_with_mode(sketches: &[GenomeSketch], mode: SmallGenomeMode) -> Vec<u8> {
+        let mut buf = Vec::new();
+        write_two_stage_db(
+            &mut buf,
+            sketches,
+            MODE_SCREEN_C,
+            SPARSE_TARGET_MIN_DEFAULT,
+            0,
+            mode,
+        )
+        .unwrap();
+        buf
+    }
+
+    fn sorted_hits(hits: &FxHashMap<u32, Vec<u32>>) -> Vec<(u32, Vec<u32>)> {
+        let mut out: Vec<(u32, Vec<u32>)> = hits
+            .iter()
+            .map(|(&g, v)| {
+                let mut v = v.clone();
+                v.sort_unstable();
+                (g, v)
+            })
+            .collect();
+        out.sort();
+        out
+    }
+
+    /// The three modes are meant to be different *storage* for the same screen,
+    /// not different screens: `loosen`, `band` and `none` + the reader-side
+    /// small-genome screen must all give the same per-genome k-mer counts and the
+    /// same matched coverages. `none` on its own is the sensitivity loss they all
+    /// exist to avoid, so it must (and does) miss the tiny genome entirely.
+    #[test]
+    fn small_genome_modes_screen_identically() {
+        let (sketches, big, tiny) = big_and_tiny();
+        let sample = sample_from(&[(big[0], 4), (tiny[0], 7), (tiny[39], 9)]);
+
+        let loosen = open(std::io::Cursor::new(build_with_mode(
+            &sketches,
+            SmallGenomeMode::Loosen,
+        )))
+        .unwrap();
+        let band = open(std::io::Cursor::new(build_with_mode(
+            &sketches,
+            SmallGenomeMode::Band,
+        )))
+        .unwrap();
+        let mut none = open(std::io::Cursor::new(build_with_mode(
+            &sketches,
+            SmallGenomeMode::None,
+        )))
+        .unwrap();
+
+        // Without a floor the tiny genome has no screen k-mers at all and is
+        // invisible, however much of it the sample contains.
+        assert_eq!(none.screen_kmers(1), 0);
+        assert!(none.screen(&sample).get(&1).is_none());
+
+        none.enable_small_genome_screen(SPARSE_TARGET_MIN_DEFAULT)
+            .unwrap();
+        let reader = none;
+
+        for db in [&loosen, &band, &reader] {
+            assert_eq!(db.screen_kmers(0) as usize, big.len());
+            assert_eq!(db.screen_kmers(1) as usize, tiny.len());
+        }
+        let expected = sorted_hits(&loosen.screen(&sample));
+        assert_eq!(expected, vec![(0, vec![4]), (1, vec![7, 9])]);
+        assert_eq!(sorted_hits(&band.screen(&sample)), expected);
+        assert_eq!(sorted_hits(&reader.screen(&sample)), expected);
+
+        // Only `loosen` pays for the tiny genome database-wide; the other two
+        // keep the nominal rate for everything the tiny genome does not own, but
+        // all three report the same densest (effective) rate, so downstream
+        // k-mer-count scaling behaves identically.
+        assert!(loosen.screen_c < MODE_SCREEN_C);
+        assert_eq!(band.screen_c, MODE_SCREEN_C);
+        assert_eq!(reader.screen_c, MODE_SCREEN_C);
+        assert_eq!(band.effective_screen_c(), loosen.effective_screen_c());
+        assert_eq!(reader.effective_screen_c(), loosen.effective_screen_c());
+    }
+
+    /// Band 1 is *appended* to the band-0 index block, so a `band` database's
+    /// index is byte-for-byte a `none` database's index plus a trailing block: a
+    /// reader that predates banding consumes band 0 and stops, seeing a valid
+    /// nominal-rate index rather than an error.
+    #[test]
+    fn band_index_extends_unfloored_index() {
+        let (sketches, _, tiny) = big_and_tiny();
+        let band_bytes = build_with_mode(&sketches, SmallGenomeMode::Band);
+        let none_bytes = build_with_mode(&sketches, SmallGenomeMode::None);
+
+        let index_block = |b: &[u8]| -> Vec<u8> {
+            let (i, f) = parse_header(b).unwrap();
+            b[i as usize..f as usize].to_vec()
+        };
+        let (band_index, none_index) = (index_block(&band_bytes), index_block(&none_bytes));
+        assert!(
+            band_index.starts_with(&none_index),
+            "band-0 keys/fingerprints/counts must be identical to an unfloored build"
+        );
+        assert_eq!(
+            &band_index[none_index.len()..none_index.len() + 4],
+            BAND_MAGIC
+        );
+
+        // The dense blocks are untouched by banding, so only the index differs
+        // (and, in the header, the footer offset the longer index pushes along).
+        let dense_body = |b: &[u8]| {
+            let (i, _) = parse_header(b).unwrap();
+            b[HEADER_LEN as usize..i as usize].to_vec()
+        };
+        assert_eq!(dense_body(&band_bytes), dense_body(&none_bytes));
+
+        // Band 1 holds exactly the tiny genome's keys, and nothing else.
+        let db = open(std::io::Cursor::new(band_bytes)).unwrap();
+        let band = db.screen_index.band.as_ref().unwrap();
+        assert_eq!(band.num_keys(), tiny.len());
+        assert_eq!(band.num_genomes(), 1);
+        assert_eq!(band.count(1) as usize, tiny.len());
+    }
+
+    /// `none` means no floor at all, so the file it writes cannot depend on
+    /// `--min-sparse-kmers` -- that is what makes it byte-identical to a build
+    /// with no small-genome handling, and therefore still readable by stock
+    /// sylph.
+    #[test]
+    fn none_mode_ignores_the_sparse_floor() {
+        let (sketches, _, _) = big_and_tiny();
+        let mut with_1 = Vec::new();
+        write_two_stage_db(
+            &mut with_1,
+            &sketches,
+            MODE_SCREEN_C,
+            1,
+            0,
+            SmallGenomeMode::None,
+        )
+        .unwrap();
+        let mut with_500 = Vec::new();
+        write_two_stage_db(
+            &mut with_500,
+            &sketches,
+            MODE_SCREEN_C,
+            500,
+            0,
+            SmallGenomeMode::None,
+        )
+        .unwrap();
+        assert_eq!(with_1, with_500);
+    }
+
+    /// The reader-side screen reconstructs a genome's sparse prefix from its
+    /// dense block: the `n` smallest hashes, which is exactly what a densified
+    /// build stores. Enabling it on a database that already densified must
+    /// therefore change nothing -- it either has nothing to do, or (for a genome
+    /// whose whole dense sketch is smaller than the floor, so no build could
+    /// reach it) re-derives the same set and replaces it with itself.
+    #[test]
+    fn reader_side_screen_matches_stored_prefix() {
+        let (sketches, big, tiny) = big_and_tiny();
+        let db = open(std::io::Cursor::new(build_with_mode(
+            &sketches,
+            SmallGenomeMode::None,
+        )))
+        .unwrap();
+
+        let mut expected: Vec<u64> = big.clone();
+        expected.sort_unstable();
+        expected.truncate(10);
+        assert_eq!(db.dense_sparse_prefix(0, 10).unwrap(), expected);
+        // Asking for more than the genome has yields all of it, sorted.
+        assert_eq!(db.dense_sparse_prefix(1, 1000).unwrap(), tiny);
+
+        let mut loosened = open(std::io::Cursor::new(build_with_mode(
+            &sketches,
+            SmallGenomeMode::Loosen,
+        )))
+        .unwrap();
+        let before = sorted_hits(&loosened.screen(&sample_from(&[(tiny[0], 7)])));
+        let kmers_before = loosened.screen_kmers(1);
+        loosened
+            .enable_small_genome_screen(SPARSE_TARGET_MIN_DEFAULT)
+            .unwrap();
+        // `big` already cleared the floor, so only the 40-k-mer `tiny` is picked
+        // up -- and its reconstructed set is the one already stored.
+        let small = loosened.small_screen.as_ref().unwrap();
+        assert_eq!(small.num_genomes(), 1);
+        assert_eq!(small.num_kmers(), tiny.len());
+        assert_eq!(loosened.screen_kmers(1), kmers_before);
+        assert_eq!(
+            sorted_hits(&loosened.screen(&sample_from(&[(tiny[0], 7)]))),
+            before
+        );
     }
 }

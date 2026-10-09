@@ -1,5 +1,6 @@
 use clap::{Args, Parser, Subcommand};
 use crate::constants::*;
+use crate::twostage_db::SmallGenomeMode;
 
 #[derive(Parser)]
 #[clap(author, version, about = "Ultrafast genome ANI queries and taxonomic profiling for metagenomic shotgun samples.\n\n--- Preparing inputs by sketching (indexing)\n## fastq (reads) and fasta (genomes all at once)\n## *.sylsp found in -d; *.syldb given by -o\nsylph sketch -t 5 sample1.fq sample2.fq genome1.fa genome2.fa -o genome1+genome2 -d sample_dir\n\n## paired-end reads\nsylph sketch -1 a_1.fq b_1.fq -2 b_2.fq b_2.fq -d paired_sketches\n\n--- Taxonomic profiling with relative abundances and ANI\nsylph profile *.syldb *.sylsp > all-to-all-profile.tsv\n\n--- Direct profiling against database with raw reads\nsylph profile *.syldb -1 sampleA_1.fq -2 sampleA_2.fq", arg_required_else_help = true, disable_help_subcommand = true)]
@@ -37,6 +38,9 @@ pub struct DbConvertArgs {
     pub screen_c: usize,
     #[clap(long="min-sparse-kmers", default_value_t = SPARSE_TARGET_MIN_DEFAULT, help = "Minimum stage-1 sparse/screen k-mers per genome; genomes whose nominal --screen-c subsample would fall short use a denser, genome-specific screen rate to reach this floor (or all of their dense k-mers if they have fewer than this to begin with). Must be >= 1.")]
     pub min_sparse_kmers: usize,
+    #[clap(long="small-genome-screen", arg_enum, default_value_t = SmallGenomeMode::Loosen,
+        help = "How the mixture of screen rates that --min-sparse-kmers creates is stored. `loosen`: widen the single pooled index to the densest rate any genome needed (one small genome slows the screen for the whole database). `band`: keep the pooled index at --screen-c and put the extra keys of small genomes in a separate value band. `none`: no floor at all, so the file is identical to a build without small-genome handling; use `profile --screen-small-genomes` to recover them reader-side.")]
+    pub small_genome_screen: SmallGenomeMode,
     #[clap(long="min-contain",default_value_t = 7, help_heading = "ALGORITHM", help = "Throw away genomes with fewer than this many dense k-mers (they could never pass `profile`/`query`'s hit threshold at the matching default anyway, or are likely erroneous/fragmentary genomes). Set to 7 in line with default profiling options. ")]
     pub min_contain: usize,
     #[clap(short, default_value_t = 3, help = "Number of threads")]
@@ -210,6 +214,8 @@ pub struct ContainArgs {
     pub screen_ani: f64,
     #[clap(long="screen-dump", hidden=true, help_heading = "TWO-STAGE PROFILING", help = "Debug: write a TSV of every stage-1 screen survivor (genome, matched/total screen k-mers, naive/adjusted ANI, median coverage) to this file.")]
     pub screen_dump: Option<String>,
+    #[clap(long="screen-small-genomes", default_value_t = 0, help_heading = "TWO-STAGE PROFILING", help = "Two-stage databases (.syl2db) only: screen genomes with fewer than this many stored stage-1 k-mers (small genomes: viruses, plasmids, short contigs) directly instead, by reading back their smallest this-many dense k-mers when the database is opened. Recovers small-genome sensitivity from a database built with --small-genome-screen none, at a per-sample cost proportional to the number of such genomes. 0 disables.")]
+    pub screen_small_genomes: usize,
 
 
     //Hidden options that are embedded in the args but no longer used... 
