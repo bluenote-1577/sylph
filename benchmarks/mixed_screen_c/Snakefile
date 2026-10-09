@@ -1,0 +1,769 @@
+"""Benchmark: making a stage-1 screen that mixes several screen-c values scale.
+
+## The problem
+
+A `.syl2db` stage-1 screen subsamples each genome at `--screen-c` (3000 by
+default). A genome of a few kb has almost nothing left at that rate -- a
+mean-length MetaVR vOTU (~8.8 kb) keeps ~2 k-mers at `-c 100 --screen-c 3000` --
+so small references are silently undetectable. `--min-sparse-kmers` fixes the
+sensitivity by giving such a genome a denser, genome-specific rate, which means
+one database now holds a *mixture* of screen rates. The question this benchmark
+answers is how to store and query that mixture, because the obvious way does not
+scale:
+
+* **loosen** (the incumbent): widen the single pooled MPHF to the densest rate
+  any genome needed. One 8 kb genome drags the whole database's effective screen
+  rate toward `-c`, so the MPHF grows toward the *dense* k-mer count and every
+  sample k-mer below MAX/c -- i.e. every k-mer of a c=100 sample -- has to be
+  looked up in it.
+* **band** (option A): value-banded tiers. Partition keys by hash value, not by
+  genome. Band 0 (`h < MAX/screen_c`) is the pooled MPHF at exactly the nominal
+  rate, so it costs what an unloosened build costs; band 1 (`MAX/screen_c <= h <
+  MAX/dense_c`) holds only the extra keys densified genomes needed, as a sorted
+  `Vec<u64>` behind a bloom pre-filter. Each sample k-mer picks its band with two
+  comparisons. Band 1 is appended to the index block, so older readers ignore it.
+* **reader** (option B): build strictly at `--screen-c` (a file byte-identical to
+  one with no small-genome handling, still readable by stock sylph) and intersect
+  each small genome's reconstructed sparse prefix against the sample hashmap at
+  open time. Cost is O(number of small references) per sample instead of
+  O(sample) -- but it applies to sylph-built databases too.
+
+Both are only *storage* changes: all three arms screen the same per-genome k-mer
+set, so they must pass the same genomes out of stage 1. `compare_profiles.py`
+asserts exactly that on the `--screen-dump` survivor sets, which is what makes the
+timing comparison meaningful (and makes this pipeline a regression test as well as
+a benchmark). It deliberately does *not* assert equality of the final profiles:
+those additionally depend on how k-mer reassignment breaks ties between
+near-identical references, which at MetaVR scale differs between two runs of the
+same arm -- so the report quotes between-arm differences against that measured
+noise floor.
+
+## What is measured
+
+Cost, on real c=100 metagenome sketches: build wall time and index size, open
+time and RSS, the stage-1 inverted pass, survivor count and the stage-2 dense
+decode. Sensitivity, on a simulated sample with known truth *and* against a
+single-stage (unscreened) profile of the same references: which genomes each arm
+loses, split by genome size.
+
+The independent variable is the number of small genomes mixed into a fixed
+large-genome background (`n_metavr` x `n_gtdb`), because that -- not the total
+reference size -- is what decides which option wins.
+
+A second, separate question: `band` and `reader` both pay a one-time cost when
+the database is opened (deserializing the band block; reading back small
+genomes' dense prefixes) that `loosen` and `nofloor` barely do. Real usage scores
+many samples per `sylph profile` invocation, opening the database once -- so
+does that one-time cost matter once it is amortized over `multisample_n`
+samples, or does it wash out? `multisample_n` (0 disables) reuses one sample
+sketch that many times via `-l` at the largest (or `multisample_grid`-chosen)
+database, and measures the *whole-process* wall time, not just stage 1.
+
+## Running
+
+    pixi run snakemake --configfile config_smoke.yaml --cores 4   # smoke test
+    pixi run snakemake --profile aqua                             # the grid
+    pixi run snakemake --profile aqua --configfile config_full.yaml   # full GTDB+MetaVR
+
+The grid's largest point (100k vOTUs) is still 1/127th of MetaVR, and the two
+options scale differently in the number of small genomes, so `config_full.yaml`
+runs the same measurements once on the whole of GTDB R226 + MetaVR. Sketching is
+split into `sketch_groups` independent jobs there (`convert` takes many `.syldb`
+inputs, so nothing has to be merged), and when a grid point asks for the whole
+vOTU corpus the shard FASTAs are sketched where they are rather than being
+rewritten into chunk files.
+"""
+
+import glob
+import os
+import subprocess
+
+configfile: "config.yaml"
+
+
+def _expand(p):
+    return os.path.abspath(os.path.expanduser(str(p)))
+
+
+W = _expand(config["workdir"])
+RES = config["resultsdir"]
+LOGS = config["logdir"]
+BENCH = config["benchdir"]
+REPORT = config["report"]
+
+SYLPH = _expand(os.path.join(workflow.basedir, config["sylph"])) \
+    if not str(config["sylph"]).startswith("/") else _expand(config["sylph"])
+
+GTDB_DIR = _expand(config["gtdb_reps_dir"])
+METAVR_SHARDS = _expand(config["metavr_shards"])
+SCRIPTS = os.path.join(workflow.basedir, "scripts")
+
+C = config["c"]
+K = config["k"]
+MIN_SPACING = config["min_spacing"]
+SCREEN_C = config["screen_c"]
+MIN_SPARSE = config["min_sparse_kmers"]
+# PBS refuses to start a job whose walltime would cross a scheduled maintenance
+# boundary, so ask for what these rules actually need rather than the default.
+RUNTIME = config["runtime"]
+
+
+def rt(rule_key):
+    """Walltime for a rule family, falling back to the global `runtime`."""
+    return config.get(f"runtime_{rule_key}", RUNTIME)
+
+
+def mem(rule_key, fallback_key):
+    return config.get(f"mem_mb_{rule_key}", config[f"mem_mb_{fallback_key}"])
+
+
+# Sketching is split this many ways per source. One job per group, each writing
+# its own .syldb -- `convert-db-two-screen` takes any number of them, so there is
+# nothing to merge. 1 reproduces the single-job behaviour.
+SKETCH_GROUPS = int(config.get("sketch_groups", 1))
+GROUPS = list(range(SKETCH_GROUPS))
+
+# The whole vOTU corpus, as sharded FASTA. `metavr_shard_counts` (written by the
+# 235_sylph_metavr pipeline) gives the record count per shard, which is how a
+# grid point can ask for *all* of MetaVR without anyone counting 106 GB of FASTA:
+# a request that reaches the total is served by sketching the shards in place.
+SHARDS = sorted(glob.glob(os.path.join(METAVR_SHARDS, "*.fna")))
+METAVR_TOTAL = None
+if config.get("metavr_shard_counts"):
+    _counts = {}
+    with open(_expand(config["metavr_shard_counts"])) as _fh:
+        for _line in _fh:
+            _name, _n = _line.split()[:2]
+            _counts[_name] = int(_n)
+    _missing = [n for n in _counts if not os.path.exists(os.path.join(METAVR_SHARDS, n))]
+    if _missing:
+        raise WorkflowError(
+            f"{config['metavr_shard_counts']} names {len(_missing)} shard(s) that are not in "
+            f"{METAVR_SHARDS} (e.g. {_missing[:3]}): the two are out of sync"
+        )
+    METAVR_TOTAL = sum(_counts.values())
+
+N_GTDB = sorted(set(config["n_gtdb"]))
+N_METAVR = sorted(set(config["n_metavr"]))
+# Every non-degenerate point of the grid. (0, 0) would be an empty database.
+GRID = [(g, v) for g in N_GTDB for v in N_METAVR if g > 0 or v > 0]
+DBS = [f"g{g}_v{v}" for g, v in GRID]
+
+ARMS = config["arms"]
+BUILD_MODES = sorted({a["build_mode"] for a in ARMS.values()})
+REPS = list(range(1, config["replicates"] + 1))
+
+# The selected real samples plus the simulated one built below.
+SAMPLES = {name: _expand(config["sample_sketches"][name]) for name in config["use_samples"]}
+SAMPLES["simulated"] = f"{W}/sim/sketch/simulated.paired.sylsp"
+
+# --- multi-sample amortization -----------------------------------------------
+# Does a one-time per-open cost (band's pooled-index deserialize, reader's
+# dense-block read-back) pay for itself once a database scores many samples in
+# one process instead of one? `n_gtdb`/`n_metavr` already vary reference size;
+# this varies sample *count* at a fixed reference, so it needs its own grid
+# point(s) -- default to the largest (ng, nv) already in GRID, since that is
+# where a one-time open cost is largest and so most needs amortizing away.
+MULTI_N = int(config.get("multisample_n", 0))
+if MULTI_N <= 0:
+    MULTI_SAMPLES, MULTI_GRID = [], []
+else:
+    MULTI_SAMPLES = [s for s in config.get("multisample_samples", config["use_samples"]) if s in SAMPLES]
+    if config.get("multisample_grid"):
+        MULTI_GRID = [tuple(pt) for pt in config["multisample_grid"]]
+        _bad = [pt for pt in MULTI_GRID if pt not in GRID]
+        if _bad:
+            raise WorkflowError(
+                f"multisample_grid point(s) {_bad} are not in the n_gtdb x n_metavr grid {GRID}"
+            )
+    elif GRID:
+        MULTI_GRID = [max(GRID, key=lambda gv: (gv[1], gv[0]))]
+    else:
+        MULTI_GRID = []
+MULTI_DBS = [f"g{g}_v{v}" for g, v in MULTI_GRID]
+
+# Text-processing steps run on the submitting host: each is seconds of work, and
+# a queue round-trip for them would dominate their own runtime.
+localrules:
+    all,
+    gtdb_rep_listing,
+    gtdb_subset_list,
+    gtdb_group_lists,
+    metavr_subset,
+    simulation_plan,
+    # wgsim comes from this benchmark's pixi environment, which a PBS job does
+    # not inherit; the ~100 calls take seconds anyway.
+    simulate_reads,
+    screen_kmer_summary,
+    collect_metrics,
+    compare_profiles,
+    multisample_list,
+    collect_multisample,
+    report,
+
+
+wildcard_constraints:
+    ng=r"\d+",
+    nv=r"\d+",
+    p=r"\d+",
+    rep=r"\d+",
+    n=r"\d+",
+    mode="|".join(BUILD_MODES),
+    arm="|".join(ARMS),
+    sample="|".join(SAMPLES),
+
+
+# --- parse-time input checks ------------------------------------------------
+# Fail now, with a readable message, rather than three hours into a grid.
+
+if not os.path.exists(SYLPH):
+    raise WorkflowError(f"sylph binary not found at {SYLPH}; build it with `cargo build --release`")
+
+_help = subprocess.run([SYLPH, "convert-db-two-screen", "--help"],
+                       capture_output=True, text=True).stdout
+for _flag in ("--small-genome-screen", "--min-sparse-kmers"):
+    if _flag not in _help:
+        raise WorkflowError(
+            f"{SYLPH} has no `convert-db-two-screen {_flag}`: it predates the small-genome "
+            "screen modes this benchmark compares. Rebuild from the mixed-screen-kmers branch."
+        )
+if "--screen-small-genomes" not in subprocess.run(
+        [SYLPH, "profile", "--help"], capture_output=True, text=True).stdout:
+    raise WorkflowError(f"{SYLPH} has no `profile --screen-small-genomes` (option B)")
+
+for _name, _path in SAMPLES.items():
+    if _name != "simulated" and not os.path.exists(_path):
+        raise WorkflowError(f"sample sketch {_path} ({_name}) does not exist")
+
+_nonzero_v = [v for v in N_METAVR if v > 0]
+if _nonzero_v and min(_nonzero_v) < config["n_sim_viral"]:
+    raise WorkflowError(
+        f"n_sim_viral ({config['n_sim_viral']}) exceeds the smallest non-zero n_metavr "
+        f"({min(_nonzero_v)}): the simulated viral genomes would not be in every database"
+    )
+_nonzero_g = [g for g in N_GTDB if g > 0]
+if _nonzero_g and min(_nonzero_g) < config["n_sim_bacterial"]:
+    raise WorkflowError(
+        f"n_sim_bacterial ({config['n_sim_bacterial']}) exceeds the smallest non-zero n_gtdb "
+        f"({min(_nonzero_g)})"
+    )
+
+# Every sketch group must get at least one input file, or `sylph sketch` would be
+# invoked with none.
+if _nonzero_g and SKETCH_GROUPS > min(_nonzero_g):
+    raise WorkflowError(
+        f"sketch_groups ({SKETCH_GROUPS}) exceeds the smallest non-zero n_gtdb ({min(_nonzero_g)})"
+    )
+if _nonzero_v:
+    _v_files = len(SHARDS) if (METAVR_TOTAL and max(_nonzero_v) >= METAVR_TOTAL) \
+        else config["metavr_chunks"]
+    if SKETCH_GROUPS > _v_files:
+        raise WorkflowError(
+            f"sketch_groups ({SKETCH_GROUPS}) exceeds the {_v_files} MetaVR input file(s) "
+            "there are to spread over"
+        )
+if METAVR_TOTAL is None and _nonzero_v and max(_nonzero_v) > 12_000_000:
+    raise WorkflowError(
+        "an n_metavr this large is only servicable by sketching the shards in place, which "
+        "needs `metavr_shard_counts` set so the total corpus size is known"
+    )
+
+
+# --- helpers ----------------------------------------------------------------
+
+def db_parts(wildcards):
+    """The plain .syldb sources a grid point is built from (one or both)."""
+    out = []
+    if int(wildcards.ng) > 0:
+        out += [f"{W}/sketch/gtdb_{wildcards.ng}.p{p}.syldb" for p in GROUPS]
+    if int(wildcards.nv) > 0:
+        out += [f"{W}/sketch/metavr_{wildcards.nv}.p{p}.syldb" for p in GROUPS]
+    return out
+
+
+def metavr_chunks(nv):
+    return [f"{W}/metavr/v{nv}/chunk_{i}.fna" for i in range(config["metavr_chunks"])]
+
+
+def metavr_group_inputs(nv, p):
+    """The FASTA files sketch group `p` of an `nv`-vOTU subset covers.
+
+    Round-robin, because `sylph sketch` parallelises over input files: a group
+    that gets one large file leaves its other cores idle. A request that reaches
+    the whole corpus is served from the shards directly -- rewriting 106 GB of
+    FASTA to select all of it would cost more than the sketching does.
+    """
+    files = SHARDS if (METAVR_TOTAL and int(nv) >= METAVR_TOTAL) else metavr_chunks(nv)
+    return files[int(p)::SKETCH_GROUPS]
+
+
+def arm_db(wildcards):
+    return f"{W}/db/g{wildcards.ng}_v{wildcards.nv}.{ARMS[wildcards.arm]['build_mode']}.syl2db"
+
+
+rule all:
+    input:
+        f"{RES}/build_metrics.tsv",
+        f"{RES}/screen_metrics.tsv",
+        f"{RES}/agreement.tsv",
+        f"{RES}/recall.tsv",
+        f"{RES}/stability.tsv",
+        f"{RES}/screen_kmers.tsv",
+        f"{RES}/multisample_metrics.tsv",
+        REPORT,
+
+
+# ----------------------------------------------------------------------------
+# 1. Reference subsets
+# ----------------------------------------------------------------------------
+
+# Listing every GTDB representative once: the tree is ~110k files deep in a
+# three-level hash of directories, so this is worth caching.
+rule gtdb_rep_listing:
+    output:
+        f"{W}/sketch/gtdb_all_reps.txt",
+    log:
+        f"{LOGS}/gtdb_rep_listing.log",
+    shell:
+        "( find {GTDB_DIR} -name '*_genomic.fna.gz' | sort > {output} && "
+        "wc -l < {output} ) > {log} 2>&1"
+
+
+# Seeded shuffle, then prefixes: the n=500 list is the first 500 lines of the
+# n=2000 list, so a genome chosen for the simulated sample is present at every
+# non-zero grid point.
+rule gtdb_subset_list:
+    input:
+        f"{W}/sketch/gtdb_all_reps.txt",
+    output:
+        f"{W}/sketch/gtdb_{{ng}}.txt",
+    params:
+        seed=config["seed"],
+    log:
+        f"{LOGS}/gtdb_subset_list_{{ng}}.log",
+    shell:
+        "python3 {SCRIPTS}/subset_lines.py --input {input} --n {wildcards.ng} "
+        "--seed {params.seed} --output {output} > {log} 2>&1"
+
+
+# Round-robin the subset over the sketch groups. Whole GTDB is 143k files and
+# ~40 GB of sketch, which is both slow and memory-hungry to do in one process.
+rule gtdb_group_lists:
+    input:
+        f"{W}/sketch/gtdb_{{ng}}.txt",
+    output:
+        expand(f"{W}/sketch/gtdb_{{{{ng}}}}.group_{{p}}.txt", p=GROUPS),
+    params:
+        prefix=lambda w: f"{W}/sketch/gtdb_{w.ng}.group_",
+    log:
+        f"{LOGS}/gtdb_group_lists_{{ng}}.log",
+    shell:
+        "( awk -v n={SKETCH_GROUPS} -v prefix={params.prefix} "
+        "'{{ print > (prefix (NR-1)%n \".txt\") }}' {input} && "
+        "wc -l {params.prefix}*.txt ) > {log} 2>&1"
+
+
+rule sketch_gtdb:
+    input:
+        f"{W}/sketch/gtdb_{{ng}}.group_{{p}}.txt",
+    output:
+        f"{W}/sketch/gtdb_{{ng}}.p{{p}}.syldb",
+    threads: config["threads_sketch"]
+    resources:
+        mem_mb=config["mem_mb_sketch"],
+        runtime=rt("sketch"),
+    log:
+        f"{LOGS}/sketch_gtdb_{{ng}}.p{{p}}.log",
+    benchmark:
+        f"{BENCH}/sketch_gtdb_{{ng}}.p{{p}}.tsv"
+    shell:
+        "{SYLPH} sketch -c {C} -k {K} --min-spacing {MIN_SPACING} -t {threads} "
+        "--gl {input} -o {W}/sketch/gtdb_{wildcards.ng}.p{wildcards.p} > {log} 2>&1"
+
+
+# The first {nv} vOTU representatives, round-robined across chunk files so
+# sketching (which parallelises over files, not records) can use every core.
+# "First {nv}" keeps the subsets nested, like the GTDB lists above.
+rule metavr_subset:
+    output:
+        temp(metavr_chunks("{nv}")),
+    params:
+        chunks=config["metavr_chunks"],
+        prefix=lambda w: f"{W}/metavr/v{w.nv}/chunk",
+    log:
+        f"{LOGS}/metavr_subset_{{nv}}.log",
+    shell:
+        "python3 {SCRIPTS}/take_metavr.py --shards {METAVR_SHARDS} --n {wildcards.nv} "
+        "--chunks {params.chunks} --out-prefix {params.prefix} > {log} 2>&1"
+
+
+rule sketch_metavr:
+    input:
+        chunks=lambda w: metavr_group_inputs(w.nv, w.p),
+    output:
+        f"{W}/sketch/metavr_{{nv}}.p{{p}}.syldb",
+    # `sylph sketch` parallelises over input files, so asking for more cores than
+    # this group has files would just idle them on the node.
+    threads: lambda w: min(config["threads_sketch"], len(metavr_group_inputs(w.nv, w.p)))
+    resources:
+        mem_mb=config["mem_mb_sketch"],
+        runtime=rt("sketch"),
+    log:
+        f"{LOGS}/sketch_metavr_{{nv}}.p{{p}}.log",
+    benchmark:
+        f"{BENCH}/sketch_metavr_{{nv}}.p{{p}}.tsv"
+    shell:
+        # -i: each vOTU record is its own genome, which is what makes this the
+        # small-genome regime rather than one large concatenated genome.
+        "{SYLPH} sketch -c {C} -k {K} --min-spacing {MIN_SPACING} -t {threads} -i "
+        "{input.chunks} -o {W}/sketch/metavr_{wildcards.nv}.p{wildcards.p} > {log} 2>&1"
+
+
+# ----------------------------------------------------------------------------
+# 2. Simulated sample with known truth
+# ----------------------------------------------------------------------------
+
+rule simulation_plan:
+    input:
+        gtdb_list=f"{W}/sketch/gtdb_{min(_nonzero_g) if _nonzero_g else 0}.txt" if _nonzero_g else [],
+    output:
+        plan=f"{W}/sim/plan.tsv",
+        done=touch(f"{W}/sim/fastas.done"),
+    params:
+        n_viral=config["n_sim_viral"],
+        n_bact=config["n_sim_bacterial"],
+        cov_viral=",".join(str(c) for c in config["sim_viral_coverages"]),
+        cov_bact=config["sim_bacterial_coverage"],
+        read_length=config["sim_read_length"],
+        gtdb_list=lambda w, input: input.gtdb_list if input.gtdb_list else "",
+    log:
+        f"{LOGS}/simulation_plan.log",
+    shell:
+        "python3 {SCRIPTS}/prepare_simulation.py --shards {METAVR_SHARDS} "
+        "--n-viral {params.n_viral} --viral-coverages {params.cov_viral} "
+        "--gtdb-list '{params.gtdb_list}' --n-bacterial {params.n_bact} "
+        "--bacterial-coverage {params.cov_bact} --read-length {params.read_length} "
+        "--outdir {W}/sim/fastas --plan {output.plan} > {log} 2>&1"
+
+
+rule simulate_reads:
+    input:
+        plan=f"{W}/sim/plan.tsv",
+        done=f"{W}/sim/fastas.done",
+    output:
+        r1=temp(f"{W}/sim/reads_1.fq"),
+        r2=temp(f"{W}/sim/reads_2.fq"),
+    params:
+        err=config["sim_error_rate"],
+        read_length=config["sim_read_length"],
+        seed=config["seed"],
+    resources:
+        mem_mb=8000,
+        runtime=RUNTIME,
+    log:
+        f"{LOGS}/simulate_reads.log",
+    benchmark:
+        f"{BENCH}/simulate_reads.tsv"
+    shell:
+        "python3 {SCRIPTS}/simulate_reads.py --plan {input.plan} --r1 {output.r1} "
+        "--r2 {output.r2} --read-length {params.read_length} --error-rate {params.err} "
+        "--seed {params.seed} --workdir {W}/sim/wgsim > {log} 2>&1"
+
+
+rule sketch_simulated_sample:
+    input:
+        r1=f"{W}/sim/reads_1.fq",
+        r2=f"{W}/sim/reads_2.fq",
+    output:
+        f"{W}/sim/sketch/simulated.paired.sylsp",
+    threads: 4
+    resources:
+        mem_mb=16000,
+        runtime=RUNTIME,
+    log:
+        f"{LOGS}/sketch_simulated_sample.log",
+    benchmark:
+        f"{BENCH}/sketch_simulated_sample.tsv"
+    shell:
+        "{SYLPH} sketch -c {C} -k {K} -t {threads} -1 {input.r1} -2 {input.r2} "
+        "-S simulated -d {W}/sim/sketch > {log} 2>&1"
+
+
+# ----------------------------------------------------------------------------
+# 3. Two-stage conversion, once per (grid point, build mode)
+# ----------------------------------------------------------------------------
+
+rule convert:
+    input:
+        db_parts,
+    output:
+        f"{W}/db/g{{ng}}_v{{nv}}.{{mode}}.syl2db",
+    threads: config["threads_convert"]
+    resources:
+        mem_mb=config["mem_mb_convert"],
+        runtime=rt("convert"),
+    log:
+        f"{LOGS}/convert/g{{ng}}_v{{nv}}.{{mode}}.log",
+    benchmark:
+        f"{BENCH}/convert/g{{ng}}_v{{nv}}.{{mode}}.tsv"
+    shell:
+        # --debug: the `bench_build` line the metrics collector parses is debug-level.
+        "{SYLPH} convert-db-two-screen {input} -t {threads} --debug "
+        "--screen-c {SCREEN_C} --min-sparse-kmers {MIN_SPARSE} "
+        "--min-contain {config[min_contain]} --small-genome-screen {wildcards.mode} "
+        "-o {W}/db/g{wildcards.ng}_v{wildcards.nv}.{wildcards.mode} > {log} 2>&1"
+
+
+# How many stage-1 k-mers each genome actually ends up with. Run on the
+# unfloored (`none`) build, it says how many references the nominal --screen-c
+# leaves with zero screen k-mers, i.e. permanently invisible -- the number that
+# motivates the floor in the first place.
+rule inspect_db:
+    input:
+        f"{W}/db/g{{ng}}_v{{nv}}.{{mode}}.syl2db",
+    output:
+        yaml=temp(f"{W}/inspect/g{{ng}}_v{{nv}}.{{mode}}.yaml"),
+    resources:
+        mem_mb=mem("inspect", "convert"),
+        runtime=rt("inspect"),
+    log:
+        f"{LOGS}/inspect/g{{ng}}_v{{nv}}.{{mode}}.log",
+    shell:
+        "{SYLPH} inspect {input} -o {output.yaml} > {log} 2>&1"
+
+
+rule screen_kmer_summary:
+    input:
+        expand(f"{W}/inspect/{{db}}.{{mode}}.yaml", db=DBS, mode=BUILD_MODES),
+    output:
+        f"{RES}/screen_kmers.tsv",
+    log:
+        f"{LOGS}/screen_kmer_summary.log",
+    shell:
+        "python3 {SCRIPTS}/screen_kmer_summary.py --output {output} {input} > {log} 2>&1"
+
+
+# ----------------------------------------------------------------------------
+# 4. Profiling: every arm x sample x replicate
+# ----------------------------------------------------------------------------
+
+rule profile_two_stage:
+    input:
+        db=arm_db,
+        sample=lambda w: SAMPLES[w.sample],
+    output:
+        profile=f"{W}/profile/g{{ng}}_v{{nv}}.{{arm}}.{{sample}}.rep{{rep}}.tsv",
+        # Stage-1 survivors, which is the set the three equivalent arms must
+        # agree on exactly (the final profile additionally depends on how
+        # reassignment breaks ties between near-identical references).
+        dump=f"{W}/screen/g{{ng}}_v{{nv}}.{{arm}}.{{sample}}.rep{{rep}}.tsv",
+    params:
+        extra=lambda w: (f"--screen-small-genomes {ARMS[w.arm]['screen_small_genomes']}"
+                         if ARMS[w.arm]["screen_small_genomes"] else ""),
+    threads: config["threads_profile"]
+    resources:
+        mem_mb=config["mem_mb_profile"],
+        runtime=rt("profile"),
+    log:
+        f"{LOGS}/profile/g{{ng}}_v{{nv}}.{{arm}}.{{sample}}.rep{{rep}}.log",
+    benchmark:
+        f"{BENCH}/profile/g{{ng}}_v{{nv}}.{{arm}}.{{sample}}.rep{{rep}}.tsv"
+    shell:
+        # --debug: emits the `bench_open`/`bench_screen` lines collect_metrics parses.
+        "{SYLPH} profile {input.db} {input.sample} -t {threads} --debug "
+        "--screen-ani {config[screen_ani]} {params.extra} --screen-dump {output.dump} "
+        "-o {output.profile} > {log} 2>&1"
+
+
+# The unscreened reference: every genome profiled densely, so its detections are
+# what a perfect stage-1 screen would let through.
+rule profile_single_stage:
+    input:
+        dbs=db_parts,
+        sample=lambda w: SAMPLES[w.sample],
+    output:
+        f"{W}/profile/g{{ng}}_v{{nv}}.single.{{sample}}.rep{{rep}}.tsv",
+    threads: config["threads_profile"]
+    resources:
+        mem_mb=config["mem_mb_profile_single"],
+        runtime=rt("profile"),
+    log:
+        f"{LOGS}/profile/g{{ng}}_v{{nv}}.single.{{sample}}.rep{{rep}}.log",
+    benchmark:
+        f"{BENCH}/profile/g{{ng}}_v{{nv}}.single.{{sample}}.rep{{rep}}.tsv"
+    shell:
+        "{SYLPH} profile {input.dbs} {input.sample} -t {threads} -o {output} > {log} 2>&1"
+
+
+# ----------------------------------------------------------------------------
+# 4b. Amortization: one process, many samples
+# ----------------------------------------------------------------------------
+# `n_gtdb`/`n_metavr` above vary reference size at one sample each; this varies
+# sample *count* at one (large) reference, to see whether a one-time per-open
+# cost (band's pooled-index deserialize, reader's dense-block read-back) still
+# matters once it is amortized over many samples in the same process -- which is
+# how sylph is actually run (one `profile` invocation scores a whole sample set
+# against a database, not one process per sample).
+
+rule multisample_list:
+    input:
+        sample=lambda w: SAMPLES[w.sample],
+    output:
+        f"{W}/multisample/{{sample}}.n{{n}}.list.txt",
+    log:
+        f"{LOGS}/multisample_list_{{sample}}_{{n}}.log",
+    shell:
+        "python3 {SCRIPTS}/repeat_list.py --sample {input.sample} --n {wildcards.n} "
+        "--output {output} > {log} 2>&1"
+
+
+rule profile_multisample:
+    input:
+        db=arm_db,
+        list=f"{W}/multisample/{{sample}}.n{{n}}.list.txt",
+    output:
+        f"{W}/multisample/g{{ng}}_v{{nv}}.{{arm}}.{{sample}}.n{{n}}.tsv",
+    params:
+        extra=lambda w: (f"--screen-small-genomes {ARMS[w.arm]['screen_small_genomes']}"
+                         if ARMS[w.arm]["screen_small_genomes"] else ""),
+    threads: config["threads_profile"]
+    resources:
+        mem_mb=config["mem_mb_profile"],
+        runtime=rt("multisample"),
+    log:
+        f"{LOGS}/multisample/g{{ng}}_v{{nv}}.{{arm}}.{{sample}}.n{{n}}.log",
+    benchmark:
+        f"{BENCH}/multisample/g{{ng}}_v{{nv}}.{{arm}}.{{sample}}.n{{n}}.tsv"
+    shell:
+        # One process, N lines in {input.list}: the database opens once
+        # (bench_open) and is screened N times (bench_screen x N), which is
+        # exactly the split collect_multisample.py needs.
+        "{SYLPH} profile {input.db} -l {input.list} -t {threads} --debug "
+        "--screen-ani {config[screen_ani]} {params.extra} -o {output} > {log} 2>&1"
+
+
+MULTI_RUNS = expand(
+    f"{W}/multisample/{{db}}.{{arm}}.{{sample}}.n{{n}}.tsv",
+    db=MULTI_DBS, arm=list(ARMS), sample=MULTI_SAMPLES, n=[MULTI_N],
+)
+MULTI_LOGS = expand(
+    f"{LOGS}/multisample/{{db}}.{{arm}}.{{sample}}.n{{n}}.log",
+    db=MULTI_DBS, arm=list(ARMS), sample=MULTI_SAMPLES, n=[MULTI_N],
+)
+MULTI_BENCH = expand(
+    f"{BENCH}/multisample/{{db}}.{{arm}}.{{sample}}.n{{n}}.tsv",
+    db=MULTI_DBS, arm=list(ARMS), sample=MULTI_SAMPLES, n=[MULTI_N],
+)
+
+
+rule collect_multisample:
+    input:
+        runs=MULTI_RUNS,
+        logs=MULTI_LOGS,
+        bench=MULTI_BENCH,
+    output:
+        f"{RES}/multisample_metrics.tsv",
+    log:
+        f"{LOGS}/collect_multisample.log",
+    run:
+        if not MULTI_RUNS:
+            # multisample_n unset/0: nothing to measure, but `all` still needs
+            # the output to exist so the report can distinguish "not run" from
+            # "failed".
+            import polars as pl
+            pl.DataFrame(schema={"db": pl.String}).write_csv(output[0], separator="\t")
+        else:
+            shell(
+                "python3 {SCRIPTS}/collect_multisample.py --logdir {LOGS} "
+                "--benchdir {BENCH} --output {output} > {log} 2>&1"
+            )
+
+
+# ----------------------------------------------------------------------------
+# 5. Collection and comparison
+# ----------------------------------------------------------------------------
+
+PROFILE_ARMS = list(ARMS) + (["single"] if config["single_stage_reference"] else [])
+
+ALL_PROFILES = expand(
+    f"{W}/profile/{{db}}.{{arm}}.{{sample}}.rep{{rep}}.tsv",
+    db=DBS, arm=PROFILE_ARMS, sample=list(SAMPLES), rep=REPS,
+)
+# `single` is not a two-stage run, so it has no stage-1 survivors to dump.
+ALL_SCREEN_DUMPS = expand(
+    f"{W}/screen/{{db}}.{{arm}}.{{sample}}.rep{{rep}}.tsv",
+    db=DBS, arm=list(ARMS), sample=list(SAMPLES), rep=REPS,
+)
+CONVERT_LOGS = expand(f"{LOGS}/convert/{{db}}.{{mode}}.log", db=DBS, mode=BUILD_MODES)
+CONVERT_BENCH = expand(f"{BENCH}/convert/{{db}}.{{mode}}.tsv", db=DBS, mode=BUILD_MODES)
+PROFILE_LOGS = expand(
+    f"{LOGS}/profile/{{db}}.{{arm}}.{{sample}}.rep{{rep}}.log",
+    db=DBS, arm=PROFILE_ARMS, sample=list(SAMPLES), rep=REPS,
+)
+PROFILE_BENCH = expand(
+    f"{BENCH}/profile/{{db}}.{{arm}}.{{sample}}.rep{{rep}}.tsv",
+    db=DBS, arm=PROFILE_ARMS, sample=list(SAMPLES), rep=REPS,
+)
+
+
+rule collect_metrics:
+    input:
+        convert_logs=CONVERT_LOGS,
+        convert_bench=CONVERT_BENCH,
+        profile_logs=PROFILE_LOGS,
+        profile_bench=PROFILE_BENCH,
+        dbs=expand(f"{W}/db/{{db}}.{{mode}}.syl2db", db=DBS, mode=BUILD_MODES),
+    output:
+        build=f"{RES}/build_metrics.tsv",
+        screen=f"{RES}/screen_metrics.tsv",
+    log:
+        f"{LOGS}/collect_metrics.log",
+    shell:
+        "python3 {SCRIPTS}/collect_metrics.py --logdir {LOGS} --benchdir {BENCH} "
+        "--dbdir {W}/db --build-out {output.build} --screen-out {output.screen} > {log} 2>&1"
+
+
+# Hard-asserts the invariant that makes the timings comparable: loosen, band and
+# the reader-side screen must detect exactly the same genomes.
+rule compare_profiles:
+    input:
+        profiles=ALL_PROFILES,
+        dumps=ALL_SCREEN_DUMPS,
+        plan=f"{W}/sim/plan.tsv",
+    output:
+        agreement=f"{RES}/agreement.tsv",
+        recall=f"{RES}/recall.tsv",
+        stability=f"{RES}/stability.tsv",
+    params:
+        # Arms that are only different storage for the same screen, so any
+        # difference between them is a bug, not a trade-off.
+        equivalent=",".join(config["equivalent_arms"]),
+        reference=config["reference_arm"],
+    log:
+        f"{LOGS}/compare_profiles.log",
+    shell:
+        "python3 {SCRIPTS}/compare_profiles.py --profile-dir {W}/profile "
+        "--screen-dir {W}/screen --plan {input.plan} "
+        "--equivalent {params.equivalent} --reference-arm {params.reference} "
+        "--agreement-out {output.agreement} --recall-out {output.recall} "
+        "--stability-out {output.stability} > {log} 2>&1"
+
+
+rule report:
+    input:
+        build=f"{RES}/build_metrics.tsv",
+        screen=f"{RES}/screen_metrics.tsv",
+        agreement=f"{RES}/agreement.tsv",
+        recall=f"{RES}/recall.tsv",
+        stability=f"{RES}/stability.tsv",
+        screen_kmers=f"{RES}/screen_kmers.tsv",
+        multisample=f"{RES}/multisample_metrics.tsv",
+    output:
+        REPORT,
+    log:
+        f"{LOGS}/report.log",
+    shell:
+        "python3 {SCRIPTS}/report.py --build {input.build} --screen {input.screen} "
+        "--agreement {input.agreement} --recall {input.recall} "
+        "--stability {input.stability} --screen-kmers {input.screen_kmers} "
+        "--multisample {input.multisample} --output {output} > {log} 2>&1"

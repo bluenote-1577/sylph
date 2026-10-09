@@ -1,0 +1,15 @@
+[workspace]
+authors = ["Ben Woodcroft <benjwoodcroft@gmail.com>"]
+channels = ["conda-forge", "bioconda"]
+name = "mixed_screen_c"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+snakemake = "*"
+snakemake-executor-plugin-cluster-generic = "*"
+polars = "*"
+seqkit = "*"
+wgsim = "*"

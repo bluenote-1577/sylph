@@ -1,0 +1,67 @@
+# Smoke-test overrides: the whole pipeline in a couple of minutes on 4 cores.
+#
+#   pixi run snakemake --configfile config_smoke.yaml --cores 4
+#
+# Same rules, same code paths, same assertions (in particular the hard
+# loosen/band/reader equivalence check) -- only the reference subsets, the
+# simulated sample and the resource requests are shrunk. Everything lands under
+# smoke_work/ so a smoke run can never be mistaken for, or overwrite, a real one.
+
+sylph: ../../target/release/sylph
+
+workdir: smoke_work
+resultsdir: smoke_work/results
+report: smoke_work/RESULTS.md
+logdir: smoke_work/logs
+benchdir: smoke_work/benchmarks
+
+gtdb_reps_dir: ~/m/db/gtdb/gtdb_release226/genomic_files_reps/gtdb_genomes_reps_r226/database
+metavr_shards: /scratch/microbiome/woodcrob/non_sensitive/scratch/235_sylph_metavr/shards
+
+# One small real sample (the synthetic methanobacteria mixture, 1.4 MB) so the
+# real-sample code path runs without paying for a 45 M k-mer marine sketch.
+use_samples: [synthetic]
+
+c: 100
+k: 31
+min_spacing: 30
+
+# Two grid points: with and without small genomes mixed in.
+n_gtdb: [5]
+n_metavr: [0, 200]
+metavr_chunks: 2
+
+screen_c: 3000
+min_sparse_kmers: 50
+min_contain: 7
+screen_ani: 85
+
+# `arms` is inherited from config.yaml unchanged: the smoke test is meant to
+# exercise every arm, just on tiny data. (It could not be narrowed here anyway --
+# snakemake merges dicts across config files.)
+equivalent_arms: [loosen, band, reader]
+reference_arm: single
+single_stage_reference: true
+replicates: 1
+
+n_sim_viral: 20
+n_sim_bacterial: 2
+sim_viral_coverages: [0.5, 2.0]
+sim_bacterial_coverage: 0.5
+sim_read_length: 150
+sim_error_rate: 0.005
+seed: 42
+
+# Small N, just to exercise the code path (the largest grid point, g5_v200, by
+# default).
+multisample_n: 3
+multisample_samples: [synthetic]
+
+runtime: 1h
+threads_sketch: 4
+threads_convert: 4
+threads_profile: 4
+mem_mb_sketch: 8000
+mem_mb_convert: 8000
+mem_mb_profile: 8000
+mem_mb_profile_single: 8000

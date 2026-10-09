@@ -1,0 +1,152 @@
+# Configuration for the mixed-screen-c scalability benchmark.
+#
+# See the Snakefile docstring for what this measures and why.
+
+# ------------------------------------------------------------------ binaries
+# The sylph build under test. Must be new enough to have
+# `convert-db-two-screen --small-genome-screen` and `profile
+# --screen-small-genomes`; the Snakefile checks this at parse time rather than
+# silently benchmarking a stale binary.
+sylph: ../../target/release/sylph
+
+# ------------------------------------------------------------------- layout
+# Databases, sketches and simulated reads are large and disposable, so they go
+# to scratch; every report stays next to this Snakefile.
+workdir: /scratch/microbiome/woodcrob/non_sensitive/scratch/236_sylph_mixed_screen_c
+resultsdir: results
+# Where the rendered report goes. The smoke config points this inside
+# smoke_work/ so a smoke run cannot overwrite a real one.
+report: RESULTS.md
+logdir: logs
+benchdir: benchmarks
+
+# -------------------------------------------------------------------- inputs
+# GTDB representative genomes: the large-genome background whose screen the
+# small genomes are not supposed to slow down.
+gtdb_reps_dir: ~/m/db/gtdb/gtdb_release226/genomic_files_reps/gtdb_genomes_reps_r226/database
+
+# MetaVR vOTU representative FASTA shards (mean ~8.8 kb, long tail below 5 kb) --
+# the small-genome regime the whole exercise is about. Produced by
+# ~/m/msingle/mess/235_sylph_metavr; headers are already bare UViG ids.
+metavr_shards: /scratch/microbiome/woodcrob/non_sensitive/scratch/235_sylph_metavr/shards
+
+# Real pre-sketched metagenome samples (c=100, k=31), which is what the
+# per-sample screen cost has to be measured on: a sample sketched at c=100 has
+# *every* k-mer below MAX/100, so a screen loosened to c=100 looks all of them
+# up.
+#
+# `use_samples` selects from the catalogue rather than the catalogue itself being
+# the selection, because snakemake merges dicts from an extra --configfile
+# recursively (so a smaller `sample_sketches` could not remove an entry) but
+# replaces lists outright.
+sample_sketches:
+  human: ~/n/sylph_two_stage_inputs/human.paired.sylsp
+  marine: ~/n/sylph_two_stage_inputs/marine.paired.sylsp
+  synthetic: ~/n/sylph_two_stage_inputs/synthetic.paired.sylsp
+use_samples: [human, marine]
+
+# ------------------------------------------------------- sketching parameters
+# c must match the sample sketches above; 100 is sylph's documented viral
+# recommendation and what the Sandpiper/SingleM2 corpus is sketched at.
+c: 100
+k: 31
+min_spacing: 30
+
+# ------------------------------------------------------- reference size grid
+# The benchmark's independent variable is how many *small* genomes are mixed in
+# with a fixed large-genome background, because that is what decides whether
+# banding (A) or reader-side screening (B) wins. n_gtdb: 0 is the
+# small-genomes-only extreme (all of MetaVR is small); n_metavr: 0 is the
+# no-small-genomes control that shows what an unloosened screen costs.
+n_gtdb: [0, 2000]
+n_metavr: [0, 1000, 10000, 100000]
+
+# Files the MetaVR subset is split across, so `sylph sketch` (which
+# parallelises over input files, not records) can use more than one core.
+metavr_chunks: 8
+
+# --------------------------------------------------------- screen parameters
+screen_c: 3000
+# Stage-1 k-mers each genome must have. A mean-length vOTU gets ~2 at
+# --screen-c 3000, hence the floor -- and hence this benchmark.
+min_sparse_kmers: 50
+min_contain: 7
+screen_ani: 85
+
+# ------------------------------------------------------------------- the arms
+# build_mode          -> convert-db-two-screen --small-genome-screen
+# screen_small_genomes -> profile --screen-small-genomes (0 = off)
+#
+# `loosen` is the incumbent, `band` is option A, `reader` is option B, and
+# `nofloor` is the no-small-genome-handling lower bound: the fastest possible
+# screen and the sensitivity it costs. `single` skips the two-stage screen
+# entirely (plain .syldb, every genome profiled densely), so it defines the
+# detections a perfect screen would pass through.
+arms:
+  loosen:
+    build_mode: loosen
+    screen_small_genomes: 0
+  band:
+    build_mode: band
+    screen_small_genomes: 0
+  reader:
+    build_mode: none
+    screen_small_genomes: 50
+  nofloor:
+    build_mode: none
+    screen_small_genomes: 0
+
+# Arms that are only different storage for the same screen: any disagreement
+# between them is a bug, and `compare_profiles.py` fails the run.
+equivalent_arms: [loosen, band, reader]
+# Arm the recall/agreement numbers are quoted against. `single` (unscreened) is
+# the honest reference; set it to `loosen` to compare the options against the
+# incumbent screen instead.
+reference_arm: single
+
+# Include the (expensive, no-screen) single-stage reference profile.
+single_stage_reference: true
+
+# Timing replicates per (database, arm, sample). Wall-clock on a shared cluster
+# is noisy; the report takes the minimum and reports the spread.
+replicates: 3
+
+# ------------------------------------------- simulated sample (ground truth)
+# The real samples measure cost but give no truth for small genomes. This
+# simulates reads from genomes that are *known* to be in the database, spread
+# over a coverage range, so screen sensitivity can be measured directly (and
+# separately for small vs large genomes). The chosen genomes are the first
+# n_sim_* of each subset, so they are present in every non-empty grid point.
+n_sim_viral: 100
+n_sim_bacterial: 10
+sim_viral_coverages: [0.2, 0.5, 1.0, 2.0, 5.0]
+sim_bacterial_coverage: 0.5
+sim_read_length: 150
+sim_error_rate: 0.005
+seed: 42
+
+# ------------------------------------------ multi-sample amortization
+# Does a one-time per-open cost (band's pooled-index deserialize, reader's
+# dense-block read-back) still matter once amortized over many samples in one
+# `sylph profile` process, rather than one process per sample? 0 disables.
+# Reuses the same sketch `multisample_n` times via `-l`, at the largest grid
+# point (override with `multisample_grid: [[2000, 100000]]`, say).
+multisample_n: 100
+multisample_samples: [human, marine]
+
+# ------------------------------------------------------------- resources
+# Sized for aqua (`snakemake --profile aqua`); the smoke test overrides these
+# down to fit one small node.
+# Walltime requested per cluster job. Every rule here is minutes of work; a
+# long request only makes PBS refuse to start it before a maintenance window.
+runtime: 2h
+threads_sketch: 8
+threads_convert: 8
+threads_profile: 8
+mem_mb_sketch: 32000
+mem_mb_convert: 32000
+mem_mb_profile: 32000
+# The unscreened arm loads every genome's dense k-mers up front, which is the
+# whole reason the two-stage format exists -- but at this grid's size it is still
+# only a few GB.
+mem_mb_profile_single: 32000
