@@ -1,0 +1,11 @@
+.pixi/
+.snakemake/
+# Smoke-test scratch: regenerated in a minute, and never a real measurement.
+smoke_work/
+# Raw per-run material: the sylph --debug logs (~10 MB per grid) and snakemake's
+# one-file-per-job benchmark TSVs (~300 files). Everything either is used for is
+# already folded into results/*.tsv and RESULTS.md, which are kept.
+logs/
+logs_full/
+benchmarks/
+benchmarks_full/

@@ -95,6 +95,15 @@ pub struct Syl2DbInspect{
     pub c: usize,
     pub k: usize,
     pub screen_c: usize,
+    /// Densest stage-1 rate anything in the database is screened at: equal to
+    /// `screen_c` unless small genomes forced a denser one (`loosen` collapses
+    /// `screen_c` itself; `band` keeps `screen_c` nominal and reports the denser
+    /// rate only here).
+    pub effective_screen_c: usize,
+    /// Distinct band-1 keys, and genomes owning them: 0 unless the database was
+    /// built with `--small-genome-screen band`.
+    pub band_keys: usize,
+    pub band_genomes: usize,
     pub num_genomes: usize,
     pub genomes: Vec<Syl2DbGenomeInspect>,
 }
@@ -267,7 +276,7 @@ fn get_syl2db_inspect(
                 gn_size: meta.gn_size,
                 min_spacing: meta.min_spacing,
                 has_pseudotax: meta.has_pseudotax,
-                screen_kmers_num: db.screen_index.sparse_count[g as usize] as usize,
+                screen_kmers_num: db.screen_index.screen_kmers(g) as usize,
             }
         })
         .collect();
@@ -283,6 +292,9 @@ fn get_syl2db_inspect(
         c: db.c,
         k: db.k,
         screen_c: db.screen_c,
+        effective_screen_c: db.effective_screen_c(),
+        band_keys: db.screen_index.band.as_ref().map_or(0, |b| b.num_keys()),
+        band_genomes: db.screen_index.band.as_ref().map_or(0, |b| b.num_genomes()),
         num_genomes: db.len(),
         genomes,
     }

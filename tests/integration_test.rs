@@ -807,6 +807,95 @@ fn test_two_stage_mixed_sources(){
         "mixed .syl2db + .syldb profile detected a different genome set than a combined single-stage database");
 }
 
+/// The three `--small-genome-screen` modes are different *storage* for the same
+/// screen, so they must profile identically: `loosen` (widen the pooled index),
+/// `band` (extra keys in a separate value band) and `none` + reader-side
+/// `--screen-small-genomes`. A deliberately coarse `--screen-c` with a high
+/// `--min-sparse-kmers` puts even these multi-Mbp genomes below the floor, which
+/// is what makes them exercise the mixed-rate paths.
+#[serial]
+#[test]
+fn test_two_stage_small_genome_screen_modes_agree(){
+    fresh();
+    let dir = "./tests/results/two_stage_screen_modes";
+    let _ = fs::remove_dir_all(dir);
+    fs::create_dir_all(dir).unwrap();
+
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    cmd.arg("sketch").arg("-c").arg("50")
+        .arg("./test_files/e.coli-o157.fasta.gz")
+        .arg("./test_files/e.coli-K12.fasta.gz")
+        .arg("./test_files/e.coli-EC590.fasta.gz")
+        .arg("-o").arg(format!("{}/db", dir))
+        .assert().success().code(0);
+    let mut cmd = Command::cargo_bin("sylph").unwrap();
+    cmd.arg("sketch").arg("-c").arg("50")
+        .arg("./test_files/o157_reads.fastq.gz")
+        .arg("-d").arg(dir)
+        .assert().success().code(0);
+    let sample = format!("{}/o157_reads.fastq.gz.sylsp", dir);
+
+    let floor = "4000";
+    let convert = |mode: &str| -> String {
+        let out = format!("{}/db_{}", dir, mode);
+        let mut cmd = Command::cargo_bin("sylph").unwrap();
+        cmd.arg("convert-db-two-screen").arg(format!("{}/db.syldb", dir))
+            .arg("--screen-c").arg("20000")
+            .arg("--min-sparse-kmers").arg(floor)
+            .arg("--small-genome-screen").arg(mode)
+            .arg("-o").arg(&out)
+            .assert().success().code(0);
+        format!("{}.syl2db", out)
+    };
+    let (loosen_db, band_db, none_db) = (convert("loosen"), convert("band"), convert("none"));
+
+    // Not applying the floor must leave the file smaller (no extra keys at all),
+    // and banding must not cost more than loosening the whole index.
+    let size = |p: &str| fs::metadata(p).unwrap().len();
+    assert!(size(&none_db) < size(&band_db), "the floor must add keys somewhere");
+    assert!(size(&band_db) <= size(&loosen_db),
+        "banding the extra keys should not cost more than widening the pooled index");
+
+    // Each profile also dumps its stage-1 survivors: the three modes store the
+    // same screen k-mer set, so that dump must be identical, not merely lead to
+    // the same profile.
+    let profile = |db: &str, tag: &str, extra: &[&str]| -> (String, String) {
+        let dump = format!("{}/screen_{}.tsv", dir, tag);
+        let mut cmd = Command::cargo_bin("sylph").unwrap();
+        let out = cmd.arg("profile").arg(db).arg(&sample).args(extra)
+            .arg("--screen-dump").arg(&dump)
+            .output().expect("Output failed");
+        assert!(out.status.success());
+        (
+            str::from_utf8(&out.stdout).expect("not UTF-8").to_string(),
+            fs::read_to_string(&dump).unwrap(),
+        )
+    };
+    let (loosen, loosen_screen) = profile(&loosen_db, "loosen", &[]);
+    assert!(loosen.contains("e.coli-o157.fasta.gz"));
+    assert!(
+        loosen_screen.starts_with("Genome_id\tGenome_file\tContig_name\t")
+            && loosen_screen.lines().count() > 1,
+        "expected a screen dump with identifiable rows, got: {}",
+        loosen_screen
+    );
+    let (band, band_screen) = profile(&band_db, "band", &[]);
+    assert_eq!(band, loosen, "band mode profiled differently from loosen mode");
+    assert_eq!(band_screen, loosen_screen, "band mode passed different stage-1 survivors");
+    let (reader, reader_screen) = profile(&none_db, "reader", &["--screen-small-genomes", floor]);
+    assert_eq!(reader, loosen,
+        "reader-side small-genome screening profiled differently from loosen mode");
+    assert_eq!(reader_screen, loosen_screen,
+        "reader-side small-genome screening passed different stage-1 survivors");
+    // Enabling the reader-side screen on an already-densified database must also
+    // be a no-op rather than double-counting.
+    let (both, both_screen) = profile(&loosen_db, "loosen_reader", &["--screen-small-genomes", floor]);
+    assert_eq!(both, loosen,
+        "reader-side screening changed a database that was already densified at build time");
+    assert_eq!(both_screen, loosen_screen,
+        "reader-side screening changed the survivors of an already-densified database");
+}
+
 /// A genome with very few total dense k-mers (a short contig/virus) must
 /// trigger the convert-db-two-screen warning, and the resulting .syl2db must still be
 /// valid and profile the other (normal-sized) genomes correctly.
@@ -844,8 +933,8 @@ fn test_two_stage_small_genome_warning(){
     assert!(convert.status.success());
     let stderr = str::from_utf8(&convert.stderr).expect("not UTF-8").to_string();
     assert!(
-        stderr.contains("tiny_virus") && stderr.contains("total dense k-mers"),
-        "expected a small-genome warning mentioning tiny_virus and its dense k-mer count, got: {}",
+        stderr.contains("tiny_virus") && stderr.contains("stage-1 screen k-mers"),
+        "expected a small-genome warning mentioning tiny_virus and its screen k-mer count, got: {}",
         stderr
     );
 

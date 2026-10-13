@@ -123,6 +123,10 @@ fn minimum_ani_fraction(args: &ContainArgs) -> f64 {
     }
 }
 
+/// One `--screen-dump` row: genome id, source file, contig name, matched and
+/// total screen k-mers, naive and adjusted ANI, median coverage.
+type ScreenDumpRow = (usize, String, String, usize, usize, f64, f64, f64);
+
 /// Two-stage stage 1 + 2 against one `.syl2db`: screen `sequence_sketch`
 /// against the database's pooled `screen_index` (a single inverted pass over
 /// the sample at the sparse, per-database `screen_c`), then decode and return
@@ -134,6 +138,7 @@ fn compute_dense_survivors(
     db: &TwoStageDb,
     sequence_sketch: &SequencesSketch,
 ) -> Vec<GenomeSketch> {
+    let start = std::time::Instant::now();
     let screen_index = &db.screen_index;
     // Stage 1: cheap, permissive screen (query-like settings, no CIs).
     let mut screen_args = args.clone();
@@ -147,31 +152,32 @@ fn compute_dense_survivors(
     // plasmids, short contigs) that single-stage profiling would report. Scale
     // the floor to the screen resolution so a genome that could clear the dense
     // floor also clears the screen; genomes truly below the floor are still
-    // rejected at the dense stage. `db.screen_c` is the *stored* (possibly
-    // adaptively-densified, see `write_two_stage_db`) rate, so this scaling
-    // automatically becomes less aggressive too when a small genome forced a
-    // denser effective rate. `--min-contain` is deliberately deferred to the
-    // decoded dense sketch below: applying an absolute dense evidence floor to
-    // this much sparser screen could discard a valid dense candidate.
-    screen_args.min_number_kmers = args.min_number_kmers * db.c as f64 / db.screen_c as f64;
+    // rejected at the dense stage. `effective_screen_c` is the *densest* rate
+    // anything in this database is screened at (see `write_two_stage_db`'s floor
+    // and `--screen-small-genomes`), so this scaling automatically becomes less
+    // aggressive when a small genome forced a denser rate. `--min-contain` is
+    // deliberately deferred to the decoded dense sketch below: applying an
+    // absolute dense evidence floor to this much sparser screen could discard a
+    // valid dense candidate.
+    let effective_screen_c = db.effective_screen_c();
+    screen_args.min_number_kmers = args.min_number_kmers * db.c as f64 / effective_screen_c as f64;
 
     // Stage 1 = "Path B": one inverted pass over the sample produces, per genome,
     // the same matched-coverage multiset the per-genome `get_stats` loop would
     // collect; feeding it to the same `finalize_stats` + `min_number_kmers`
     // checks reproduces the survivor set exactly, in O(sample) rather than
     // O(reference) work. (See experiments/7_mphf_screen_again.)
-    let hits: Vec<(u32, Vec<u32>)> = screen_index
-        .gather_hits(sequence_sketch)
-        .into_iter()
-        .collect();
-    // Optional per-survivor dump: (genome, matched k-mers, total screen k-mers,
-    // naive ANI, adjusted ANI, median coverage).
-    let dump: Mutex<Vec<(String, usize, usize, f64, f64, f64)>> = Mutex::new(vec![]);
+    let hits: Vec<(u32, Vec<u32>)> = db.screen(sequence_sketch).into_iter().collect();
+    let gather_s = start.elapsed().as_secs_f64();
+    // Optional per-survivor dump. The genome id and contig name are what make a
+    // row identifiable: a database built from multi-record FASTA (a viral vOTU
+    // set, say) has one source file for millions of genomes.
+    let dump: Mutex<Vec<ScreenDumpRow>> = Mutex::new(vec![]);
     let mut survivors: Vec<usize> = hits
         .into_par_iter()
         .filter_map(|(g, covs)| {
             let g = g as usize;
-            let n_kmers = screen_index.sparse_count[g] as usize;
+            let n_kmers = db.screen_kmers(g as u32) as usize;
             // Mirror get_stats: reject genomes below the (scaled) k-mer floor.
             if (n_kmers as f64) < screen_args.min_number_kmers {
                 return None;
@@ -181,7 +187,9 @@ fn compute_dense_survivors(
             let fin = finalize_stats(&screen_args, db.k, n_kmers, contain_count, covs, None)?;
             if args.screen_dump.is_some() {
                 dump.lock().unwrap().push((
+                    g,
                     db.genome_file_name(g as u32).to_string(),
+                    db.genome_first_contig_name(g as u32).to_string(),
                     contain_count,
                     n_kmers,
                     fin.naive_ani * 100.,
@@ -193,15 +201,26 @@ fn compute_dense_survivors(
         })
         .collect();
     survivors.sort_unstable();
+    let stage1_s = start.elapsed().as_secs_f64();
     log::info!(
         "{}: stage-1 screen (c={}, min-ANI {}) kept {} / {} candidate genomes",
-        sequence_sketch.file_name, db.screen_c, args.screen_ani, survivors.len(), screen_index.num_genomes()
+        sequence_sketch.file_name, effective_screen_c, args.screen_ani, survivors.len(), screen_index.num_genomes()
     );
     if let Some(path) = &args.screen_dump {
         let mut f = BufWriter::new(File::create(path).expect("could not create --screen-dump file"));
-        writeln!(f, "Genome_file\tscreen_matched_kmers\tscreen_total_kmers\tnaive_ani\tscreen_adjusted_ani\tscreen_median_cov").unwrap();
-        for (g, m, t, na, ea, mc) in dump.into_inner().unwrap() {
-            writeln!(f, "{}\t{}\t{}\t{:.3}\t{:.3}\t{}", g, m, t, na, ea, mc).unwrap();
+        writeln!(f, "Genome_id\tGenome_file\tContig_name\tscreen_matched_kmers\tscreen_total_kmers\tnaive_ani\tscreen_adjusted_ani\tscreen_median_cov").unwrap();
+        // Sorted, so two runs' dumps are directly comparable: the survivor set is
+        // the stage-1 output, and the parallel filter above collects it in
+        // whatever order threads finish.
+        let mut rows = dump.into_inner().unwrap();
+        rows.sort_unstable_by_key(|r| r.0);
+        for (g, file, contig, m, t, na, ea, mc) in rows {
+            writeln!(
+                f,
+                "{}\t{}\t{}\t{}\t{}\t{:.3}\t{:.3}\t{}",
+                g, file, contig, m, t, na, ea, mc
+            )
+            .unwrap();
         }
         log::info!("Wrote stage-1 screen dump to {}", path);
     }
@@ -227,6 +246,26 @@ fn compute_dense_survivors(
     log::info!(
         "{}: stage-2 dense profiling (c={}) against {} genomes",
         sequence_sketch.file_name, db.c, dense.len()
+    );
+    // One machine-readable line per (sample, database) for benchmark harnesses
+    // (debug-level: the format is for parsers, not for people). `gather` is the
+    // inverted pass over the sample plus (if enabled) the reader-side
+    // small-genome intersection; `stage1` adds the per-survivor ANI
+    // finalisation; `stage2` is the dense decode + pass-1 profiling.
+    log::debug!(
+        "bench_screen sample={} db={} sample_kmers={} screen_c={} effective_screen_c={} \
+         gather_s={:.4} stage1_s={:.4} survivors={} stage2_s={:.4} dense_kept={} genomes={}",
+        sequence_sketch.file_name,
+        db.path,
+        sequence_sketch.kmer_counts.len(),
+        db.screen_c,
+        effective_screen_c,
+        gather_s,
+        stage1_s,
+        survivors.len(),
+        start.elapsed().as_secs_f64() - stage1_s,
+        dense.len(),
+        db.len(),
     );
     dense
 }
@@ -357,8 +396,40 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
     // plain genomes before profiling/reassignment.
     let two_stage_dbs: Vec<TwoStageDb> = two_stage_db_files.iter().map(|f| {
         log::info!("Opening two-stage database {} (loading stage-1 sparse index)...", f);
-        crate::twostage_db::open_file(f)
-            .unwrap_or_else(|e| panic!("{} is not a valid two-stage database: {}", f, e))
+        let open_start = std::time::Instant::now();
+        let mut db = crate::twostage_db::open_file(f)
+            .unwrap_or_else(|e| panic!("{} is not a valid two-stage database: {}", f, e));
+        let index_s = open_start.elapsed().as_secs_f64();
+        // Reader-side small-genome screen: only touches genomes the *stored*
+        // index left short, and reconstructs exactly the set a densified build
+        // would have stored, so it changes nothing on a database already built
+        // with --small-genome-screen loosen/band and composes safely with either.
+        if args.screen_small_genomes > 0 {
+            db.enable_small_genome_screen(args.screen_small_genomes)
+                .unwrap_or_else(|e| panic!("Could not read back dense blocks of small genomes in {}: {}", f, e));
+            let s = db.small_screen.as_ref().unwrap();
+            log::info!(
+                "{}: screening {} genome(s) with < {} stored stage-1 k-mers directly, from {} \
+                 k-mers read back out of their dense blocks",
+                f, s.num_genomes(), args.screen_small_genomes, s.num_kmers()
+            );
+        }
+        let small = db.small_screen.as_ref();
+        log::debug!(
+            "bench_open db={} genomes={} screen_c={} effective_screen_c={} band_keys={} \
+             band_owners={} small_genomes={} small_kmers={} index_s={:.4} open_s={:.4}",
+            f,
+            db.len(),
+            db.screen_c,
+            db.effective_screen_c(),
+            db.screen_index.band.as_ref().map_or(0, |b| b.num_keys()),
+            db.screen_index.band.as_ref().map_or(0, |b| b.num_owners()),
+            small.map_or(0, |s| s.num_genomes()),
+            small.map_or(0, |s| s.num_kmers()),
+            index_s,
+            open_start.elapsed().as_secs_f64(),
+        );
+        db
     }).collect();
     for db in &two_stage_dbs {
         if db.is_empty() {
@@ -486,7 +557,12 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
                 }
                 else{
                     kmer_id_opt = get_kmer_identity(&sequence_sketch, args.estimate_unknown);
-                    log::debug!("{} has estimated identity {:.3}.", &first_read_file, kmer_id_opt.unwrap().powf(1./sequence_sketch.k as f64) * 100.);
+                    // None unless -u/--estimate-unknown was given, in which case
+                    // there is no identity to report. Unwrapping it here aborted
+                    // every `--debug` run without `-u`.
+                    if let Some(kmer_id) = kmer_id_opt{
+                        log::debug!("{} has estimated identity {:.3}.", &first_read_file, kmer_id.powf(1./sequence_sketch.k as f64) * 100.);
+                    }
                 }
 
                 // Screen each two-stage database, then union its survivors with
