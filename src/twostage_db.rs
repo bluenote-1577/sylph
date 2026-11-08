@@ -546,15 +546,19 @@ const SPARSE_WARN_THRESHOLD: usize = 20;
 /// callers must enforce this (see `run_db_convert`'s validation), since 0
 /// would let a genome's sparse set end up empty, making it silently invisible
 /// to the stage-1 screen forever.
-pub fn write_two_stage_db<W: Write>(
+///
+/// Generic over the sketch container so callers holding shared sketches
+/// (`&[Arc<GenomeSketch>]`) can write without cloning; `&[GenomeSketch]` works
+/// unchanged.
+pub fn write_two_stage_db<W: Write, S: std::borrow::Borrow<GenomeSketch>>(
     mut w: W,
-    sketches: &[GenomeSketch],
+    sketches: &[S],
     screen_c: usize,
     min_sparse_kmers: usize,
     min_contain: usize,
 ) -> io::Result<()> {
-    let c = sketches.first().map(|s| s.c).unwrap_or(0);
-    let k = sketches.first().map(|s| s.k).unwrap_or(0);
+    let c = sketches.first().map(|s| s.borrow().c).unwrap_or(0);
+    let k = sketches.first().map(|s| s.borrow().k).unwrap_or(0);
     // FracMinHash threshold for the nominal sparse subsample (same rule as
     // subsample_view), and for this database's own dense rate -- every dense
     // k-mer already satisfies `h < dense_thresh` by construction, so it is a
@@ -571,6 +575,7 @@ pub fn write_two_stage_db<W: Write>(
     let mut thresh_needed: u64 = 0;
 
     for gs in sketches {
+        let gs: &GenomeSketch = gs.borrow();
         let dense_total = gs.genome_kmers.len();
         if dense_total < min_contain {
             warn!(
@@ -812,10 +817,27 @@ fn from_bytes(data: DenseData) -> io::Result<TwoStageDb> {
 pub fn open<R: Read>(mut r: R) -> io::Result<TwoStageDb> {
     let mut v = Vec::new();
     r.read_to_end(&mut v)?;
-    from_bytes(DenseData::Owned(v))
+    from_vec(v)
+}
+
+/// Open an in-memory `.syl2db`, taking ownership of its serialized bytes
+/// (no copy). The bytes stay available via [`TwoStageDb::as_bytes`].
+pub fn from_vec(bytes: Vec<u8>) -> io::Result<TwoStageDb> {
+    from_bytes(DenseData::Owned(bytes))
 }
 
 impl TwoStageDb {
+    /// The full serialized database (exactly what `write_two_stage_db` wrote)
+    /// for in-memory databases opened via [`open`] or [`from_vec`]; `None` for
+    /// file-backed databases opened via [`open_file`], whose dense blocks are
+    /// read from disk on demand.
+    pub fn as_bytes(&self) -> Option<&[u8]> {
+        match &self.data {
+            DenseData::Owned(v) => Some(&v[..]),
+            DenseData::File(_) => None,
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.genomes.len()
     }
@@ -1339,5 +1361,51 @@ mod tests {
         let sample_out = sample_from(&[(kmers[50], 3)]);
         let hits_out = db.screen_index.gather_hits(&sample_out);
         assert!(hits_out.get(&0).is_none(), "51st-smallest k-mer should not have been kept");
+    }
+
+    fn two_genomes() -> Vec<GenomeSketch> {
+        vec![
+            gsketch("g0.fa", (1..=120u64).collect(), Some(vec![100, 200, 300])),
+            gsketch("g1.fa", (200..=330u64).collect(), Some(vec![])),
+        ]
+    }
+
+    #[test]
+    fn from_vec_as_bytes_roundtrip() {
+        let sketches = two_genomes();
+        let mut buf = Vec::new();
+        write_two_stage_db(&mut buf, &sketches, 200, SPARSE_TARGET_MIN_DEFAULT, 0).unwrap();
+        let expected = buf.clone();
+        let db = from_vec(buf).unwrap();
+        assert_eq!(db.len(), 2);
+        assert_eq!(db.as_bytes(), Some(&expected[..]));
+        assert_eq!(db.decode_dense(1).unwrap().genome_kmers, sketches[1].genome_kmers);
+
+        let db = open(std::io::Cursor::new(expected.clone())).unwrap();
+        assert_eq!(db.as_bytes(), Some(&expected[..]));
+    }
+
+    #[test]
+    fn write_two_stage_db_accepts_arc_sketches() {
+        let sketches = two_genomes();
+        let arcs: Vec<Arc<GenomeSketch>> = sketches.iter().cloned().map(Arc::new).collect();
+        let mut a = Vec::new();
+        let mut b = Vec::new();
+        write_two_stage_db(&mut a, &sketches, 200, SPARSE_TARGET_MIN_DEFAULT, 0).unwrap();
+        write_two_stage_db(&mut b, &arcs, 200, SPARSE_TARGET_MIN_DEFAULT, 0).unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn open_file_has_no_as_bytes() {
+        let mut buf = Vec::new();
+        write_two_stage_db(&mut buf, &two_genomes(), 200, SPARSE_TARGET_MIN_DEFAULT, 0).unwrap();
+        let path = std::env::temp_dir().join(format!("sylph_as_bytes_test_{}.syl2db", std::process::id()));
+        std::fs::write(&path, &buf).unwrap();
+        let db = open_file(path.to_str().unwrap());
+        std::fs::remove_file(&path).ok();
+        let db = db.unwrap();
+        assert_eq!(db.len(), 2);
+        assert!(db.as_bytes().is_none());
     }
 }

@@ -113,7 +113,7 @@ fn get_chunks(indices: &Vec<usize>, steps: usize) -> Vec<Vec<usize>>{
     return_chunks
 }
 
-fn minimum_ani_fraction(args: &ContainArgs) -> f64 {
+pub fn minimum_ani_fraction(args: &ContainArgs) -> f64 {
     if let Some(minimum_ani) = args.minimum_ani {
         minimum_ani / 100.0
     } else if args.pseudotax {
@@ -129,7 +129,7 @@ fn minimum_ani_fraction(args: &ContainArgs) -> f64 {
 /// *dense* sketches for only the genomes that pass. The returned set is one
 /// database's contribution to the combined active-genome list the (expensive)
 /// dense profiling pass runs against.
-fn compute_dense_survivors(
+pub fn compute_dense_survivors(
     args: &ContainArgs,
     db: &TwoStageDb,
     sequence_sketch: &SequencesSketch,
@@ -573,7 +573,7 @@ pub fn contain(mut args: ContainArgs, pseudotax_in: bool) {
     log::info!("sylph finished.");
 }
 
-fn derep_if_reassign_threshold<'a>(results_old: &Vec<AniResult>, results_new: Vec<AniResult<'a>>, ani_thresh: f64, k: usize) -> Vec<AniResult<'a>>{
+pub fn derep_if_reassign_threshold<'a>(results_old: &Vec<AniResult>, results_new: Vec<AniResult<'a>>, ani_thresh: f64, k: usize) -> Vec<AniResult<'a>>{
     let ani_thresh = ani_thresh/100.;
 
     let mut gn_sketch_to_contain = FxHashMap::default();
@@ -597,7 +597,7 @@ fn derep_if_reassign_threshold<'a>(results_old: &Vec<AniResult>, results_new: Ve
     return return_vec;
 }
 
-fn estimate_true_cov(results: &mut Vec<AniResult>, kmer_id_opt: Option<f64>, 
+pub fn estimate_true_cov(results: &mut Vec<AniResult>, kmer_id_opt: Option<f64>, 
                      estimate_unknown: bool, read_length: f64, k: usize){
     let mut multiplier = 1.;
     if estimate_unknown{
@@ -611,7 +611,7 @@ fn estimate_true_cov(results: &mut Vec<AniResult>, kmer_id_opt: Option<f64>,
     }
 }
 
-fn estimate_covered_bases(results: &Vec<AniResult>, sequence_sketch: &SequencesSketch, read_length: f64, k: usize) -> f64{
+pub fn estimate_covered_bases(results: &Vec<AniResult>, sequence_sketch: &SequencesSketch, read_length: f64, k: usize) -> f64{
     let multiplier = read_length / (read_length - (k as f64) + 1.);
 
     let mut num_covered_bases = 0.;
@@ -630,7 +630,7 @@ fn estimate_covered_bases(results: &Vec<AniResult>, sequence_sketch: &SequencesS
     return f64::min(num_covered_bases as f64 / num_tentative_bases, 1.);
 }
 
-fn winner_table<'a>(results : &'a Vec<AniResult>, log_reassign: bool) -> FxHashMap<Kmer, (f64,&'a GenomeSketch, bool)> {
+pub fn winner_table<'a>(results : &'a Vec<AniResult>, log_reassign: bool) -> FxHashMap<Kmer, (f64,&'a GenomeSketch, bool)> {
     let mut kmer_to_genome_map : FxHashMap<_,_> = FxHashMap::default();
     for res in results.iter(){
         //let gn_sketch = &genome_sketches[res.genome_sketch_index];
@@ -839,7 +839,7 @@ fn get_seq_sketch(
     }
 }
 
-fn get_stats<'a>(
+pub fn get_stats<'a>(
     args: &ContainArgs,
     genome_sketch: &'a GenomeSketch,
     sequence_sketch: &SequencesSketch,
@@ -946,15 +946,15 @@ fn get_stats<'a>(
 }
 
 /// Scalar outputs of the coverage-correction + ANI estimation.
-struct Finalized {
-    naive_ani: f64,
-    final_est_ani: f64,
-    final_est_cov: f64,
-    median_cov: f64,
-    mean_cov: f64,
-    lambda: AdjustStatus,
-    ani_ci: (Option<f64>, Option<f64>),
-    lambda_ci: (Option<f64>, Option<f64>),
+pub struct Finalized {
+    pub naive_ani: f64,
+    pub final_est_ani: f64,
+    pub final_est_cov: f64,
+    pub median_cov: f64,
+    pub mean_cov: f64,
+    pub lambda: AdjustStatus,
+    pub ani_ci: (Option<f64>, Option<f64>),
+    pub lambda_ci: (Option<f64>, Option<f64>),
 }
 
 /// Coverage-correction + ANI math shared by `get_stats` (materialized genome)
@@ -962,7 +962,7 @@ struct Finalized {
 /// Consumes the matched coverage counts `covs` and the genome k-mer count
 /// `n_kmers`; applies the minimum-ANI gate (returns None below it). When
 /// `reassign_log` is set, logs a drop during pseudotax reassignment.
-fn finalize_stats(
+pub fn finalize_stats(
     args: &ContainArgs,
     k: usize,
     n_kmers: usize,
@@ -1081,7 +1081,7 @@ fn finalize_stats(
 }
 
 
-fn ani_from_lambda(lambda: Option<f64>, _mean: f64, k: f64, full_cov: &[u32]) -> Option<f64> {
+pub fn ani_from_lambda(lambda: Option<f64>, _mean: f64, k: f64, full_cov: &[u32]) -> Option<f64> {
     if lambda.is_none() {
         return None;
     }
@@ -1113,7 +1113,7 @@ fn ani_from_lambda(lambda: Option<f64>, _mean: f64, k: f64, full_cov: &[u32]) ->
     return ret_ani;
 }
 
-fn bootstrap_interval(
+pub fn bootstrap_interval(
     covs_full: &Vec<u32>,
     k: f64,
     args: &ContainArgs,
@@ -1167,7 +1167,7 @@ fn bootstrap_interval(
 }
 
 
-fn get_kmer_identity(seq_sketch: &SequencesSketch, estimate_unknown: bool) -> Option<f64>{
+pub fn get_kmer_identity(seq_sketch: &SequencesSketch, estimate_unknown: bool) -> Option<f64>{
 
     if !estimate_unknown{
         return None

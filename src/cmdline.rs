@@ -232,6 +232,27 @@ pub struct ContainArgs {
 
 }
 
+/// Parser wrapper used only to materialize `ContainArgs`'s CLI defaults without
+/// going through the top-level `Cli` (which requires choosing a subcommand).
+#[derive(Parser)]
+struct ContainDefaults {
+    #[clap(flatten)]
+    contain: ContainArgs,
+}
+
+impl ContainArgs {
+    /// Build a `ContainArgs` with every field set to its command-line default.
+    ///
+    /// `pseudotax` selects the mode defaults the CLI would apply:
+    /// `true` for `sylph profile`, `false` for `sylph query` (see `main.rs`).
+    /// Parsing goes through clap, so this stays in sync with the options above.
+    pub fn from_cli_defaults(pseudotax: bool) -> Self {
+        let mut args = ContainDefaults::parse_from(["sylph"]).contain;
+        args.pseudotax = pseudotax;
+        args
+    }
+}
+
 #[derive(Args)]
 pub struct InspectArgs {
     #[clap(multiple=true, help = "Pre-sketched *.syldb/*.sylsp files.")]
@@ -241,3 +262,71 @@ pub struct InspectArgs {
 
 }
     
+
+#[cfg(test)]
+mod contain_defaults_tests {
+    use super::*;
+    use crate::contain::minimum_ani_fraction;
+
+    fn parse_mode(subcommand: &str) -> ContainArgs {
+        let cli = Cli::try_parse_from(["sylph", subcommand, "database.syldb", "sample.sylsp"])
+            .unwrap();
+        match cli.mode {
+            Mode::Profile(mut args) => {
+                args.pseudotax = true;
+                args
+            }
+            Mode::Query(args) => args,
+            _ => panic!("expected profile or query arguments"),
+        }
+    }
+
+    #[test]
+    fn from_cli_defaults_has_expected_values() {
+        let args = ContainArgs::from_cli_defaults(true);
+
+        assert_eq!(args.min_number_kmers, 10.0);
+        assert_eq!(args.min_contain, 7);
+        assert_eq!(args.c, 200);
+        assert_eq!(args.k, 31);
+        assert_eq!(args.threads, 3);
+        assert_eq!(args.min_count_correct, 3.0);
+        assert_eq!(args.redundant_ani, 99.0);
+        assert_eq!(args.screen_ani, 85.0);
+        assert_eq!(args.min_spacing_kmer, 30);
+        assert_eq!(args.minimum_ani, None);
+        assert!(args.files.is_empty());
+        assert!(args.databases.is_empty());
+        assert!(args.reads.is_empty());
+        assert!(!args.individual);
+        assert!(!args.estimate_unknown);
+        assert!(!args.no_ci);
+        assert!(!args.ratio && !args.mme && !args.mle && !args.nb);
+        assert_eq!(args.out_file_name, None);
+    }
+
+    #[test]
+    fn from_cli_defaults_matches_cli_parse_for_both_modes() {
+        for (subcommand, pseudotax) in [("profile", true), ("query", false)] {
+            let cli = parse_mode(subcommand);
+            let args = ContainArgs::from_cli_defaults(pseudotax);
+
+            assert_eq!(args.min_number_kmers, cli.min_number_kmers);
+            assert_eq!(args.min_contain, cli.min_contain);
+            assert_eq!(args.c, cli.c);
+            assert_eq!(args.k, cli.k);
+            assert_eq!(args.min_count_correct, cli.min_count_correct);
+            assert_eq!(args.minimum_ani, cli.minimum_ani);
+            assert_eq!(args.threads, cli.threads);
+            assert_eq!(args.pseudotax, cli.pseudotax);
+            assert_eq!(args.screen_ani, cli.screen_ani);
+            assert_eq!(args.redundant_ani, cli.redundant_ani);
+        }
+    }
+
+    #[test]
+    fn from_cli_defaults_mode_sets_minimum_ani_fraction() {
+        assert_eq!(minimum_ani_fraction(&ContainArgs::from_cli_defaults(true)), 0.95);
+        assert_eq!(minimum_ani_fraction(&ContainArgs::from_cli_defaults(false)), 0.9);
+    }
+}

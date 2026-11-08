@@ -23,7 +23,7 @@ use std::io::BufWriter;
 use std::io::{prelude::*, BufReader};
 use std::path::Path;
 use std::sync::Mutex;
-pub(crate) type Marker = u32;
+pub type Marker = u32;
 
 pub fn check_vram_and_block(max_ram: usize, file: &str) {
     if let Some(usage) = memory_stats() {
@@ -662,7 +662,7 @@ pub fn sketch_genome(
 }
 
 #[inline]
-pub(crate) fn pair_kmer_single(s1: &[u8]) -> Option<([Marker; 2], [Marker; 2])> {
+pub fn pair_kmer_single(s1: &[u8]) -> Option<([Marker; 2], [Marker; 2])> {
     let k = std::mem::size_of::<Marker>() * 4;
     if s1.len() < 4 * k + 2 {
         return None;
@@ -696,7 +696,7 @@ pub(crate) fn pair_kmer_single(s1: &[u8]) -> Option<([Marker; 2], [Marker; 2])> 
 }
 
 #[inline]
-pub(crate) fn pair_kmer(s1: &[u8], s2: &[u8]) -> Option<([Marker; 2], [Marker; 2])> {
+pub fn pair_kmer(s1: &[u8], s2: &[u8]) -> Option<([Marker; 2], [Marker; 2])> {
     let k = std::mem::size_of::<Marker>() * 4;
     if s1.len() < 2 * k + 1 || s2.len() < 2 * k + 1 {
         return None;
@@ -727,7 +727,7 @@ pub(crate) fn pair_kmer(s1: &[u8], s2: &[u8]) -> Option<([Marker; 2], [Marker; 2
     }
 }
 
-pub(crate) fn dup_removal_lsh_full_exact(
+pub fn dup_removal_lsh_full_exact(
     kmer_counts: &mut FxHashMap<Kmer, u32>,
     kmer_to_pair_set: &mut FxHashSet<(u64, [Marker; 2])>,
     //kmer_to_pair_set: &mut ScalableCuckooFilter<(u64,[Marker;2]), FxHasher>,
@@ -770,7 +770,7 @@ pub(crate) fn dup_removal_lsh_full_exact(
     *c += 1;
 }
 
-pub(crate) fn dup_removal_lsh_full<R: rand::Rng>(
+pub fn dup_removal_lsh_full<R: rand::Rng>(
     kmer_counts: &mut FxHashMap<Kmer, u32>,
     //kmer_to_pair_set: &mut FxHashSet<(u64,[Marker;2])>,
     kmer_to_pair_set: &mut ScalableCuckooFilter<(u64, [Marker; 2]), FxHasher, R>,
